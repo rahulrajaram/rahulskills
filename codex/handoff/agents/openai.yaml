@@ -1,0 +1,4 @@
+interface:
+  display_name: "Handoff"
+  short_description: "Commit changes, sync plan docs, and generate next-shell prompt."
+  default_prompt: "Run /handoff: commit all current changes, update IMPLEMENTATION_PLAN.md and PROMPT.md if present, and produce a detailed next-shell continuation prompt with completed work and next tasks."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Python Package Severe"
+  short_description: "Decompose a Python package into independent projects via phased structural split."
+  default_prompt: "Run /pythonpackagesevere on the current directory: analyze the Python package, build a dependency model, design target architecture, perform pre-split refactoring, execute the structural split, and verify each resulting project."

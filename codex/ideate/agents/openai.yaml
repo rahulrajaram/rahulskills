@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ideate"
+  short_description: "Generate divergent ideas from a seed using evolutionary ideation via gptengage."
+  default_prompt: "Run /ideate: generate a tree of divergent ideas from the given seed using ~/.local/bin/gptengage ideate."

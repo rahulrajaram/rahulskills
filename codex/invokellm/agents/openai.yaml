@@ -1,0 +1,4 @@
+interface:
+  display_name: "Invoke LLM"
+  short_description: "Invoke a single AI CLI (claude, codex, gemini) via gptengage."
+  default_prompt: "Run /invokellm: invoke a specific AI CLI with the given prompt using ~/.local/bin/gptengage invoke."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Yore Vocabulary LLM Filter"
+  short_description: "Classify corpus terms for Whisper vocabulary with per-term verdict, category, and reason for user review."
+  default_prompt: "Run /yore-vocabulary-llm-filter using terms from yore-vocabulary-harvest. Classify each term as keep/drop/review/artifact with category and reason. Present a review table and wait for user approval before merging into Whisper vocabulary."

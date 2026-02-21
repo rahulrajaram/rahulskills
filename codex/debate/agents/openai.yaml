@@ -1,0 +1,4 @@
+interface:
+  display_name: "Debate"
+  short_description: "Run a multi-AI debate (Claude + Codex + Gemini) via gptengage."
+  default_prompt: "Run /debate: orchestrate a multi-AI debate on the given topic using ~/.local/bin/gptengage debate."
