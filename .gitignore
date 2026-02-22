@@ -21,3 +21,6 @@ __pycache__/
 # Per-machine exclude lists for private skills (not version controlled)
 .exclude-codex
 .exclude-claude
+
+# Generated scan report (contains absolute paths)
+skill-candidates.md
