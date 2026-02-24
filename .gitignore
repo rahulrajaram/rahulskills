@@ -19,6 +19,7 @@ __pycache__/
 *.tmp
 
 # Per-machine exclude lists and blocklist (not version controlled)
+.exclude-skills
 .exclude-codex
 .exclude-claude
 .blocklist.local

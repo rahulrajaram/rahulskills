@@ -3,35 +3,23 @@ set -euo pipefail
 
 SKILLS_DIR="$(cd "$(dirname "$0")" && pwd)"
 LISTINGS="$HOME/Documents/listings.txt"
-CODEX_EXCLUDE_FILE="$SKILLS_DIR/.exclude-codex"
-CLAUDE_EXCLUDE_FILE="$SKILLS_DIR/.exclude-claude"
+EXCLUDE_FILE="$SKILLS_DIR/.exclude-skills"
 REPORT_FILE="$SKILLS_DIR/skill-candidates.md"
 
-# Collected skill/command names for status tagging
-collected_commands=()
+# Collected skill names and excluded names for status tagging
 collected_skills=()
-excluded_commands=()
 excluded_skills=()
 
 load_collected() {
     local f
-    for f in "$SKILLS_DIR/claude"/*.md; do
-        [[ -f "$f" ]] && collected_commands+=("$(basename "$f" .md)")
-    done
     for f in "$SKILLS_DIR/codex"/*/; do
         [[ -d "$f" ]] && collected_skills+=("$(basename "$f")")
     done
-    if [[ -f "$CLAUDE_EXCLUDE_FILE" ]]; then
-        while IFS= read -r line; do
-            [[ -z "$line" || "$line" == \#* ]] && continue
-            excluded_commands+=("$line")
-        done < "$CLAUDE_EXCLUDE_FILE"
-    fi
-    if [[ -f "$CODEX_EXCLUDE_FILE" ]]; then
+    if [[ -f "$EXCLUDE_FILE" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" || "$line" == \#* ]] && continue
             excluded_skills+=("$line")
-        done < "$CODEX_EXCLUDE_FILE"
+        done < "$EXCLUDE_FILE"
     fi
 }
 
@@ -44,14 +32,9 @@ in_array() {
 
 # Tag a name: [COLLECTED], [EXCLUDED], or [NEW]
 tag_item() {
-    local name="$1" type="$2"
-    if [[ "$type" == "cmd" ]]; then
-        in_array "$name" "${collected_commands[@]+"${collected_commands[@]}"}" && { echo "[COLLECTED]"; return; }
-        in_array "$name" "${excluded_commands[@]+"${excluded_commands[@]}"}" && { echo "[EXCLUDED]"; return; }
-    elif [[ "$type" == "skl" ]]; then
-        in_array "$name" "${collected_skills[@]+"${collected_skills[@]}"}" && { echo "[COLLECTED]"; return; }
-        in_array "$name" "${excluded_skills[@]+"${excluded_skills[@]}"}" && { echo "[EXCLUDED]"; return; }
-    fi
+    local name="$1"
+    in_array "$name" "${collected_skills[@]+"${collected_skills[@]}"}" && { echo "[COLLECTED]"; return; }
+    in_array "$name" "${excluded_skills[@]+"${excluded_skills[@]}"}" && { echo "[EXCLUDED]"; return; }
     echo "[NEW]"
 }
 
@@ -101,6 +84,23 @@ list_glob() {
     done
 }
 
+# Count skill dirs in a path
+count_skill_dirs() {
+    local base="$1"
+    [[ -d "$base" ]] || { echo 0; return; }
+    local sd=( "$base"/*/ ) 2>/dev/null || true
+    [[ -d "${sd[0]:-}" ]] && echo "${#sd[@]}" || echo 0
+}
+
+# List skill dirs in a path
+list_skill_dirs() {
+    local base="$1"
+    [[ -d "$base" ]] || return 0
+    for d in "$base"/*/; do
+        [[ -d "$d" ]] && basename "$d"
+    done
+}
+
 # Count Makefile/justfile targets
 count_build_targets() {
     local proj="$1"
@@ -123,9 +123,9 @@ list_build_targets() {
     done
 }
 
-# Print items with overflow, tagging Tier 1 items
+# Print items with overflow, tagging collected items
 print_items() {
-    local label="$1" tag_type="$2"; shift 2
+    local label="$1" do_tag="$2"; shift 2
     local items=("$@")
     local total=${#items[@]}
     [[ $total -eq 0 ]] && return
@@ -134,10 +134,9 @@ print_items() {
     local i=0
     for item in "${items[@]}"; do
         [[ $i -ge $show ]] && break
-        if [[ -n "$tag_type" ]]; then
-            local name="${item%.md}"
+        if [[ "$do_tag" == "yes" ]]; then
             local tag
-            tag="$(tag_item "$name" "$tag_type")"
+            tag="$(tag_item "$item")"
             echo "    $item $tag"
         else
             echo "    $item"
@@ -161,16 +160,14 @@ do_scan() {
         name="$(basename "$proj")"
 
         # Gather items
-        local cmds=() skls=() agts=() ins=() scrs=() blds=()
+        local codex_skls=() claude_skls=() agts=() ins=() scrs=() blds=()
 
-        # Tier 1: Claude commands
-        while IFS= read -r f; do [[ -n "$f" ]] && cmds+=("$f"); done < <(list_glob "$proj/.claude/commands/*.md")
         # Tier 1: Codex skills
-        if [[ -d "$proj/.agents/skills" ]]; then
-            for d in "$proj/.agents/skills"/*/; do
-                [[ -d "$d" ]] && skls+=("$(basename "$d")")
-            done
-        fi
+        while IFS= read -r s; do [[ -n "$s" ]] && codex_skls+=("$s"); done < <(list_skill_dirs "$proj/.agents/skills")
+
+        # Tier 1: Claude skills
+        while IFS= read -r s; do [[ -n "$s" ]] && claude_skls+=("$s"); done < <(list_skill_dirs "$proj/.claude/skills")
+
         # Tier 1: Claude agents
         while IFS= read -r f; do [[ -n "$f" ]] && agts+=("$f"); done < <(list_glob "$proj/.claude/agents/*.md")
 
@@ -190,17 +187,17 @@ do_scan() {
         # Tier 4: Build targets
         while IFS= read -r t; do [[ -n "$t" ]] && blds+=("$t"); done < <(list_build_targets "$proj")
 
-        local total=$(( ${#cmds[@]} + ${#skls[@]} + ${#agts[@]} + ${#ins[@]} + ${#scrs[@]} + ${#blds[@]} ))
+        local total=$(( ${#codex_skls[@]} + ${#claude_skls[@]} + ${#agts[@]} + ${#ins[@]} + ${#scrs[@]} + ${#blds[@]} ))
         [[ $total -eq 0 ]] && continue
 
         echo "=== $name ==="
         echo "  $proj"
-        print_items "Commands (CMD)" "cmd" "${cmds[@]+"${cmds[@]}"}"
-        print_items "Skills (SKL)" "skl" "${skls[@]+"${skls[@]}"}"
-        print_items "Agents (AGT)" "" "${agts[@]+"${agts[@]}"}"
-        print_items "Instructions (INS)" "" "${ins[@]+"${ins[@]}"}"
-        print_items "Scripts (SCR)" "" "${scrs[@]+"${scrs[@]}"}"
-        print_items "Build targets (BLD)" "" "${blds[@]+"${blds[@]}"}"
+        print_items "Codex skills (SKL)" "yes" "${codex_skls[@]+"${codex_skls[@]}"}"
+        print_items "Claude skills (SKL)" "yes" "${claude_skls[@]+"${claude_skls[@]}"}"
+        print_items "Agents (AGT)" "no" "${agts[@]+"${agts[@]}"}"
+        print_items "Instructions (INS)" "no" "${ins[@]+"${ins[@]}"}"
+        print_items "Scripts (SCR)" "no" "${scrs[@]+"${scrs[@]}"}"
+        print_items "Build targets (BLD)" "no" "${blds[@]+"${blds[@]}"}"
         echo ""
     done <<< "$projects"
 }
@@ -209,9 +206,9 @@ do_check() {
     local projects
     projects="$(read_projects)"
 
-    printf "%-35s %4s %4s %4s %4s %4s %4s\n" "PROJECT" "CMD" "SKL" "AGT" "INS" "SCR" "BLD"
+    printf "%-35s %4s %4s %4s %4s %4s %4s\n" "PROJECT" "CDX" "CLD" "AGT" "INS" "SCR" "BLD"
 
-    local t_cmd=0 t_skl=0 t_agt=0 t_ins=0 t_scr=0 t_bld=0
+    local t_cdx=0 t_cld=0 t_agt=0 t_ins=0 t_scr=0 t_bld=0
 
     while IFS= read -r proj; do
         [[ -d "$proj" ]] || continue
@@ -219,17 +216,9 @@ do_check() {
         local name
         name="$(basename "$proj")"
 
-        local n_cmd n_skl n_agt n_ins n_scr n_bld
-        n_cmd=$(count_glob "$proj/.claude/commands/*.md")
-
-        # Count skill dirs
-        if [[ -d "$proj/.agents/skills" ]]; then
-            local sd=( "$proj/.agents/skills"/*/ ) 2>/dev/null || true
-            [[ -d "${sd[0]:-}" ]] && n_skl=${#sd[@]} || n_skl=0
-        else
-            n_skl=0
-        fi
-
+        local n_cdx n_cld n_agt n_ins n_scr n_bld
+        n_cdx=$(count_skill_dirs "$proj/.agents/skills")
+        n_cld=$(count_skill_dirs "$proj/.claude/skills")
         n_agt=$(count_glob "$proj/.claude/agents/*.md")
 
         n_ins=0
@@ -247,13 +236,13 @@ do_check() {
 
         n_bld=$(count_build_targets "$proj")
 
-        printf "%-35s %4d %4d %4d %4d %4d %4d\n" "$name" "$n_cmd" "$n_skl" "$n_agt" "$n_ins" "$n_scr" "$n_bld"
+        printf "%-35s %4d %4d %4d %4d %4d %4d\n" "$name" "$n_cdx" "$n_cld" "$n_agt" "$n_ins" "$n_scr" "$n_bld"
 
-        t_cmd=$((t_cmd + n_cmd)); t_skl=$((t_skl + n_skl)); t_agt=$((t_agt + n_agt))
+        t_cdx=$((t_cdx + n_cdx)); t_cld=$((t_cld + n_cld)); t_agt=$((t_agt + n_agt))
         t_ins=$((t_ins + n_ins)); t_scr=$((t_scr + n_scr)); t_bld=$((t_bld + n_bld))
     done <<< "$projects"
 
-    printf "%-35s %4d %4d %4d %4d %4d %4d\n" "TOTAL" "$t_cmd" "$t_skl" "$t_agt" "$t_ins" "$t_scr" "$t_bld"
+    printf "%-35s %4d %4d %4d %4d %4d %4d\n" "TOTAL" "$t_cdx" "$t_cld" "$t_agt" "$t_ins" "$t_scr" "$t_bld"
 }
 
 do_report() {
@@ -278,31 +267,27 @@ do_report() {
             local has_content=0
             local section=""
 
-            # Tier 1: Commands
-            local cmds=()
-            while IFS= read -r f; do [[ -n "$f" ]] && cmds+=("$f"); done < <(list_glob "$proj/.claude/commands/*.md")
-            if [[ ${#cmds[@]} -gt 0 ]]; then
+            # Tier 1: Codex skills
+            local codex_skls=()
+            while IFS= read -r s; do [[ -n "$s" ]] && codex_skls+=("$s"); done < <(list_skill_dirs "$proj/.agents/skills")
+            if [[ ${#codex_skls[@]} -gt 0 ]]; then
                 has_content=1
-                section+="### Commands\n"
-                for c in "${cmds[@]}"; do
-                    local tag; tag="$(tag_item "${c%.md}" "cmd")"
-                    section+="- \`$c\` $tag\n"
+                section+="### Codex Skills\n"
+                for s in "${codex_skls[@]}"; do
+                    local tag; tag="$(tag_item "$s")"
+                    section+="- \`$s\` $tag\n"
                 done
                 section+="\n"
             fi
 
-            # Tier 1: Skills
-            local skls=()
-            if [[ -d "$proj/.agents/skills" ]]; then
-                for d in "$proj/.agents/skills"/*/; do
-                    [[ -d "$d" ]] && skls+=("$(basename "$d")")
-                done
-            fi
-            if [[ ${#skls[@]} -gt 0 ]]; then
+            # Tier 1: Claude skills
+            local claude_skls=()
+            while IFS= read -r s; do [[ -n "$s" ]] && claude_skls+=("$s"); done < <(list_skill_dirs "$proj/.claude/skills")
+            if [[ ${#claude_skls[@]} -gt 0 ]]; then
                 has_content=1
-                section+="### Skills\n"
-                for s in "${skls[@]}"; do
-                    local tag; tag="$(tag_item "$s" "skl")"
+                section+="### Claude Skills\n"
+                for s in "${claude_skls[@]}"; do
+                    local tag; tag="$(tag_item "$s")"
                     section+="- \`$s\` $tag\n"
                 done
                 section+="\n"

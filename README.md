@@ -6,8 +6,10 @@ Shared AI agent skills and shell scripts for Claude Code and OpenAI Codex CLI. T
 
 This repo collects skills (prompt-based automation units) for two AI coding assistants:
 
-- **Claude Code commands** (`claude/`) -- single-file `.md` prompts loaded as `/slash-commands` in Claude Code sessions.
-- **Codex skills** (`codex/`) -- directory-based skills with `SKILL.md` entry points, optional scripts, agents, and reference material.
+- **Codex** (`~/.agents/skills/`) -- OpenAI Codex CLI skills
+- **Claude Code** (`~/.claude/skills/`) -- Claude Code skills
+
+Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `codex/` directory in this repo is the single source of truth, synced to both locations.
 
 Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yarli orchestration, Yore vocabulary curation).
 
@@ -17,8 +19,7 @@ Three shell scripts handle discovery, syncing, and audit across all local projec
 
 ```
 rahulskills/
-  claude/                  # Claude Code commands (*.md)
-  codex/                   # Codex skills (name/SKILL.md)
+  codex/                   # Skills (name/SKILL.md) — synced to ~/.agents/skills/ + ~/.claude/skills/
   audit-skills.sh          # Pre-commit guard against private reference leaks
   scan-skills.sh           # Cross-project skill discovery and reporting
   sync-skills.sh           # Bidirectional sync between repo and installed locations
@@ -26,45 +27,36 @@ rahulskills/
   .github/workflows/       # CI: audit-skills.sh on PRs and pushes
   .githooks/pre-commit     # Repo-local hook calling audit-skills.sh
   .githooks/commit-msg     # Repo-local hook enforcing conventional commits
-  .exclude-codex           # Per-machine Codex exclusion list (gitignored)
-  .exclude-claude          # Per-machine Claude exclusion list (gitignored)
+  .exclude-skills          # Per-machine skill exclusion list (gitignored)
   .blocklist.local         # Per-machine term blocklist (gitignored)
 ```
 
 ## Skills Inventory
 
-### Claude Code Commands (12)
+### Skills (23)
 
-| Command | Description |
-|---------|-------------|
+Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
+
+| Skill | Description |
+|-------|-------------|
 | `analyze-conversation` | Post-mortem analysis of conversations for anti-patterns and learnings |
 | `archdiagram` | Generate architecture diagrams from context or codebase |
 | `check-antipatterns` | Real-time anti-pattern detection during active work |
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
-| `ideate` | Evolutionary ideation across multiple AI models via gptengage |
-| `install-commithooks` | Install shared commithooks framework into a project |
-| `invokellm` | Invoke a single AI CLI (claude, codex, gemini) via gptengage |
-| `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint |
-| `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
-| `speak` | Read text out loud using Kokoro TTS |
-| `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
-| `yore-vocabulary-llm-filter` | Filter Yore vocabulary via LLM for Whisper-specific domains |
-
-### Codex Skills (16)
-
-| Skill | Description |
-|-------|-------------|
-| `archdiagram` | Generate architecture diagrams from context or codebase |
-| `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
+| `git-status-report` | Report git sync status of repo and submodules as ASCII table |
 | `handoff` | Commit workspace state and generate next-shell continuation prompt |
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
 | `install-commithooks` | Install shared commithooks framework into a project |
 | `invokellm` | Invoke a single AI CLI (claude, codex, gemini) via gptengage |
+| `kokoro-tts` | Read text out loud using Kokoro TTS |
 | `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint |
+| `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
+| `postmortem` | Generate Amazon COE-style 5-whys postmortem reports |
 | `pythonpackagesevere` | Decompose a Python package into independent projects |
 | `readme-doctor` | Build and validate project README and CLI help text |
 | `reference-cleaner` | Remove blocklisted references from git history and source files |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
+| `test` | Run tests with overwatch for streaming output and failure detection |
 | `vision-plan-tranche-sync` | Translate roadmap items into implementation tranches |
 | `yarli-introspect` | Live introspection of running or completed Yarli runs |
 | `yarli-repo-init` | Initialize and validate Yarli orchestration in a repository |
@@ -75,7 +67,7 @@ rahulskills/
 
 ### `sync-skills.sh`
 
-Bidirectional sync between this repo and the installed skill locations (`~/.agents/skills/` for Codex, `~/.claude/commands/` for Claude Code).
+Bidirectional sync between this repo and two installed locations (`~/.agents/skills/` for Codex, `~/.claude/skills/` for Claude Code).
 
 ```bash
 ./sync-skills.sh pull      # Copy installed skills into this repo
@@ -84,7 +76,7 @@ Bidirectional sync between this repo and the installed skill locations (`~/.agen
 ./sync-skills.sh status    # List which skills exist where
 ```
 
-Respects per-machine exclusion lists in `.exclude-codex` and `.exclude-claude` (one skill name per line, gitignored).
+Respects per-machine exclusion list in `.exclude-skills` (one skill name per line, gitignored).
 
 ### `scan-skills.sh`
 
@@ -108,7 +100,7 @@ Pre-commit guard that scans skill files for private references (project names in
 ./audit-skills.sh install-hook   # Write pre-commit hook into .git/hooks/
 ```
 
-Uses patterns from `.exclude-codex`, `.exclude-claude`, and `.blocklist.local`. Also matches personal home-directory paths under `Documents/`.
+Uses patterns from `.exclude-skills` and `.blocklist.local`. Also matches personal home-directory paths under `Documents/`.
 
 ## Installation
 
@@ -121,7 +113,7 @@ cd ~/Documents/rahulskills
 `setup.sh` handles everything:
 1. Clones [commithooks](https://github.com/rahulrajaram/commithooks) to `~/Documents/commithooks/` if not already present
 2. Installs hook dispatchers into `.git/hooks/` and library modules into `.git/lib/`
-3. Optionally deploys skills to `~/.agents/skills/` and `~/.claude/commands/`
+3. Optionally deploys skills to `~/.agents/skills/` and `~/.claude/skills/`
 
 Pass `--skip-skills` to skip the interactive skill deployment prompt.
 
@@ -131,10 +123,9 @@ The `audit-skills.sh check` scan runs on every push to `master` and on pull requ
 
 ## Adding a New Skill
 
-1. **Claude command**: Create `claude/<name>.md` with frontmatter (`allowed-tools`, `description`, optional `argument-hint`).
-2. **Codex skill**: Create `codex/<name>/SKILL.md` with frontmatter (`name`, `description`, `allowed-tools`). Add optional `agents/`, `references/`, or `scripts/` subdirectories.
-3. Run `./audit-skills.sh check` to verify no private references leaked.
-4. Commit and `./sync-skills.sh push` to deploy.
+1. Create `codex/<name>/SKILL.md` with frontmatter (`name`, `description`, `allowed-tools`). Add optional `agents/`, `references/`, or `scripts/` subdirectories.
+2. Run `./audit-skills.sh check` to verify no private references leaked.
+3. Commit and `./sync-skills.sh push` to deploy to both `~/.agents/skills/` and `~/.claude/skills/`.
 
 ## Git Hooks
 

@@ -1,0 +1,109 @@
+{
+  "universal_rules": [
+    {
+      "id": 1,
+      "rule": "NEVER hardcode credentials",
+      "keywords": ["PASSWORD", "SECRET", "KEY", "TOKEN", "CREDENTIAL"],
+      "detection": "Message contains security keywords without kubectl get secret",
+      "severity": "HIGH"
+    },
+    {
+      "id": 2,
+      "rule": "ALWAYS diagnose before retry",
+      "keywords": ["retry", "again"],
+      "detection": "Same command run 2+ times without diagnostic commands",
+      "severity": "HIGH"
+    },
+    {
+      "id": 3,
+      "rule": "STOP and ASK when scope expands",
+      "keywords": ["also create", "also build", "also implement", "additionally"],
+      "detection": "Creating new files/services not in original request",
+      "severity": "MEDIUM"
+    },
+    {
+      "id": 4,
+      "rule": "VERIFY entire dependency chain",
+      "keywords": ["integration", "e2e", "test"],
+      "detection": "Running integration tests without preflight checks",
+      "severity": "HIGH"
+    },
+    {
+      "id": 5,
+      "rule": "DISCOVER tools before reinventing",
+      "keywords": ["script", "tool", "command"],
+      "detection": "Never checked for existing tools in conversation",
+      "severity": "LOW"
+    },
+    {
+      "id": 6,
+      "rule": "External values MUST be verified",
+      "keywords": ["ip", "url", "endpoint"],
+      "detection": "Using IP addresses/URLs without verification",
+      "severity": "MEDIUM"
+    },
+    {
+      "id": 7,
+      "rule": "Read error messages completely",
+      "keywords": ["error", "failed", "failure"],
+      "detection": "Command failed but error not referenced in next message",
+      "severity": "MEDIUM"
+    },
+    {
+      "id": 8,
+      "rule": "Verify prerequisites before complex operations",
+      "keywords": ["deploy", "migration", "bootstrap"],
+      "detection": "Running complex operation without checking prerequisites",
+      "severity": "MEDIUM"
+    },
+    {
+      "id": 9,
+      "rule": "Document assumptions explicitly",
+      "keywords": ["assume", "assuming"],
+      "detection": "Making assumptions without documenting them",
+      "severity": "LOW"
+    },
+    {
+      "id": 10,
+      "rule": "One command, one purpose",
+      "keywords": ["&&", "||", ";"],
+      "detection": "Chaining 4+ commands with &&",
+      "severity": "LOW"
+    },
+    {
+      "id": 11,
+      "rule": "Check pod events on K8s failures",
+      "keywords": ["kubectl", "pod", "failed"],
+      "detection": "Pod failure without checking events",
+      "severity": "MEDIUM"
+    },
+    {
+      "id": 12,
+      "rule": "Verify ConfigMap/Secret exists before using",
+      "keywords": ["configmap", "secret", "kubectl"],
+      "detection": "Referencing ConfigMap/Secret without verifying existence",
+      "severity": "MEDIUM"
+    },
+    {
+      "id": 13,
+      "rule": "Background services require health checks",
+      "keywords": ["service", "database", "discovery"],
+      "detection": "Using background service without health check",
+      "severity": "MEDIUM"
+    },
+    {
+      "id": 14,
+      "rule": "Cross-cluster operations need network verification",
+      "keywords": ["cross-cluster", "kind", "docker"],
+      "detection": "Cross-cluster operation without network verification",
+      "severity": "MEDIUM"
+    },
+    {
+      "id": 15,
+      "rule": "Integration tests are not unit tests",
+      "keywords": ["integration", "e2e", "pytest"],
+      "detection": "Running integration tests without environment validation",
+      "severity": "HIGH"
+    }
+  ]
+}
