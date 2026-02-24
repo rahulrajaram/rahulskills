@@ -1,0 +1,15 @@
+name: Audit skills
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run audit-skills check
+        run: ./audit-skills.sh check

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vision to Tranche Sync"
+  short_description: "Sync VISION.md -> IMPLEMENTATION_PLAN.md -> .yarli/tranches.toml and enforce principal-architect fallback when vision is missing."
+  default_prompt: "Run /vision-plan-tranche-sync: sync actionable VISION.md items into IMPLEMENTATION_PLAN.md and sync open tranches into .yarli/tranches.toml; if no vision exists, trigger principal-architect fallback." 
