@@ -22,7 +22,10 @@ rahulskills/
   audit-skills.sh          # Pre-commit guard against private reference leaks
   scan-skills.sh           # Cross-project skill discovery and reporting
   sync-skills.sh           # Bidirectional sync between repo and installed locations
+  setup.sh                 # Contributor bootstrap (hooks + optional skill deploy)
+  .github/workflows/       # CI: audit-skills.sh on PRs and pushes
   .githooks/pre-commit     # Repo-local hook calling audit-skills.sh
+  .githooks/commit-msg     # Repo-local hook enforcing conventional commits
   .exclude-codex           # Per-machine Codex exclusion list (gitignored)
   .exclude-claude          # Per-machine Claude exclusion list (gitignored)
   .blocklist.local         # Per-machine term blocklist (gitignored)
@@ -105,7 +108,7 @@ Pre-commit guard that scans skill files for private references (project names in
 ./audit-skills.sh install-hook   # Write pre-commit hook into .git/hooks/
 ```
 
-Uses patterns from `.exclude-codex`, `.exclude-claude`, and `.blocklist.local`. Also matches personal paths matching `~/<user>/Documents/*`.
+Uses patterns from `.exclude-codex`, `.exclude-claude`, and `.blocklist.local`. Also matches personal home-directory paths under `Documents/`.
 
 ## Installation
 
@@ -137,10 +140,12 @@ The `audit-skills.sh check` scan runs on every push to `master` and on pull requ
 
 This repo uses a two-tier hook system:
 
-1. **Shared dispatchers** in `~/Documents/commithooks/` (set via `core.hooksPath`) handle delegation.
+1. **Shared dispatchers** copied into `.git/hooks/` from [commithooks](https://github.com/rahulrajaram/commithooks) handle delegation.
 2. **Repo-local hooks** in `.githooks/` contain project-specific logic.
 
-The pre-commit hook runs `audit-skills.sh pre-commit` to block commits containing private skill names or personal paths.
+The dispatchers look for executable hooks in `.githooks/` (or `scripts/git-hooks/`) and `exec` them. Currently active:
+- **`pre-commit`** runs `audit-skills.sh pre-commit` to block commits containing private skill names or personal paths.
+- **`commit-msg`** enforces conventional commit format and subject line rules.
 
 ## License
 
