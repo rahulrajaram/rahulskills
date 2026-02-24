@@ -2,8 +2,6 @@
 set -euo pipefail
 
 SKILLS_DIR="$(cd "$(dirname "$0")" && pwd)"
-CODEX_EXCLUDE_FILE="$SKILLS_DIR/.exclude-codex"
-CLAUDE_EXCLUDE_FILE="$SKILLS_DIR/.exclude-claude"
 BLOCKLIST_FILE="$SKILLS_DIR/.blocklist.local"
 
 usage() {
@@ -11,19 +9,19 @@ usage() {
 Usage: audit-skills.sh <command>
 
 Commands:
-  check          Scan all skill files in claude/ and codex/ for private references
+  check          Scan all skill files in codex/ for private references
   pre-commit     Scan only staged skill files (called by git hook)
   install-hook   Write the pre-commit hook into .git/hooks/
 EOF
     exit 1
 }
 
-# Build a combined grep pattern from exclude files and personal path regex.
+# Build a combined grep pattern from exclude file, blocklist, and personal path regex.
 # Returns 1 if no patterns were found (nothing to check).
 build_pattern() {
     local names=()
 
-    for file in "$CODEX_EXCLUDE_FILE" "$CLAUDE_EXCLUDE_FILE" "$BLOCKLIST_FILE"; do
+    for file in "$BLOCKLIST_FILE"; do
         [[ -f "$file" ]] || continue
         while IFS= read -r line; do
             [[ -z "$line" || "$line" == \#* ]] && continue
@@ -88,12 +86,7 @@ do_check() {
     echo "Pattern: $pattern"
     echo ""
 
-    {
-        # Claude commands
-        find "$SKILLS_DIR/claude" -type f -name '*.md' 2>/dev/null
-        # Codex skills (all files under each skill dir)
-        find "$SKILLS_DIR/codex" -type f 2>/dev/null
-    } | scan_files "$pattern"
+    find "$SKILLS_DIR/codex" -type f 2>/dev/null | scan_files "$pattern"
 
     local rc=$?
     [[ $rc -eq 0 ]] && echo "All clean."
