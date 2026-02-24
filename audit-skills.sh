@@ -4,6 +4,7 @@ set -euo pipefail
 SKILLS_DIR="$(cd "$(dirname "$0")" && pwd)"
 CODEX_EXCLUDE_FILE="$SKILLS_DIR/.exclude-codex"
 CLAUDE_EXCLUDE_FILE="$SKILLS_DIR/.exclude-claude"
+BLOCKLIST_FILE="$SKILLS_DIR/.blocklist.local"
 
 usage() {
     cat <<'EOF'
@@ -22,7 +23,7 @@ EOF
 build_pattern() {
     local names=()
 
-    for file in "$CODEX_EXCLUDE_FILE" "$CLAUDE_EXCLUDE_FILE"; do
+    for file in "$CODEX_EXCLUDE_FILE" "$CLAUDE_EXCLUDE_FILE" "$BLOCKLIST_FILE"; do
         [[ -f "$file" ]] || continue
         while IFS= read -r line; do
             [[ -z "$line" || "$line" == \#* ]] && continue
@@ -30,9 +31,7 @@ build_pattern() {
         done < "$file"
     done
 
-    # Hardcoded personal-path patterns:
-    #   /home/<user>/Documents/<project>
-    #   -home-<user>-Documents-<project>  (dash-encoded)
+    # Hardcoded personal-path patterns (home dir + Documents subtree)
     local path_re='/home/[^/]+/Documents/[^ ]*'
     local dash_re='-home-[a-zA-Z0-9_]+-Documents-[a-zA-Z0-9_-]+'
 
@@ -105,16 +104,15 @@ do_pre_commit() {
     local pattern
     pattern="$(build_pattern)"
 
-    # Collect staged files under claude/ and codex/ only
+    # Collect all staged files
     local staged
-    staged="$(git -C "$SKILLS_DIR" diff --cached --name-only --diff-filter=ACM -- 'claude/' 'codex/' 2>/dev/null || true)"
+    staged="$(git -C "$SKILLS_DIR" diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)"
 
     if [[ -z "$staged" ]]; then
-        # No skill files staged — nothing to audit
         exit 0
     fi
 
-    echo "Auditing staged skill files for private references..."
+    echo "Auditing all staged files for private references..."
     echo ""
 
     # Convert relative paths to absolute

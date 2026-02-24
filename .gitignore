@@ -18,9 +18,10 @@ __pycache__/
 /tmp/
 *.tmp
 
-# Per-machine exclude lists for private skills (not version controlled)
+# Per-machine exclude lists and blocklist (not version controlled)
 .exclude-codex
 .exclude-claude
+.blocklist.local
 
 # Generated scan report (contains absolute paths)
 skill-candidates.md
