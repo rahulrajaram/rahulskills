@@ -19,8 +19,7 @@ python3 ~/.claude/skills/analyze-conversation/generate_report.py "$ARGUMENTS"
 
 First, find the current conversation ID:
 ```bash
-PROJECT_DIR=$(pwd | sed 's|/|-|g')
-CONV_ID=$(ls -t ~/.claude/projects/${PROJECT_DIR}/*.jsonl | head -1 | xargs basename -s .jsonl)
+CONV_ID=$(ls -t ~/.claude/projects/$(pwd | sed 's|/|-|g; s|^-||')/*.jsonl | head -1 | xargs basename -s .jsonl)
 python3 ~/.claude/skills/analyze-conversation/generate_report.py "$CONV_ID"
 ```
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reference Cleaner"
+  short_description: "Remove blocklisted term references from git history and source files before publishing."
+  default_prompt: "Run /reference-cleaner: scan for blocklisted terms in source files and commit history, present a cleanup plan, and execute after approval."

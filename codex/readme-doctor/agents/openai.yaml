@@ -1,0 +1,4 @@
+interface:
+  display_name: "README Doctor"
+  short_description: "Build and validate project README and CLI help text for accuracy and congruence."
+  default_prompt: "Run /readme-doctor: audit all CLI help text for consistency, verify documentation against code, and generate a comprehensive README with accurate usage examples."

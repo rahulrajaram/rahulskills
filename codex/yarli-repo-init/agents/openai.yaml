@@ -1,0 +1,4 @@
+interface:
+  display_name: "Yarli Repo Init"
+  short_description: "Bootstrap yarli.toml, prompt/plan authority files, and smoke validation."
+  default_prompt: "Initialize this repository for Yarli: generate yarli.toml, align backend and durability settings, set up prompt/plan authority files if missing, optionally enable Haake memory, and run a smoke validation with status/explain-exit checks."

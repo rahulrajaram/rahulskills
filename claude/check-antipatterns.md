@@ -13,12 +13,10 @@ Analyze the CURRENT conversation for anti-patterns and provide immediate warning
 Run the anti-pattern checker on the current conversation:
 
 ```bash
-PROJECT_DIR=$(pwd | sed 's|/|-|g')
-CONV_FILE=$(ls -t ~/.claude/projects/${PROJECT_DIR}/*.jsonl 2>/dev/null | head -1)
-python3 ~/.claude/skills/check-antipatterns/checker.py "$CONV_FILE"
+python3 ~/.claude/skills/check-antipatterns/checker.py ~/.claude/projects/$(pwd | sed 's|/|-|g; s|^-||')/$(basename $(pwd)).jsonl
 ```
 
-**Note:** The project directory is derived from `pwd` with slashes replaced by dashes. If the conversation file is not found, check `~/.claude/projects/` for the correct JSONL file.
+**Note:** If the conversation file path is different, you'll need to find the correct JSONL file in `~/.claude/projects/`.
 
 The checker will analyze the conversation and provide:
 - ⚠️ **Warnings**: Anti-patterns detected
