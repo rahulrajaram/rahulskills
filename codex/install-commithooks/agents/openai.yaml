@@ -1,0 +1,4 @@
+interface:
+  display_name: "Install Commithooks"
+  short_description: "Install shared commithooks dispatchers, lib, and .githooks/ stubs into a repo."
+  default_prompt: "Run /install-commithooks: copy commithooks dispatchers and lib into .git/, scaffold .githooks/ stubs for the detected project type, and wire hook installation into the project's dev setup path (pyproject.toml for Python, package.json for Node, build.rs for Rust)."
