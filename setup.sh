@@ -59,7 +59,7 @@ fi
 
 echo ""
 echo "Available skill targets:"
-echo "  all     Deploy all skills to ~/.agents/skills/ and ~/.claude/commands/"
+echo "  all     Deploy all skills to ~/.agents/skills/, ~/.claude/skills/, and ~/.claude/commands/"
 echo "  none    Skip skill deployment"
 echo ""
 
