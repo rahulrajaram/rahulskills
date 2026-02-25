@@ -4,7 +4,9 @@ set -euo pipefail
 SKILLS_DIR="$(cd "$(dirname "$0")" && pwd)"
 CODEX_SRC="$HOME/.agents/skills"
 CLAUDE_SRC="$HOME/.claude/skills"
+CLAUDE_CMD_SRC="$HOME/.claude/commands"
 SKILLS_DST="$SKILLS_DIR/codex"
+COMMANDS_DST="$SKILLS_DIR/claude"
 
 # Exclusion list — one skill name per line, lines starting with # are ignored.
 # This file is gitignored so each machine can maintain its own private list.
@@ -27,8 +29,9 @@ Commands:
   status    List which skills exist where
 
 Installed locations:
-  Codex skills:  ~/.agents/skills/
-  Claude skills: ~/.claude/skills/
+  Codex skills:     ~/.agents/skills/
+  Claude skills:    ~/.claude/skills/
+  Slash commands:   ~/.claude/commands/
 EOF
     exit 1
 }
@@ -69,7 +72,25 @@ pull() {
     done
 
     echo ""
+    echo "Pulling slash commands from $CLAUDE_CMD_SRC ..."
+    mkdir -p "$COMMANDS_DST"
+    local cmd_count=0
+    for cmd_file in "$CLAUDE_CMD_SRC"/*.md; do
+        [[ -f "$cmd_file" ]] || continue
+        cmd_name="$(basename "$cmd_file")"
+        if is_excluded "${cmd_name%.md}"; then
+            echo "  SKIP (excluded): $cmd_name"
+            skipped=$((skipped + 1))
+            rm -f "$COMMANDS_DST/$cmd_name"
+            continue
+        fi
+        cp -a "$cmd_file" "$COMMANDS_DST/$cmd_name"
+        cmd_count=$((cmd_count + 1))
+    done
+
+    echo ""
     echo "Skills: $(ls -1d "$SKILLS_DST"/*/ 2>/dev/null | wc -l)"
+    echo "Commands: $cmd_count"
     [ "$skipped" -gt 0 ] && echo "Excluded: $skipped"
     echo "Done. Review with: cd $SKILLS_DIR && git diff"
     echo "Tip: run ./audit-skills.sh check before committing."
@@ -95,6 +116,16 @@ push() {
         cp -a "$skill_dir" "$CLAUDE_SRC/$skill_name"
     done
     echo "  $(ls -1d "$SKILLS_DST"/*/ 2>/dev/null | wc -l) skills synced"
+
+    echo "Pushing slash commands to $CLAUDE_CMD_SRC ..."
+    mkdir -p "$CLAUDE_CMD_SRC"
+    local cmd_count=0
+    for cmd_file in "$COMMANDS_DST"/*.md; do
+        [[ -f "$cmd_file" ]] || continue
+        cp -a "$cmd_file" "$CLAUDE_CMD_SRC/$(basename "$cmd_file")"
+        cmd_count=$((cmd_count + 1))
+    done
+    echo "  $cmd_count commands synced"
 
     echo "Done."
 }
@@ -150,6 +181,31 @@ do_diff() {
         fi
     done
 
+    echo ""
+    echo "=== Slash commands (~/.claude/commands/) ==="
+    for cmd_file in "$COMMANDS_DST"/*.md; do
+        [[ -f "$cmd_file" ]] || continue
+        cmd_name="$(basename "$cmd_file")"
+        if [ -f "$CLAUDE_CMD_SRC/$cmd_name" ]; then
+            if ! diff -q "$cmd_file" "$CLAUDE_CMD_SRC/$cmd_name" > /dev/null 2>&1; then
+                echo "  MODIFIED: $cmd_name"
+                diff -u "$CLAUDE_CMD_SRC/$cmd_name" "$cmd_file" || true
+                has_diff=1
+            fi
+        else
+            echo "  NEW (repo only): $cmd_name"
+            has_diff=1
+        fi
+    done
+    for cmd_file in "$CLAUDE_CMD_SRC"/*.md; do
+        [[ -f "$cmd_file" ]] || continue
+        cmd_name="$(basename "$cmd_file")"
+        if [ ! -f "$COMMANDS_DST/$cmd_name" ]; then
+            echo "  INSTALLED ONLY: $cmd_name"
+            has_diff=1
+        fi
+    done
+
     if [ "$has_diff" -eq 0 ]; then
         echo ""
         echo "Everything in sync."
@@ -157,19 +213,22 @@ do_diff() {
 }
 
 status() {
-    printf "%-35s %-8s %-8s\n" "SKILL" "CODEX" "CLAUDE"
-    printf "%-35s %-8s %-8s\n" "-----" "-----" "------"
+    printf "%-35s %-8s %-8s %-10s\n" "SKILL" "CODEX" "CLAUDE" "COMMANDS"
+    printf "%-35s %-8s %-8s %-10s\n" "-----" "-----" "------" "--------"
 
     declare -A all_skills
     for d in "$CODEX_SRC"/*/; do [[ -d "$d" ]] && all_skills["$(basename "$d")"]=1; done
     for d in "$CLAUDE_SRC"/*/; do [[ -d "$d" ]] && all_skills["$(basename "$d")"]=1; done
+    for f in "$CLAUDE_CMD_SRC"/*.md; do [[ -f "$f" ]] && { local _n; _n="$(basename "$f")"; all_skills["${_n%.md}"]=1; }; done
 
     for skill in $(echo "${!all_skills[@]}" | tr ' ' '\n' | sort); do
         codex="--"
         claude="--"
+        commands="--"
         [ -d "$CODEX_SRC/$skill" ] && codex="yes"
         [ -d "$CLAUDE_SRC/$skill" ] && claude="yes"
-        printf "%-35s %-8s %-8s\n" "$skill" "$codex" "$claude"
+        [ -f "$CLAUDE_CMD_SRC/$skill.md" ] && commands="yes"
+        printf "%-35s %-8s %-8s %-10s\n" "$skill" "$codex" "$claude" "$commands"
     done
 }
 

@@ -20,6 +20,7 @@ Three shell scripts handle discovery, syncing, and audit across all local projec
 ```
 rahulskills/
   codex/                   # Skills (name/SKILL.md) — synced to ~/.agents/skills/ + ~/.claude/skills/
+  claude/                  # Claude Code slash commands (*.md) — synced to ~/.claude/commands/
   audit-skills.sh          # Pre-commit guard against private reference leaks
   scan-skills.sh           # Cross-project skill discovery and reporting
   sync-skills.sh           # Bidirectional sync between repo and installed locations
@@ -63,11 +64,29 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
 
+### Claude Code Slash Commands (11)
+
+Synced to `~/.claude/commands/`. These are invoked as `/command-name` inside Claude Code.
+
+| Command | Description |
+|---------|-------------|
+| `analyze-conversation` | Analyze completed conversations for anti-patterns, tooling gaps, and learnings |
+| `archdiagram` | Generate an architecture diagram from the current context or codebase |
+| `check-antipatterns` | Real-time checking of current conversation against known anti-patterns |
+| `debate` | Run a multi-AI debate (Claude + Codex + Gemini) via gptengage |
+| `ideate` | Generate divergent ideas from a seed using evolutionary ideation via gptengage |
+| `install-commithooks` | Install shared commithooks framework into a project |
+| `invokellm` | Invoke a single AI CLI (claude, codex, gemini) via gptengage |
+| `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint with optional CSS stylesheet |
+| `memleak-investigate` | Investigate memory leaks in any Linux process using /proc, eBPF, and system tools |
+| `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index for Whisper vocabulary curation |
+| `yore-vocabulary-llm-filter` | Filter Yore vocabulary via LLM to build Whisper-specific domain vocabulary |
+
 ## Shell Scripts
 
 ### `sync-skills.sh`
 
-Bidirectional sync between this repo and two installed locations (`~/.agents/skills/` for Codex, `~/.claude/skills/` for Claude Code).
+Bidirectional sync between this repo and three installed locations (`~/.agents/skills/` for Codex, `~/.claude/skills/` for Claude Code skills, `~/.claude/commands/` for Claude Code slash commands).
 
 ```bash
 ./sync-skills.sh pull      # Copy installed skills into this repo
@@ -100,7 +119,7 @@ Pre-commit guard that scans skill files for private references (project names in
 ./audit-skills.sh install-hook   # Write pre-commit hook into .git/hooks/
 ```
 
-Uses patterns from `.exclude-skills` and `.blocklist.local`. Also matches personal home-directory paths under `Documents/`.
+Uses patterns from `.blocklist.local`. Also matches personal home-directory paths under `Documents/`.
 
 ## Installation
 
@@ -113,7 +132,7 @@ cd ~/Documents/rahulskills
 `setup.sh` handles everything:
 1. Clones [commithooks](https://github.com/rahulrajaram/commithooks) to `~/Documents/commithooks/` if not already present
 2. Installs hook dispatchers into `.git/hooks/` and library modules into `.git/lib/`
-3. Optionally deploys skills to `~/.agents/skills/` and `~/.claude/skills/`
+3. Optionally deploys skills to `~/.agents/skills/`, `~/.claude/skills/`, and `~/.claude/commands/`
 
 Pass `--skip-skills` to skip the interactive skill deployment prompt.
 
@@ -125,7 +144,7 @@ The `audit-skills.sh check` scan runs on every push to `master` and on pull requ
 
 1. Create `codex/<name>/SKILL.md` with frontmatter (`name`, `description`, `allowed-tools`). Add optional `agents/`, `references/`, or `scripts/` subdirectories.
 2. Run `./audit-skills.sh check` to verify no private references leaked.
-3. Commit and `./sync-skills.sh push` to deploy to both `~/.agents/skills/` and `~/.claude/skills/`.
+3. Commit and `./sync-skills.sh push` to deploy to `~/.agents/skills/`, `~/.claude/skills/`, and `~/.claude/commands/`.
 
 ## Git Hooks
 
