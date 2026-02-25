@@ -1,3 +1,8 @@
+---
+name: git-status-report
+description: Report the sync status of the current git repository and all submodules relative to remote tracking branches.
+---
+
 # Git Status Report
 
 Report the sync status of the current git repository and all submodules relative to their remote origins, displayed as a clean ASCII table.
