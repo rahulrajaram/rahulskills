@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 PLAN_HEADER_RE = re.compile(
-    r"^\s*(\d+)\.\s*(I\d+)\s+([^:]+):\s*(complete|incomplete|blocked)\.\s*tranche_group=([^\s#]+)"
+    r"^\s*(\d+)\.\s*(I\d+)\s+`([^`]+)`:\s*(complete|incomplete|blocked)\.\s*tranche_group=([^\s#]+)"
 )
 
 VISION_CANDIDATES = ["VISION.md", "Vision.md", "vision.md"]

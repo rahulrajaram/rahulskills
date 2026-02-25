@@ -1,12 +1,12 @@
 ---
 name: install-commithooks
-description: "Install shared commithooks framework into a project. Copies dispatchers and lib into .git/, scaffolds .githooks/ stubs, and creates setup.sh for contributors. Use when user says /install-commithooks, 'install hooks', 'setup git hooks', 'add commit hooks', or asks to wire up shared commithooks."
-allowed-tools: Bash, Read, Write, Grep, Glob
+description: "Install shared commithooks framework into a project. Copies dispatchers and lib into .git/, scaffolds .githooks/ stubs, and wires hook installation into the project's dev setup path. Use when user says /install-commithooks, 'install hooks', 'setup git hooks', 'add commit hooks', or asks to wire up shared commithooks."
+allowed-tools: Bash, Read, Write, Edit, Grep, Glob
 ---
 
 # Install Commithooks
 
-Install the shared commithooks framework into the current git repository. Copies dispatchers into `.git/hooks/`, library modules into `.git/lib/`, scaffolds `.githooks/` stubs, and creates a `setup.sh` so contributors can bootstrap after cloning.
+Install the shared commithooks framework into the current git repository. Copies dispatchers into `.git/hooks/`, library modules into `.git/lib/`, scaffolds `.githooks/` stubs, and wires hook installation into the project's dev setup path so contributors get hooks automatically.
 
 ## Usage
 
@@ -68,7 +68,7 @@ done
 ### Step 3: Copy Library into `.git/lib/`
 
 ```bash
-rm -rf "$GIT_DIR/lib"
+rm -rf "${GIT_DIR:?}/lib"
 cp -r "$SOURCE/lib" "$GIT_DIR/lib"
 ```
 
@@ -92,22 +92,85 @@ For each hook type:
 - `pyproject.toml` / `setup.py` / `setup.cfg` → `lib/lint-python.sh`
 - Multiple → source multiple lint modules
 
-Stubs source from `$(git rev-parse --git-dir)/lib/<module>.sh`.
+Stubs must use the `COMMITHOOKS_DIR` variable to locate library modules:
+
+```bash
+COMMITHOOKS_DIR="${COMMITHOOKS_DIR:-$(git rev-parse --git-dir)}"
+source "$COMMITHOOKS_DIR/lib/common.sh"
+```
 
 Make all scaffolded hooks executable.
 
-### Step 6: Create or Update `setup.sh`
+### Step 6: Wire Hook Installation into Dev Setup Path
 
-If the repo does not have a `setup.sh`, copy the canonical template from the commithooks source:
+The goal: after `git clone` + normal project setup, contributors get dispatchers and lib in `.git/` automatically. The approach depends on project type. **Do NOT create Makefiles for Python projects. Do NOT create standalone `setup.sh` scripts.**
 
-```bash
-cp "$SOURCE/setup-template.sh" "$REPO_ROOT/setup.sh"
-chmod +x "$REPO_ROOT/setup.sh"
+#### Python projects (`pyproject.toml`)
+
+Create a `setup_hooks.py` module inside the package and add a console script entry to `pyproject.toml`:
+
+1. Create `<package>/setup_hooks.py`:
+
+```python
+"""Install commithooks dispatchers and lib into .git/."""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+
+def main() -> None:
+    commithooks = Path(os.environ.get("COMMITHOOKS_DIR", Path.home() / "Documents" / "commithooks"))
+    if not (commithooks / "lib").is_dir():
+        print(f"Commithooks not found at {commithooks} (skipping)")
+        return
+
+    result = subprocess.run(["git", "rev-parse", "--git-dir"], capture_output=True, text=True)
+    if result.returncode != 0:
+        print("Not in a git repository (skipping)")
+        return
+
+    git_dir = Path(result.stdout.strip())
+
+    hooks_dir = git_dir / "hooks"
+    hooks_dir.mkdir(exist_ok=True)
+    for hook in ("pre-commit", "commit-msg", "pre-push", "post-checkout", "post-merge"):
+        src = commithooks / hook
+        if src.exists():
+            shutil.copy2(src, hooks_dir / hook)
+            (hooks_dir / hook).chmod(0o755)
+
+    lib_dst = git_dir / "lib"
+    if lib_dst.exists():
+        shutil.rmtree(lib_dst)
+    shutil.copytree(commithooks / "lib", lib_dst)
+
+    print(f"Commithooks installed from {commithooks}")
 ```
 
-If `setup-template.sh` is not available in the source (older commithooks version), generate a minimal setup.sh that clones commithooks and runs the dispatcher/lib copy logic.
+2. Add to `[project.scripts]` in `pyproject.toml`:
 
-If `setup.sh` already exists, do not overwrite — note it in summary.
+```toml
+<project-name>-setup-hooks = "<package>.setup_hooks:main"
+```
+
+Contributors run `pip install -e .` then `<project-name>-setup-hooks`.
+
+#### Rust projects (`Cargo.toml`)
+
+Add a `build.rs` that runs the copy, or add a `xtask` subcommand.
+
+#### Node projects (`package.json`)
+
+Add a `"prepare"` script:
+
+```json
+"scripts": {
+  "prepare": "bash -c 'COMMITHOOKS=${COMMITHOOKS_DIR:-$HOME/Documents/commithooks}; GIT_DIR=$(git rev-parse --git-dir); [ -d $COMMITHOOKS/lib ] && for h in pre-commit commit-msg pre-push post-checkout post-merge; do [ -f $COMMITHOOKS/$h ] && cp $COMMITHOOKS/$h $GIT_DIR/hooks/$h && chmod +x $GIT_DIR/hooks/$h; done && rm -rf ${GIT_DIR}/lib && cp -r $COMMITHOOKS/lib $GIT_DIR/lib || true'"
+}
+```
 
 ### Step 7: Check .gitignore
 
@@ -143,12 +206,13 @@ Hook Stubs (.githooks/):
   pre-commit    [created/skipped/exists]
   commit-msg    [created/skipped/exists]
 
-setup.sh:       [created/exists]
+Dev setup wiring:
+  <what was done — e.g., "Added <pkg>/setup_hooks.py + pyproject.toml script entry">
 
 Next steps:
   - Customize .githooks/pre-commit for project-specific checks
-  - Commit .githooks/ and setup.sh
-  - Tell contributors: git clone && ./setup.sh
+  - Commit .githooks/ and the setup_hooks module
+  - Tell contributors: pip install -e . && <project>-setup-hooks
 ```
 
 ## Edge Cases
@@ -162,7 +226,8 @@ Next steps:
 | Not in a git repo | Clear error, do not git init |
 | Active rebase/merge | Abort with explanation |
 | .githooks in .gitignore | Warn that stubs won't be tracked |
-| setup.sh already exists | Do not overwrite, note in summary |
+| setup_hooks module already exists | Do not overwrite, note in summary |
+| pyproject.toml script entry exists | Do not duplicate, note in summary |
 
 ## Related Skills
 
