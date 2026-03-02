@@ -1,4 +1,8 @@
-# rahulskills
+<p align="center">
+  <img src="logo.png" alt="rahulskills" />
+  <br/>
+  <em>A curated collection of special recipes I use extensively with AI coding assistants.</em>
+</p>
 
 Shared AI agent skills and shell scripts for Claude Code and OpenAI Codex CLI. This repository is the single source of truth for reusable skills that get synced into individual projects via `sync-skills.sh`.
 
