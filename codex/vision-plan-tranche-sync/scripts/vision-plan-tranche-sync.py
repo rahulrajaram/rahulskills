@@ -240,7 +240,7 @@ def sync_plan(
     for proposal in proposals:
         insert.extend(
             [
-                f"{proposal['ordinal']}. {proposal['key']} {proposal['title']}: {proposal['status']}. tranche_group={proposal['group']}",
+                f"{proposal['ordinal']}. {proposal['key']} `{proposal['title']}`: {proposal['status']}. tranche_group={proposal['group']}",
                 "    Scope:",
                 f"1. From {proposal['source']}: {proposal['title']}",
                 "    Exit criteria:",

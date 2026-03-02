@@ -31,7 +31,8 @@ All file paths are overrideable through CLI flags.
 Use the helper script from the skill directory:
 
 ```bash
-VISION_PLAN_TRANCHE_SYNC_DIR="$HOME/.agents/skills/vision-plan-tranche-sync"
+# Set this to the active skill directory (Claude: ~/.claude/skills/vision-plan-tranche-sync, Codex: ~/Documents/rahulskills/codex/vision-plan-tranche-sync, Agents: ~/.agents/skills/vision-plan-tranche-sync)
+VISION_PLAN_TRANCHE_SYNC_DIR="<active-skill-dir>/vision-plan-tranche-sync"
 python3 "$VISION_PLAN_TRANCHE_SYNC_DIR/scripts/vision-plan-tranche-sync.py" --help
 ```
 
@@ -113,5 +114,7 @@ If no vision file is found:
 ## Post-action checks
 
 - `./bin/yarli-lint-implementation-plan.sh <plan-file>`
+  - Fallback: `~/Documents/rahulskills/bin/yarli-lint-implementation-plan.sh`
 - Optional: `./bin/yarli-sanitize-continuation.sh`
+  - Fallback: `~/Documents/rahulskills/bin/yarli-sanitize-continuation.sh`
 - If tranches TOML was changed, run your normal Yarli validation flow.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TUI/Web Design Orchestrator"
+  short_description: "Prompt-driven TUI and web UI design copilot."
+  default_prompt: "Design a [TUI or web page] for [goal and audience], including IA, component map, interaction states, accessibility, and an implementation-ready prompt."
