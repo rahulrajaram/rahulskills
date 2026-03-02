@@ -92,12 +92,55 @@ For each hook type:
 - `pyproject.toml` / `setup.py` / `setup.cfg` → `lib/lint-python.sh`
 - Multiple → source multiple lint modules
 
-Stubs must use the `COMMITHOOKS_DIR` variable to locate library modules:
+Stubs MUST source the library modules AND call the validation functions. A stub that only sources without calling is a no-op bug.
+
+**Scaffold `.githooks/pre-commit`** (example for Rust project):
 
 ```bash
-COMMITHOOKS_DIR="${COMMITHOOKS_DIR:-$(git rev-parse --git-dir)}"
+#!/usr/bin/env bash
+set -euo pipefail
+COMMITHOOKS_DIR="$(git rev-parse --git-dir)"
 source "$COMMITHOOKS_DIR/lib/common.sh"
+source "$COMMITHOOKS_DIR/lib/lint-rust.sh"
+source "$COMMITHOOKS_DIR/lib/secrets.sh"
+
+commithooks_skip_during_rebase && exit 0
+commithooks_rust_fmt
+commithooks_rust_clippy
+commithooks_block_sensitive_files
+commithooks_scan_secrets_in_diff
 ```
+
+**Scaffold `.githooks/commit-msg`**:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+COMMITHOOKS_DIR="$(git rev-parse --git-dir)"
+source "$COMMITHOOKS_DIR/lib/common.sh"
+source "$COMMITHOOKS_DIR/lib/commit-msg.sh"
+
+commithooks_validate_conventional_commit "$1"
+commithooks_validate_subject_line "$1"
+```
+
+**Scaffold `.githooks/pre-push`**:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+COMMITHOOKS_DIR="$(git rev-parse --git-dir)"
+source "$COMMITHOOKS_DIR/lib/common.sh"
+source "$COMMITHOOKS_DIR/lib/pre-push.sh"
+
+commithooks_reject_wip_commits "$@"
+commithooks_check_branch_name
+```
+
+Adapt the `pre-commit` stub based on detected project type:
+- `Cargo.toml` → `lint-rust.sh` with `commithooks_rust_fmt`, `commithooks_rust_clippy`
+- `package.json` → `lint-js.sh` with `commithooks_js_oxlint` or `commithooks_js_eslint`
+- `pyproject.toml` → `lint-python.sh` with `commithooks_python_syntax`, `commithooks_python_ruff`
 
 Make all scaffolded hooks executable.
 

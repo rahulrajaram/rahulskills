@@ -21,6 +21,7 @@ Three shell scripts handle discovery, syncing, and audit across all local projec
 rahulskills/
   codex/                   # Skills (name/SKILL.md) — synced to ~/.agents/skills/ + ~/.claude/skills/
   claude/                  # Claude Code slash commands (*.md) — synced to ~/.claude/commands/
+  bin/                     # Shared assistant shell helpers (Yarli lint/sanitize, etc.)
   audit-skills.sh          # Pre-commit guard against private reference leaks
   scan-skills.sh           # Cross-project skill discovery and reporting
   sync-skills.sh           # Bidirectional sync between repo and installed locations
@@ -120,6 +121,14 @@ Pre-commit guard that scans skill files for private references (project names in
 ```
 
 Uses patterns from `.blocklist.local`. Also matches personal home-directory paths under `Documents/`.
+
+### `bin/` Shared Assistant Helpers
+
+Reusable helper scripts that skills can call from any repo without depending on a specific project checkout.
+
+Current helpers:
+- `bin/yarli-lint-implementation-plan.sh`
+- `bin/yarli-sanitize-continuation.sh`
 
 ## Installation
 
