@@ -39,7 +39,7 @@ rahulskills/
 
 ## Skills Inventory
 
-### Skills (24)
+### Skills (25)
 
 Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
@@ -61,6 +61,7 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `pythonpackagesevere` | Decompose a Python package into independent projects |
 | `readme-doctor` | Build and validate project README and CLI help text |
 | `reference-cleaner` | Remove blocklisted references from git history and source files |
+| `repo-topics` | Analyze a GitHub repo and apply relevant topic labels |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
