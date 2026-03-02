@@ -10,7 +10,25 @@ Analyze a range of git commits, identify contiguous groups that share a theme, a
 
 ## Usage
 
-`/squash-commits [N]` where N is the number of recent commits to analyze (default: 20).
+`/squash-commits [N] [--all] [--batch] [--max-passes M]`
+
+- `N`: number of recent commits to analyze (default: 20)
+- `--all`: include pushed history (requires force push later)
+- `--batch`: run repeated conservative squashes over multiple contiguous groups
+- `--max-passes M`: cap batch iterations (default: 5, recommended <= 20)
+
+By default, only **unpushed commits** (ahead of the remote tracking branch) are analyzed. This prevents accidentally proposing to rewrite published history. Pass `--all` to include pushed commits in the scan (will require force push).
+
+## Large History Mode (100+ commits)
+
+For large histories, prefer conservative iterative passes instead of one large rewrite:
+
+1. Use first-parent history (`git log --first-parent --oneline`) to avoid side-branch noise.
+2. Pick one contiguous group per pass.
+3. Create a unique backup tag before each pass (for example `pre-big-band-<N>-YYYYMMDD`).
+4. Recompute candidates after each pass.
+5. Run health checks and tests after every pass.
+6. Stop when remaining candidates are tiny or semantically high-value.
 
 ## Squash Candidate Rules
 
@@ -40,6 +58,7 @@ These contiguous sequences should be squashed:
 - Commits from different logical batches even if they look similar
 - Anything where contiguity is broken by an unrelated commit
 - Merge commits (skip these; do not include in groups)
+- Commits spanning major phase/milestone boundaries unless explicitly approved
 
 ## Commit Message Rules
 
@@ -51,6 +70,7 @@ All squashed commit messages MUST follow these conventions:
 - **Conventional prefix**: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `yarli:`, `handoff:`
 - **Capitalize** first word after prefix
 - **No trailing period**
+- **Be specific**: avoid generic "Consolidate related work" unless requested
 
 ### Body (optional, separated by blank line)
 - Wrap at 72 characters
@@ -80,11 +100,20 @@ To restore: git reset --hard <full 40-char SHA>
 
 This is the single source of truth for recovery. The backup tag (Step 4) is a convenience alias, but the SHA is authoritative because tags can be accidentally deleted or moved.
 
-### Step 1: Scan
+### Step 1: Determine Scan Range
 
-Run `git log --oneline -N` for the requested range. Also run `git log --oneline -N --format="%h %s"` for a clean list to analyze.
+**Default: unpushed commits only.** Run:
 
-If user specifies a SHA range instead of a count, use `git log --oneline <base>..<tip>`.
+```bash
+UPSTREAM=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null)
+```
+
+- **If upstream exists and `--all` was NOT passed**: Use `git log --oneline $UPSTREAM..HEAD` to scan only unpushed commits. If user passed N, cap at N. If there are zero unpushed commits, report "No unpushed commits to squash" and stop (suggest `--all` if they want to include pushed history).
+- **If upstream exists and `--all` WAS passed**: Use `git log --oneline -N` for the full requested range. Warn prominently: "Including pushed commits — squashing will require `git push --force-with-lease`."
+- **If no upstream**: Use `git log --oneline -N` for the requested range (no remote to diverge from).
+- **If user specifies a SHA range**: Use `git log --oneline <base>..<tip>` regardless of upstream.
+
+Display the scan range and commit count before proceeding.
 
 ### Step 2: Analyze
 
@@ -92,6 +121,7 @@ Identify contiguous squash groups using the rules above. For each group, record:
 - The SHAs (first and last in the group)
 - The commit count
 - A proposed squashed commit message
+- Estimated impact using `git diff --shortstat <base>..<tip>`
 
 Present a **table** to the user:
 
@@ -104,6 +134,11 @@ Present a **table** to the user:
 
 Also show commits that will be **left untouched** (not in any group) so the user can verify nothing was missed or incorrectly excluded.
 
+Flag groups as high risk if any of these are true:
+- More than 300 files changed
+- More than 20,000 lines touched
+- Crosses a named phase or milestone boundary
+
 ### Step 3: Confirm
 
 Ask the user to approve, modify, or reject the plan. Offer options:
@@ -112,6 +147,11 @@ Ask the user to approve, modify, or reject the plan. Offer options:
 - **Custom**: User specifies which groups to keep/drop/edit
 
 Do NOT proceed without explicit user approval.
+
+If `--batch` is used, collect one explicit approval for:
+- Maximum passes (`--max-passes`)
+- High-risk thresholds
+- Per-pass test command
 
 ### Step 4: Execute
 
@@ -135,12 +175,26 @@ GIT_SEQUENCE_EDITOR=/tmp/haake-squash-editor.sh git rebase -i <base-sha>^
 
 For the commit message amendments, use `exec git commit --amend -m "..."` lines in the rebase todo.
 
+For batch mode:
+- Create a fresh editor script per pass (`/tmp/haake-squash-editor-<pass>.sh`)
+- Create a unique backup tag per pass before rebasing
+- Recompute groups after each successful pass
+- Stop immediately on any failed health check or test failure
+
+For conflict-heavy batch mode on an isolated branch, you may enable rerere before passes:
+
+```bash
+git config rerere.enabled true
+git config rerere.autoupdate true
+```
+
 ### Step 5: Verify
 
 After rebase completes:
 1. Run `git log --oneline -N` to show the cleaned-up history
 2. Run the project test suite if one exists (`cargo test`, `npm test`, `pytest`, etc.)
 3. Report pass/fail status
+4. Report per-pass and cumulative commit-count reduction
 
 If tests fail, warn the user and suggest `git rebase --abort` or `git reflog` to recover.
 
@@ -190,42 +244,69 @@ Squash complete.
 
 ## Safety Guardrails
 
-- **Remote tracking check**: Before rebasing, run `git rev-parse --abbrev-ref @{upstream} 2>/dev/null`. If a remote tracking branch exists, **warn the user** that squashing will diverge from remote and require a force push. Ask for explicit confirmation before proceeding.
+- **Unpushed-only by default**: The scan range is scoped to unpushed commits (`$UPSTREAM..HEAD`) unless `--all` is passed. This prevents accidentally proposing to rewrite published history. When `--all` is used, warn prominently that a force push will be required.
 - **Dirty working tree**: If `git status --porcelain` shows uncommitted changes, refuse to proceed. Ask the user to commit or stash first.
 - **Never auto-squash**: Always present the plan and wait for approval.
 - **Never use --force**: Do not force-push. If the user needs to push after squashing, inform them they'll need `git push --force-with-lease` and let them do it.
 - **Original HEAD recorded**: The full 40-char HEAD SHA is captured in Step 0 and printed at both the start and end of the run. This is the authoritative recovery point — it survives even if the backup tag is lost.
 - **Backup ref**: Before rebasing, create a backup ref: `git tag -f pre-squash-backup` pointing at the original HEAD so the user can recover with `git reset --hard pre-squash-backup`.
-- **Abort on conflict**: If the rebase hits a conflict, do not attempt to resolve it. Abort with `git rebase --abort`, print the original HEAD SHA for manual recovery, and report the issue.
+- **Per-pass backup tags in batch mode**: Create `pre-big-band-<N>-YYYYMMDD` before each pass.
+- **Size guard**: If a proposed squash exceeds 300 files or 20,000 touched lines, require explicit user confirmation.
+- **Milestone guard**: Avoid squashing across major phase boundaries unless explicitly approved.
+- **Conflict policy (default)**: Abort on conflict with `git rebase --abort` and report the recovery SHA.
+- **Conflict policy with rerere (explicit opt-in)**:
+  - Only on an isolated history-cleanup branch
+  - Allow at most one rerere-assisted retry
+  - If still conflicted, abort and stop batch mode
+- **Diminishing returns stop**: In batch mode, stop when no contiguous group has 3+ commits or expected reduction is <= 1 commit/pass.
 - **Post-squash health check**: After completion, verify no rebase state dirs (`.git/rebase-merge`, `.git/rebase-apply`), no stale lock files (`.git/index.lock`, `.git/refs/heads/*.lock`), and working tree is clean. Report any anomalies.
 
-## Example Session
+## Example Sessions
+
+### Default (unpushed only)
 
 ```
-User: /squash-commits 30
+User: /squash-commits
 
 Claude:
 Original HEAD: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
 To restore:    git reset --hard a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
 
-Scanning last 30 commits...
+Upstream: origin/master (8 commits ahead)
+Scanning 8 unpushed commits...
 
-Found 4 squash groups among 30 commits:
+Found 2 squash groups among 8 unpushed commits:
 
 | # | Group Label              | Commits | SHA Range          | Proposed Message                              |
 |---|--------------------------|---------|--------------------|-------------------------------------------------|
-| 1 | Yarli YRLI-52..55 auth   | 6       | abc1234..def5678   | feat: Add per-project API key auth (YRLI-52..55) |
-| 2 | Handoff session 3        | 2       | 111aaaa..222bbbb   | handoff: Update session 3 handoff docs           |
-| 3 | Clippy fix + recovery    | 2       | 333cccc..444dddd   | fix: Resolve clippy warnings in rest.rs          |
-| 4 | Yarli workspace reapply  | 4       | 555eeee..666ffff   | yarli: Reapply workspace state after merge       |
+| 1 | Ideate feature           | 3       | abc1234..def5678   | feat: Add ideate subcommand with pager          |
+| 2 | Clippy fix + recovery    | 2       | 333cccc..444dddd   | fix: Resolve clippy warnings in rest.rs          |
 
-22 commits remain untouched (standalone).
-Result: 30 commits → 22 commits.
+3 commits remain untouched (standalone).
+Result: 8 commits → 5 commits. No force push needed.
 
 Approve this plan? [Approve / Conservative (3+ only) / Custom / Cancel]
+```
 
---- after user approves and squash completes ---
+### With --all (includes pushed history)
 
+```
+User: /squash-commits 30 --all
+
+Claude:
+Original HEAD: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
+To restore:    git reset --hard a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
+
+⚠ Including pushed commits — squashing will require force push.
+Scanning last 30 commits...
+
+Found 4 squash groups among 30 commits:
+...
+```
+
+### After squash completes
+
+```
 Squash complete.
   Original HEAD: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
   Current HEAD:  f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5

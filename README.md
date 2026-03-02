@@ -35,7 +35,7 @@ rahulskills/
 
 ## Skills Inventory
 
-### Skills (23)
+### Skills (24)
 
 Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
@@ -59,13 +59,14 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `reference-cleaner` | Remove blocklisted references from git history and source files |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
 | `test` | Run tests with overwatch for streaming output and failure detection |
+| `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
 | `vision-plan-tranche-sync` | Translate roadmap items into implementation tranches |
 | `yarli-introspect` | Live introspection of running or completed Yarli runs |
 | `yarli-repo-init` | Initialize and validate Yarli orchestration in a repository |
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
 
-### Claude Code Slash Commands (11)
+### Claude Code Slash Commands (12)
 
 Synced to `~/.claude/commands/`. These are invoked as `/command-name` inside Claude Code.
 
@@ -80,6 +81,7 @@ Synced to `~/.claude/commands/`. These are invoked as `/command-name` inside Cla
 | `invokellm` | Invoke a single AI CLI (claude, codex, gemini) via gptengage |
 | `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint with optional CSS stylesheet |
 | `memleak-investigate` | Investigate memory leaks in any Linux process using /proc, eBPF, and system tools |
+| `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index for Whisper vocabulary curation |
 | `yore-vocabulary-llm-filter` | Filter Yore vocabulary via LLM to build Whisper-specific domain vocabulary |
 
