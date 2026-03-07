@@ -5,7 +5,7 @@ SKILLS_DIR="$(cd "$(dirname "$0")" && pwd)"
 CODEX_SRC="$HOME/.agents/skills"
 CLAUDE_SRC="$HOME/.claude/skills"
 CLAUDE_CMD_SRC="$HOME/.claude/commands"
-SKILLS_DST="$SKILLS_DIR/codex"
+REPO_SKILLS_DIR="$SKILLS_DIR/skills"
 COMMANDS_DST="$SKILLS_DIR/claude"
 
 # Exclusion list — one skill name per line, lines starting with # are ignored.
@@ -83,16 +83,16 @@ pull() {
     local cmd_count=0
 
     echo "Pulling Codex skills from $CODEX_SRC ..."
-    mkdir -p "$SKILLS_DST"
+    mkdir -p "$REPO_SKILLS_DIR"
     while IFS= read -r skill_name; do
         if is_excluded "$skill_name"; then
             echo "  SKIP (excluded): $skill_name"
             skipped=$((skipped + 1))
-            rm -rf "$SKILLS_DST/$skill_name"
+            rm -rf "$REPO_SKILLS_DIR/$skill_name"
             continue
         fi
-        rm -rf "$SKILLS_DST/$skill_name"
-        cp -a "$CODEX_SRC/$skill_name" "$SKILLS_DST/$skill_name"
+        rm -rf "$REPO_SKILLS_DIR/$skill_name"
+        cp -a "$CODEX_SRC/$skill_name" "$REPO_SKILLS_DIR/$skill_name"
     done < <(list_skill_names "$CODEX_SRC")
 
     echo "Pulling Claude skills from $CLAUDE_SRC ..."
@@ -102,11 +102,11 @@ pull() {
             skipped=$((skipped + 1))
             continue
         fi
-        if [[ -d "$SKILLS_DST/$skill_name" ]]; then
+        if [[ -d "$REPO_SKILLS_DIR/$skill_name" ]]; then
             # Already pulled from Codex source, skip
             continue
         fi
-        cp -a "$CLAUDE_SRC/$skill_name" "$SKILLS_DST/$skill_name"
+        cp -a "$CLAUDE_SRC/$skill_name" "$REPO_SKILLS_DIR/$skill_name"
         echo "  NEW (from claude/skills): $skill_name"
     done < <(list_skill_names "$CLAUDE_SRC")
 
@@ -125,7 +125,7 @@ pull() {
     done < <(list_command_names "$CLAUDE_CMD_SRC")
 
     echo ""
-    echo "Skills: $(count_skill_names "$SKILLS_DST")"
+    echo "Skills: $(count_skill_names "$REPO_SKILLS_DIR")"
     echo "Commands: $cmd_count"
     [ "$skipped" -gt 0 ] && echo "Excluded: $skipped"
     echo "Done. Review with: cd $SKILLS_DIR && git diff"
@@ -141,17 +141,17 @@ push() {
     mkdir -p "$CODEX_SRC"
     while IFS= read -r skill_name; do
         rm -rf "$CODEX_SRC/$skill_name"
-        cp -a "$SKILLS_DST/$skill_name" "$CODEX_SRC/$skill_name"
+        cp -a "$REPO_SKILLS_DIR/$skill_name" "$CODEX_SRC/$skill_name"
         echo "  -> $skill_name"
-    done < <(list_skill_names "$SKILLS_DST")
+    done < <(list_skill_names "$REPO_SKILLS_DIR")
 
     echo "Pushing skills to $CLAUDE_SRC ..."
     mkdir -p "$CLAUDE_SRC"
     while IFS= read -r skill_name; do
         rm -rf "$CLAUDE_SRC/$skill_name"
-        cp -a "$SKILLS_DST/$skill_name" "$CLAUDE_SRC/$skill_name"
-    done < <(list_skill_names "$SKILLS_DST")
-    echo "  $(count_skill_names "$SKILLS_DST") skills synced"
+        cp -a "$REPO_SKILLS_DIR/$skill_name" "$CLAUDE_SRC/$skill_name"
+    done < <(list_skill_names "$REPO_SKILLS_DIR")
+    echo "  $(count_skill_names "$REPO_SKILLS_DIR") skills synced"
 
     echo "Pushing slash commands to $CLAUDE_CMD_SRC ..."
     mkdir -p "$CLAUDE_CMD_SRC"
@@ -172,19 +172,19 @@ do_diff() {
     echo "=== Codex skills (~/.agents/skills/) ==="
     while IFS= read -r skill_name; do
         if [ -d "$CODEX_SRC/$skill_name" ]; then
-            if ! diff -rq "$SKILLS_DST/$skill_name" "$CODEX_SRC/$skill_name" > /dev/null 2>&1; then
+            if ! diff -rq "$REPO_SKILLS_DIR/$skill_name" "$CODEX_SRC/$skill_name" > /dev/null 2>&1; then
                 echo "  MODIFIED: $skill_name"
-                diff -ru "$CODEX_SRC/$skill_name" "$SKILLS_DST/$skill_name" || true
+                diff -ru "$CODEX_SRC/$skill_name" "$REPO_SKILLS_DIR/$skill_name" || true
                 has_diff=1
             fi
         else
             echo "  NEW (repo only): $skill_name"
             has_diff=1
         fi
-    done < <(list_skill_names "$SKILLS_DST")
+    done < <(list_skill_names "$REPO_SKILLS_DIR")
 
     while IFS= read -r skill_name; do
-        if [ ! -d "$SKILLS_DST/$skill_name" ]; then
+        if [ ! -d "$REPO_SKILLS_DIR/$skill_name" ]; then
             echo "  INSTALLED ONLY: $skill_name"
             has_diff=1
         fi
@@ -194,7 +194,7 @@ do_diff() {
     echo "=== Claude skills (~/.claude/skills/) ==="
     while IFS= read -r skill_name; do
         if [ -d "$CLAUDE_SRC/$skill_name" ]; then
-            if ! diff -rq "$SKILLS_DST/$skill_name" "$CLAUDE_SRC/$skill_name" > /dev/null 2>&1; then
+            if ! diff -rq "$REPO_SKILLS_DIR/$skill_name" "$CLAUDE_SRC/$skill_name" > /dev/null 2>&1; then
                 echo "  MODIFIED: $skill_name"
                 has_diff=1
             fi
@@ -202,10 +202,10 @@ do_diff() {
             echo "  MISSING (not installed): $skill_name"
             has_diff=1
         fi
-    done < <(list_skill_names "$SKILLS_DST")
+    done < <(list_skill_names "$REPO_SKILLS_DIR")
 
     while IFS= read -r skill_name; do
-        if [ ! -d "$SKILLS_DST/$skill_name" ]; then
+        if [ ! -d "$REPO_SKILLS_DIR/$skill_name" ]; then
             echo "  INSTALLED ONLY: $skill_name"
             has_diff=1
         fi
@@ -236,8 +236,8 @@ do_diff() {
     if [ "$has_diff" -eq 0 ]; then
         echo ""
         echo "Summary:"
-        echo "  Codex skills: repo $(count_skill_names "$SKILLS_DST"), installed $(count_skill_names "$CODEX_SRC")"
-        echo "  Claude skills: repo $(count_skill_names "$SKILLS_DST"), installed $(count_skill_names "$CLAUDE_SRC")"
+        echo "  Codex skills: repo $(count_skill_names "$REPO_SKILLS_DIR"), installed $(count_skill_names "$CODEX_SRC")"
+        echo "  Claude skills: repo $(count_skill_names "$REPO_SKILLS_DIR"), installed $(count_skill_names "$CLAUDE_SRC")"
         echo "  Slash commands: repo $(count_command_names "$COMMANDS_DST"), installed $(count_command_names "$CLAUDE_CMD_SRC")"
         echo "Everything in sync."
     fi
@@ -251,7 +251,7 @@ compare_implementations() {
     local in_claude
     declare -A all_skills
 
-    while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$SKILLS_DST")
+    while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$REPO_SKILLS_DIR")
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CODEX_SRC")
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CLAUDE_SRC")
 
@@ -260,7 +260,7 @@ compare_implementations() {
         in_repo="no"
         in_codex="no"
         in_claude="no"
-        [ -d "$SKILLS_DST/$skill" ] && in_repo="yes"
+        [ -d "$REPO_SKILLS_DIR/$skill" ] && in_repo="yes"
         [ -d "$CODEX_SRC/$skill" ] && in_codex="yes"
         [ -d "$CLAUDE_SRC/$skill" ] && in_claude="yes"
 
@@ -280,11 +280,11 @@ compare_implementations() {
             echo "  DIVERGED: $skill"
             has_issue=1
         fi
-    done < <(list_skill_names "$SKILLS_DST")
+    done < <(list_skill_names "$REPO_SKILLS_DIR")
 
     echo ""
     echo "Summary:"
-    echo "  repo=$(count_skill_names "$SKILLS_DST"), codex=$(count_skill_names "$CODEX_SRC"), claude=$(count_skill_names "$CLAUDE_SRC")"
+    echo "  repo=$(count_skill_names "$REPO_SKILLS_DIR"), codex=$(count_skill_names "$CODEX_SRC"), claude=$(count_skill_names "$CLAUDE_SRC")"
 
     if [ "$has_issue" -eq 0 ]; then
         echo "PASS: Codex and Claude skill variants are consistent."
