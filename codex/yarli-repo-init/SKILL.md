@@ -10,7 +10,7 @@ Initialize a repository for reliable Yarli operation.
 ## Outcomes
 
 Produce a working setup with:
-- `yarli.toml` generated and tuned for the target CLI backend
+- local `yarli.toml` generated and tuned for the target CLI backend
 - Prompt/plan authority files in place (when the workflow uses them)
 - Optional Haake memory integration configured
 - A verified smoke run and status/triage commands confirmed
@@ -71,6 +71,14 @@ Ensure:
 - `[execution].working_dir = "."`
 - `[execution].runner = "native"` (unless user requests overwatch)
 - `[ui].mode` is set intentionally (`auto|stream|tui`)
+
+5. Ignore Yarli runtime state.
+Ensure repository-local runtime artifacts do not pollute Git:
+- add `yarli.toml` to `.gitignore` unless the repository explicitly treats it as a tracked canonical config
+- add `.yarl/` to `.gitignore`
+- add `.yarli/` to `.gitignore`
+- if any of those paths are already tracked, untrack them while keeping local files
+- do this before validation runs so smoke execution does not dirty the repo
 
 ## Step 3: Bootstrap Prompt + Plan Authority (If Missing)
 
@@ -164,5 +172,6 @@ Return:
 
 - Prefer repository conventions over generic defaults.
 - Keep `PROMPT.md` intent-only when using plan workflow.
+- Keep `yarli.toml`, `.yarl/`, and `.yarli/` out of version control unless the repository explicitly requires otherwise.
 - Avoid destructive git operations during initialization.
 - Do not claim setup is complete without running at least one `yarli run` smoke path.

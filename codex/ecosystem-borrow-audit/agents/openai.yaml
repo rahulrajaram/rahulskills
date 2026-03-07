@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ecosystem Borrow Audit"
+  short_description: "Audit listings + depth-1 repos for borrowable components, missed opportunities, and ideate follow-ups."
+  default_prompt: "Run /ecosystem-borrow-audit: review ~/Documents/listings.txt and all depth-1 git repos, produce a ranked borrow backlog, then run ideate at sigma 0.25/0.5/1/1.5 and merge findings."
