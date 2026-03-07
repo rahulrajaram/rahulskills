@@ -39,7 +39,7 @@ rahulskills/
 
 ## Skills Inventory
 
-### Skills (25)
+### Skills (30)
 
 Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
@@ -48,7 +48,9 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `analyze-conversation` | Post-mortem analysis of conversations for anti-patterns and learnings |
 | `archdiagram` | Generate architecture diagrams from context or codebase |
 | `check-antipatterns` | Real-time anti-pattern detection during active work |
+| `commit` | Smart commit with file triage, artifact filtering, and secret detection |
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
+| `ecosystem-borrow-audit` | Cross-repo borrowing analysis and multi-sigma ideation sweeps |
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
 | `handoff` | Commit workspace state and generate next-shell continuation prompt |
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
@@ -57,11 +59,14 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `kokoro-tts` | Read text out loud using Kokoro TTS |
 | `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint |
 | `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
+| `next-todos` | Generate concise next-step to-do lists capped at 20 words each |
 | `postmortem` | Generate Amazon COE-style 5-whys postmortem reports |
 | `pythonpackagesevere` | Decompose a Python package into independent projects |
 | `readme-doctor` | Build and validate project README and CLI help text |
 | `reference-cleaner` | Remove blocklisted references from git history and source files |
 | `repo-topics` | Analyze a GitHub repo and apply relevant topic labels |
+| `rewrite-commit-messages` | Bulk rewrite git commit messages with filter-repo |
+| `skill-creator` | Guide for creating effective skills for Claude and Codex |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |

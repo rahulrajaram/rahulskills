@@ -24,11 +24,26 @@ By default, only **unpushed commits** (ahead of the remote tracking branch) are 
 For large histories, prefer conservative iterative passes instead of one large rewrite:
 
 1. Use first-parent history (`git log --first-parent --oneline`) to avoid side-branch noise.
-2. Pick one contiguous group per pass.
+2. Pick one small contiguous group per pass.
 3. Create a unique backup tag before each pass (for example `pre-big-band-<N>-YYYYMMDD`).
 4. Recompute candidates after each pass.
-5. Run health checks and tests after every pass.
+5. Run `git range-diff` plus health checks and tests after every pass.
 6. Stop when remaining candidates are tiny or semantically high-value.
+
+### Replay-sensitivity note
+
+Contiguity is necessary for proposing a squash group, but it is **not**
+sufficient to guarantee a conflict-free rebase. Interactive rebase rewrites the
+selected commits and then replays later commits on top of the rewritten base.
+That means a perfectly contiguous `A/B/C` squash can still trigger conflicts in
+later `D/E/F` commits if those later commits touch the same regions or depend on
+the original parent chain's exact file state.
+
+Practical consequence:
+- prefer the smallest contiguous range that achieves the cleanup goal
+- avoid crossing multiple tranche waves or repeated hotspot edits in one pass
+- be especially conservative around histories containing auto-repairs, reapply
+  commits, conflict-fix commits, or repeated edits to the same files
 
 ## Squash Candidate Rules
 
@@ -115,6 +130,10 @@ UPSTREAM=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null)
 
 Display the scan range and commit count before proceeding.
 
+Before proposing any groups, also state whether this is a **tip-only cleanup**
+or a deeper rewrite that will force many later commits to be replayed. If the
+history is large or conflict-prone, bias toward tip-only cleanup first.
+
 ### Step 2: Analyze
 
 Identify contiguous squash groups using the rules above. For each group, record:
@@ -138,6 +157,13 @@ Flag groups as high risk if any of these are true:
 - More than 300 files changed
 - More than 20,000 lines touched
 - Crosses a named phase or milestone boundary
+- Crosses multiple tranche waves or repeated hotspot files
+
+Also explicitly call out:
+- whether the group is at the tip of history
+- how many later commits would need to be replayed after the rewrite
+- whether the range contains Yarli-style `task`, `merge`, `auto-repair`, or
+  `reapply` commits, since these are often replay-sensitive
 
 ### Step 3: Confirm
 
@@ -152,6 +178,9 @@ If `--batch` is used, collect one explicit approval for:
 - Maximum passes (`--max-passes`)
 - High-risk thresholds
 - Per-pass test command
+
+Recommend `Conservative` by default on large branches or replay-sensitive
+histories.
 
 ### Step 4: Execute
 
@@ -181,20 +210,27 @@ For batch mode:
 - Recompute groups after each successful pass
 - Stop immediately on any failed health check or test failure
 
-For conflict-heavy batch mode on an isolated branch, you may enable rerere before passes:
+For any non-trivial cleanup, prefer running on a dedicated cleanup branch first.
+
+For conflict-heavy batch mode on an isolated branch, enable rerere before passes:
 
 ```bash
 git config rerere.enabled true
 git config rerere.autoupdate true
 ```
 
+Prefer the merge backend behavior and avoid apply-style workflows for conflict
+prone cleanups, because merge-aware replay handles renames and context more
+robustly than apply-style patching.
+
 ### Step 5: Verify
 
 After rebase completes:
 1. Run `git log --oneline -N` to show the cleaned-up history
-2. Run the project test suite if one exists (`cargo test`, `npm test`, `pytest`, etc.)
-3. Report pass/fail status
-4. Report per-pass and cumulative commit-count reduction
+2. Run `git range-diff` against the pre-pass backup ref to verify what changed
+3. Run the project test suite if one exists (`cargo test`, `npm test`, `pytest`, etc.)
+4. Report pass/fail status
+5. Report per-pass and cumulative commit-count reduction
 
 If tests fail, warn the user and suggest `git rebase --abort` or `git reflog` to recover.
 
@@ -251,6 +287,17 @@ Squash complete.
 - **Original HEAD recorded**: The full 40-char HEAD SHA is captured in Step 0 and printed at both the start and end of the run. This is the authoritative recovery point — it survives even if the backup tag is lost.
 - **Backup ref**: Before rebasing, create a backup ref: `git tag -f pre-squash-backup` pointing at the original HEAD so the user can recover with `git reset --hard pre-squash-backup`.
 - **Per-pass backup tags in batch mode**: Create `pre-big-band-<N>-YYYYMMDD` before each pass.
+- **Prefer small passes**: Rewrite the smallest contiguous group that buys a
+  meaningful reduction. Do not squash across multiple tranche waves at once
+  unless the user explicitly accepts the replay risk.
+- **Replay warning**: Contiguous commits can still cause later conflicts because
+  later commits are replayed on the rewritten base during rebase.
+- **Use rerere on cleanup branches**: Prefer `git config rerere.enabled true`
+  and `git config rerere.autoupdate true` before multi-pass cleanup.
+- **Prefer tip-first cleanup**: Start with the newest self-contained group so
+  fewer later commits must be replayed.
+- **Verify with range-diff**: After each successful pass, compare pre/post
+  ranges with `git range-diff` before attempting another pass.
 - **Size guard**: If a proposed squash exceeds 300 files or 20,000 touched lines, require explicit user confirmation.
 - **Milestone guard**: Avoid squashing across major phase boundaries unless explicitly approved.
 - **Conflict policy (default)**: Abort on conflict with `git rebase --abort` and report the recovery SHA.
