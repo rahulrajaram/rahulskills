@@ -136,6 +136,19 @@ Discover skills, scripts, agents, and build targets across all local projects li
 
 Tags each discovered item as `[COLLECTED]`, `[EXCLUDED]`, or `[NEW]` relative to this repo.
 
+### Skill Structure Tests
+
+Validate skill construction separately for Codex and Claude installs.
+
+```bash
+./tests/test_codex_skill_structure.sh
+./tests/test_claude_skill_structure.sh
+```
+
+Both tests infer required frontmatter keys from a real installed reference
+skill (`archdiagram` by default), then validate every repo skill and installed
+skill against that shape.
+
 ### `audit-skills.sh`
 
 Pre-commit guard that scans skill files for private references (project names in blocklists, personal filesystem paths).
