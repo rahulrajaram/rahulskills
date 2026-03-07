@@ -3,17 +3,27 @@ set -euo pipefail
 
 SKILLS_DIR="$(cd "$(dirname "$0")" && pwd)"
 BLOCKLIST_FILE="$SKILLS_DIR/.blocklist.local"
+REPO_SKILLS_DIR="$SKILLS_DIR/skills"
+LEGACY_SKILLS_DIR="$SKILLS_DIR/codex"
 
 usage() {
     cat <<'EOF'
 Usage: audit-skills.sh <command>
 
 Commands:
-  check          Scan all skill files in codex/ for private references
+  check          Scan all skill files in skills/ for private references
   pre-commit     Scan only staged skill files (called by git hook)
   install-hook   Write the pre-commit hook into .git/hooks/
 EOF
     exit 1
+}
+
+skill_root_dir() {
+    if [[ -d "$REPO_SKILLS_DIR" ]]; then
+        echo "$REPO_SKILLS_DIR"
+    else
+        echo "$LEGACY_SKILLS_DIR"
+    fi
 }
 
 # Build a combined grep pattern from exclude file, blocklist, and personal path regex.
@@ -80,13 +90,15 @@ scan_files() {
 
 do_check() {
     local pattern
+    local root
     pattern="$(build_pattern)"
+    root="$(skill_root_dir)"
 
     echo "Scanning all skill files for private references..."
     echo "Pattern: $pattern"
     echo ""
 
-    find "$SKILLS_DIR/codex" -type f 2>/dev/null | scan_files "$pattern"
+    find "$root" -type f 2>/dev/null | scan_files "$pattern"
 
     local rc=$?
     [[ $rc -eq 0 ]] && echo "All clean."
