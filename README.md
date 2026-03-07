@@ -13,7 +13,7 @@ This repo collects skills (prompt-based automation units) for two AI coding assi
 - **Codex** (`~/.agents/skills/`) -- OpenAI Codex CLI skills
 - **Claude Code** (`~/.claude/skills/`) -- Claude Code skills
 
-Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `codex/` directory in this repo is the single source of truth, synced to both locations.
+Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `skills/` directory in this repo is the single source of truth, synced to both locations.
 
 Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yarli orchestration, Yore vocabulary curation).
 
@@ -23,10 +23,12 @@ Three shell scripts handle discovery, syncing, and audit across all local projec
 
 ```
 rahulskills/
-  codex/                   # Skills (name/SKILL.md) — synced to ~/.agents/skills/ + ~/.claude/skills/
+  skills/                  # Canonical shared skills (name/SKILL.md)
+  codex -> skills          # Backward-compatible symlink for legacy tooling
   claude/                  # Claude Code slash commands (*.md) — synced to ~/.claude/commands/
   bin/                     # Shared assistant shell helpers (Yarli lint/sanitize, etc.)
   audit-skills.sh          # Pre-commit guard against private reference leaks
+  stitch-skills.sh         # Canonical-layout + install/check orchestration helper
   scan-skills.sh           # Cross-project skill discovery and reporting
   sync-skills.sh           # Bidirectional sync between repo and installed locations
   setup.sh                 # Contributor bootstrap (hooks + optional skill deploy)
@@ -106,9 +108,21 @@ Bidirectional sync between this repo and three installed locations (`~/.agents/s
 ./sync-skills.sh push      # Deploy repo skills to installed locations
 ./sync-skills.sh diff      # Show differences between repo and installed
 ./sync-skills.sh status    # List which skills exist where
+./sync-skills.sh compare-implementations  # Validate Codex/Claude skill parity
 ```
 
 Respects per-machine exclusion list in `.exclude-skills` (one skill name per line, gitignored).
+
+### `stitch-skills.sh`
+
+Orchestrates shared-skill layout and installs for both CLIs.
+
+```bash
+./stitch-skills.sh repo-layout   # Ensure canonical skills/ + codex -> skills symlink
+./stitch-skills.sh install       # Push shared skills to ~/.agents/skills and ~/.claude/skills
+./stitch-skills.sh check         # Run compare + diff checks
+./stitch-skills.sh all           # repo-layout + install + check
+```
 
 ### `scan-skills.sh`
 
@@ -121,6 +135,19 @@ Discover skills, scripts, agents, and build targets across all local projects li
 ```
 
 Tags each discovered item as `[COLLECTED]`, `[EXCLUDED]`, or `[NEW]` relative to this repo.
+
+### Skill Structure Tests
+
+Validate skill construction separately for Codex and Claude installs.
+
+```bash
+./tests/test_codex_skill_structure.sh
+./tests/test_claude_skill_structure.sh
+```
+
+Both tests infer required frontmatter keys from a real installed reference
+skill (`archdiagram` by default), then validate every repo skill and installed
+skill against that shape.
 
 ### `audit-skills.sh`
 
@@ -163,7 +190,7 @@ The `audit-skills.sh check` scan runs on every push to `master` and on pull requ
 
 ## Adding a New Skill
 
-1. Create `codex/<name>/SKILL.md` with frontmatter (`name`, `description`, `allowed-tools`). Add optional `agents/`, `references/`, or `scripts/` subdirectories.
+1. Create `skills/<name>/SKILL.md` with frontmatter (`name`, `description`, `allowed-tools`). Add optional `agents/`, `references/`, or `scripts/` subdirectories.
 2. Run `./audit-skills.sh check` to verify no private references leaked.
 3. Commit and `./sync-skills.sh push` to deploy to `~/.agents/skills/`, `~/.claude/skills/`, and `~/.claude/commands/`.
 
