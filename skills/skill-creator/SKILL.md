@@ -1,7 +1,7 @@
 ---
 name: skill-creator
 description: Guide for creating effective skills for Claude and Codex. Use when users want to create or update a skill.
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob
+argument-hint: "<skill-name>"
 ---
 
 # Skill Creator

@@ -1,7 +1,7 @@
 ---
 name: tui-web-design-orchestrator
 description: "Generate structured design prompt packets for terminal UIs and web UIs from natural-language briefs. Use when the user asks to design/redesign a TUI, web page, landing page, dashboard, or UI flow, or says /tui-web-design-orchestrator."
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob
+argument-hint: "--mode <web-page|web-app|tui-dashboard|tui-wizard> --brief \"<text>\" [--audience \"...\"] [--constraints \"...\"] [--style \"...\"] [--tech \"...\"] [--output markdown|json] [--outfile PATH]"
 ---
 
 # TUI/Web Design Orchestrator

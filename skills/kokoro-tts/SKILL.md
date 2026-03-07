@@ -1,7 +1,7 @@
 ---
 name: kokoro-tts
 description: Read Claude's responses out loud using Kokoro TTS. Use when user says "read that", "speak it", "say it out loud", or requests audio output.
-allowed-tools: Bash
+argument-hint: "[optional text]"
 ---
 
 # Kokoro TTS Reader

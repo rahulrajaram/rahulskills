@@ -1,6 +1,7 @@
 ---
 name: handoff
 description: "Commit current workspace state, reconcile handoff docs, and generate a next-shell continuation prompt. Use when the user asks for /handoff, asks to wrap up work, asks to continue from a new shell, or needs an accurate session handoff. Execute three outcomes in order: (1) commit all current changes, (2) update canonical IMPLEMENTATION_PLAN.md and PROMPT.md if present so status claims are accurate, and (3) produce a detailed copy-paste prompt for the next shell."
+argument-hint: ""
 ---
 
 # Handoff

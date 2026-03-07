@@ -1,7 +1,7 @@
 ---
 name: memleak-investigate
 description: Investigate memory leaks in any Linux process using /proc, eBPF (bpftrace/bcc), and system tools. Use when user says "memory leak", "memleak", "OOM", "RSS growing", "swap full", or asks to investigate why a process is using too much memory.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task, WebSearch
+argument-hint: "[PID or process-name]"
 ---
 
 # Memory Leak Investigator

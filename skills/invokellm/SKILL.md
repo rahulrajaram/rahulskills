@@ -1,6 +1,7 @@
 ---
 name: invokellm
 description: "Invoke a single AI CLI (claude, codex, gemini) via gptengage. Use when the user asks to invoke, query, or prompt a specific LLM CLI, or says /invokellm."
+argument-hint: "<cli> <prompt> [--model MODEL] [--session NAME] [--context-file FILE] [--timeout SECS] [--write]"
 ---
 
 # Invoke LLM

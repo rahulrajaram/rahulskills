@@ -1,7 +1,8 @@
 ---
 name: commit
 description: "Create a well-formed commit after intelligently triaging every changed file to determine whether it should actually be committed. Filters planning artifacts, agent state, spurious docs, and secrets. Supports human-controlled overrides via .githooks/commit-allow. Use when the user says /commit, 'commit changes', 'make a commit', or asks to commit work."
-allowed-tools: Bash, Read, Grep, Glob
+argument-hint: "[message hint]"
+argument-hint: "[message hint]"
 ---
 
 # Commit

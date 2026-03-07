@@ -1,7 +1,7 @@
 ---
 name: repo-topics
 description: "Analyze a GitHub repository and apply relevant topic labels under repository details. Use when user says /repo-topics, 'add topics', 'add labels to repo', 'tag the repo', or asks to set GitHub repository topics."
-allowed-tools: Bash, Read, Glob, Grep
+argument-hint: "[owner/repo]"
 ---
 
 # Repo Topics

@@ -1,6 +1,7 @@
 ---
 name: git-status-report
 description: Report the sync status of the current git repository and all submodules relative to remote tracking branches.
+argument-hint: ""
 ---
 
 # Git Status Report

@@ -25,7 +25,6 @@ Three shell scripts handle discovery, syncing, and audit across all local projec
 rahulskills/
   skills/                  # Canonical shared skills (name/SKILL.md)
   codex -> skills          # Backward-compatible symlink for legacy tooling
-  claude/                  # Claude Code slash commands (*.md) — synced to ~/.claude/commands/
   bin/                     # Shared assistant shell helpers (Yarli lint/sanitize, etc.)
   audit-skills.sh          # Pre-commit guard against private reference leaks
   stitch-skills.sh         # Canonical-layout + install/check orchestration helper
@@ -78,30 +77,11 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
 
-### Claude Code Slash Commands (12)
-
-Synced to `~/.claude/commands/`. These are invoked as `/command-name` inside Claude Code.
-
-| Command | Description |
-|---------|-------------|
-| `analyze-conversation` | Analyze completed conversations for anti-patterns, tooling gaps, and learnings |
-| `archdiagram` | Generate an architecture diagram from the current context or codebase |
-| `check-antipatterns` | Real-time checking of current conversation against known anti-patterns |
-| `debate` | Run a multi-AI debate (Claude + Codex + Gemini) via gptengage |
-| `ideate` | Generate divergent ideas from a seed using evolutionary ideation via gptengage |
-| `install-commithooks` | Install shared commithooks framework into a project |
-| `invokellm` | Invoke a single AI CLI (claude, codex, gemini) via gptengage |
-| `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint with optional CSS stylesheet |
-| `memleak-investigate` | Investigate memory leaks in any Linux process using /proc, eBPF, and system tools |
-| `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
-| `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index for Whisper vocabulary curation |
-| `yore-vocabulary-llm-filter` | Filter Yore vocabulary via LLM to build Whisper-specific domain vocabulary |
-
 ## Shell Scripts
 
 ### `sync-skills.sh`
 
-Bidirectional sync between this repo and three installed locations (`~/.agents/skills/` for Codex, `~/.claude/skills/` for Claude Code skills, `~/.claude/commands/` for Claude Code slash commands).
+Bidirectional sync between this repo and two installed locations (`~/.agents/skills/` for Codex, `~/.claude/skills/` for Claude Code).
 
 ```bash
 ./sync-skills.sh pull      # Copy installed skills into this repo
@@ -180,7 +160,7 @@ cd ~/Documents/rahulskills
 `setup.sh` handles everything:
 1. Clones [commithooks](https://github.com/rahulrajaram/commithooks) to `~/Documents/commithooks/` if not already present
 2. Installs hook dispatchers into `.git/hooks/` and library modules into `.git/lib/`
-3. Optionally deploys skills to `~/.agents/skills/`, `~/.claude/skills/`, and `~/.claude/commands/`
+3. Optionally deploys skills to `~/.agents/skills/` and `~/.claude/skills/`
 
 Pass `--skip-skills` to skip the interactive skill deployment prompt.
 
@@ -192,7 +172,7 @@ The `audit-skills.sh check` scan runs on every push to `master` and on pull requ
 
 1. Create `skills/<name>/SKILL.md` with frontmatter (`name`, `description`, `allowed-tools`). Add optional `agents/`, `references/`, or `scripts/` subdirectories.
 2. Run `./audit-skills.sh check` to verify no private references leaked.
-3. Commit and `./sync-skills.sh push` to deploy to `~/.agents/skills/`, `~/.claude/skills/`, and `~/.claude/commands/`.
+3. Commit and `./sync-skills.sh push` to deploy to `~/.agents/skills/` and `~/.claude/skills/`.
 
 ## Git Hooks
 

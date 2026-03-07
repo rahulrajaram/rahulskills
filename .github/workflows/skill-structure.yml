@@ -22,3 +22,6 @@ jobs:
 
       - name: Run Claude skill structure test
         run: ./tests/test_claude_skill_structure.sh
+
+      - name: Run command metadata migration test
+        run: ./tests/test_command_metadata_migration.sh

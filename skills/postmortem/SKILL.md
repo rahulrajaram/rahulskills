@@ -3,7 +3,7 @@ name: postmortem
 description: Generate Amazon COE-style 5-whys postmortem reports for incidents and failures. Use when user says "postmortem", "COE", "5-whys", "incident report", or asks to analyze why something failed.
 author: claude
 version: 1.0.0
-allowed-tools: Bash, Read, Grep, Glob, Task
+argument-hint: "[incident description]"
 ---
 
 # Postmortem Generator (Amazon COE 5-Whys Style)
