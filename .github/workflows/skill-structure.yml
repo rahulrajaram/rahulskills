@@ -1,0 +1,24 @@
+name: Skill structure
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seed Codex/Claude skill dirs from repo skills
+        run: |
+          mkdir -p "$HOME/.agents" "$HOME/.claude"
+          cp -a skills "$HOME/.agents/skills"
+          cp -a skills "$HOME/.claude/skills"
+
+      - name: Run Codex skill structure test
+        run: ./tests/test_codex_skill_structure.sh
+
+      - name: Run Claude skill structure test
+        run: ./tests/test_claude_skill_structure.sh
