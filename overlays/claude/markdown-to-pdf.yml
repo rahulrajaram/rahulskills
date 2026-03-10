@@ -1,0 +1,1 @@
+allowed-tools: "Bash(pandoc:*), Bash(weasyprint:*), Bash(rm:*), Bash(pdfinfo:*)"

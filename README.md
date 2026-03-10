@@ -23,25 +23,28 @@ Three shell scripts handle discovery, syncing, and audit across all local projec
 
 ```
 rahulskills/
-  skills/                  # Canonical shared skills (name/SKILL.md)
-  codex -> skills          # Backward-compatible symlink for legacy tooling
-  claude/                  # Claude Code slash commands (*.md) — synced to ~/.claude/commands/
+  skills/<name>/SKILL.md   # Generic skill body + shared frontmatter (name, description, argument-hint)
+  overlays/claude/<name>.yml  # Claude-only overrides (allowed-tools, etc.)
+  overlays/codex/.gitkeep  # Codex overrides (empty for now)
+  build/                   # Gitignored — assembled output from stitch step
   bin/                     # Shared assistant shell helpers (Yarli lint/sanitize, etc.)
   audit-skills.sh          # Pre-commit guard against private reference leaks
-  stitch-skills.sh         # Canonical-layout + install/check orchestration helper
+  stitch-skills.sh         # Assemble skills + overlays, install to CLI locations
   scan-skills.sh           # Cross-project skill discovery and reporting
   sync-skills.sh           # Bidirectional sync between repo and installed locations
   setup.sh                 # Contributor bootstrap (hooks + optional skill deploy)
-  .github/workflows/       # CI: audit-skills.sh on PRs and pushes
+  .github/workflows/       # CI: assemble + structure tests on PRs and pushes
   .githooks/pre-commit     # Repo-local hook calling audit-skills.sh
   .githooks/commit-msg     # Repo-local hook enforcing conventional commits
   .exclude-skills          # Per-machine skill exclusion list (gitignored)
   .blocklist.local         # Per-machine term blocklist (gitignored)
 ```
 
+Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-tools` for Claude) lives in thin overlay files under `overlays/`. The `stitch-skills.sh assemble` step merges them into `build/` before installation.
+
 ## Skills Inventory
 
-### Skills (30)
+### Skills (31)
 
 Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
@@ -69,6 +72,7 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `repo-topics` | Analyze a GitHub repo and apply relevant topic labels |
 | `rewrite-commit-messages` | Bulk rewrite git commit messages with filter-repo |
 | `skill-creator` | Guide for creating effective skills for Claude and Codex |
+| `speak` | Read text out loud using Kokoro TTS |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
@@ -78,51 +82,33 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
 
-### Claude Code Slash Commands (12)
-
-Synced to `~/.claude/commands/`. These are invoked as `/command-name` inside Claude Code.
-
-| Command | Description |
-|---------|-------------|
-| `analyze-conversation` | Analyze completed conversations for anti-patterns, tooling gaps, and learnings |
-| `archdiagram` | Generate an architecture diagram from the current context or codebase |
-| `check-antipatterns` | Real-time checking of current conversation against known anti-patterns |
-| `debate` | Run a multi-AI debate (Claude + Codex + Gemini) via gptengage |
-| `ideate` | Generate divergent ideas from a seed using evolutionary ideation via gptengage |
-| `install-commithooks` | Install shared commithooks framework into a project |
-| `invokellm` | Invoke a single AI CLI (claude, codex, gemini) via gptengage |
-| `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint with optional CSS stylesheet |
-| `memleak-investigate` | Investigate memory leaks in any Linux process using /proc, eBPF, and system tools |
-| `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
-| `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index for Whisper vocabulary curation |
-| `yore-vocabulary-llm-filter` | Filter Yore vocabulary via LLM to build Whisper-specific domain vocabulary |
-
 ## Shell Scripts
+
+### `stitch-skills.sh`
+
+Assembles generic skills with CLI-specific overlays and installs to both CLIs.
+
+```bash
+./stitch-skills.sh repo-layout   # Validate skills/ and overlays/ directories
+./stitch-skills.sh assemble      # Build assembled output in build/ from skills/ + overlays/
+./stitch-skills.sh install       # Assemble + install to ~/.agents/skills, ~/.claude/skills
+./stitch-skills.sh check         # Compare assembled output against installed locations
+./stitch-skills.sh all           # repo-layout + install + check
+```
 
 ### `sync-skills.sh`
 
-Bidirectional sync between this repo and three installed locations (`~/.agents/skills/` for Codex, `~/.claude/skills/` for Claude Code skills, `~/.claude/commands/` for Claude Code slash commands).
+Bidirectional sync between this repo and installed locations. Push delegates to `stitch-skills.sh install`.
 
 ```bash
-./sync-skills.sh pull      # Copy installed skills into this repo
-./sync-skills.sh push      # Deploy repo skills to installed locations
-./sync-skills.sh diff      # Show differences between repo and installed
+./sync-skills.sh pull      # Copy installed skills into this repo (strips CLI-specific keys)
+./sync-skills.sh push      # Assemble and install skills to all CLI locations
+./sync-skills.sh diff      # Show differences between assembled output and installed
 ./sync-skills.sh status    # List which skills exist where
 ./sync-skills.sh compare-implementations  # Validate Codex/Claude skill parity
 ```
 
 Respects per-machine exclusion list in `.exclude-skills` (one skill name per line, gitignored).
-
-### `stitch-skills.sh`
-
-Orchestrates shared-skill layout and installs for both CLIs.
-
-```bash
-./stitch-skills.sh repo-layout   # Ensure canonical skills/ + codex -> skills symlink
-./stitch-skills.sh install       # Push shared skills to ~/.agents/skills and ~/.claude/skills
-./stitch-skills.sh check         # Run compare + diff checks
-./stitch-skills.sh all           # repo-layout + install + check
-```
 
 ### `scan-skills.sh`
 
@@ -180,7 +166,7 @@ cd ~/Documents/rahulskills
 `setup.sh` handles everything:
 1. Clones [commithooks](https://github.com/rahulrajaram/commithooks) to `~/Documents/commithooks/` if not already present
 2. Installs hook dispatchers into `.git/hooks/` and library modules into `.git/lib/`
-3. Optionally deploys skills to `~/.agents/skills/`, `~/.claude/skills/`, and `~/.claude/commands/`
+3. Optionally deploys skills to `~/.agents/skills/` and `~/.claude/skills/`
 
 Pass `--skip-skills` to skip the interactive skill deployment prompt.
 
@@ -190,9 +176,10 @@ The `audit-skills.sh check` scan runs on every push to `master` and on pull requ
 
 ## Adding a New Skill
 
-1. Create `skills/<name>/SKILL.md` with frontmatter (`name`, `description`, `allowed-tools`). Add optional `agents/`, `references/`, or `scripts/` subdirectories.
-2. Run `./audit-skills.sh check` to verify no private references leaked.
-3. Commit and `./sync-skills.sh push` to deploy to `~/.agents/skills/`, `~/.claude/skills/`, and `~/.claude/commands/`.
+1. Create `skills/<name>/SKILL.md` with frontmatter (`name`, `description`, `argument-hint`). Add optional `agents/`, `references/`, or `scripts/` subdirectories.
+2. If the skill needs Claude-specific metadata (e.g. `allowed-tools`), create `overlays/claude/<name>.yml`.
+3. Run `./audit-skills.sh check` to verify no private references leaked.
+4. Commit and `./sync-skills.sh push` to assemble and deploy to all CLI locations.
 
 ## Git Hooks
 

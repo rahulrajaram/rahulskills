@@ -1,6 +1,7 @@
 ---
 name: yore-vocabulary-llm-filter
 description: "Build Whisper-specific vocabulary by removing common terms and keeping domain signals."
+argument-hint: "[--input FILE] [--scope global|local] [--dry-run]"
 ---
 
 # Yore Vocabulary LLM Filter (Whisper Vocabulary)

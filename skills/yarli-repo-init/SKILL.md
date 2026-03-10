@@ -1,6 +1,7 @@
 ---
 name: yarli-repo-init
 description: "Initialize and validate Yarli orchestration in a repository. Use when the user asks to set up yarli.toml, bootstrap run/prompt/plan files, configure CLI backend and durability, enable optional Haake memory integration, or verify a new repo can execute `yarli run` safely."
+argument-hint: "[--backend claude|codex] [--haake]"
 ---
 
 # Yarli Repository Initialization
