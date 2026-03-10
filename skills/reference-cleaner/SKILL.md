@@ -2,7 +2,6 @@
 name: reference-cleaner
 description: "Remove references to blocklisted terms from git history and source files. Use when user says /reference-cleaner, 'clean references', 'remove mentions of X', 'scrub project names from history', or asks to sanitize a repo before publishing."
 argument-hint: "<term> [<term>...]"
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob
 ---
 
 # Reference Cleaner

@@ -4,7 +4,6 @@ description: Generate Amazon COE-style 5-whys postmortem reports for incidents a
 author: claude
 version: 1.0.0
 argument-hint: "[incident description]"
-allowed-tools: Bash, Read, Grep, Glob, Task
 ---
 
 # Postmortem Generator (Amazon COE 5-Whys Style)

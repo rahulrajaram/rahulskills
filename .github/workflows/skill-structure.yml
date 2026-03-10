@@ -11,14 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Assemble skills
-        run: ./stitch-skills.sh assemble
-
-      - name: Install from assembled output
-        run: |
-          mkdir -p "$HOME/.agents" "$HOME/.claude"
-          cp -a build/codex/skills "$HOME/.agents/skills"
-          cp -a build/claude/skills "$HOME/.claude/skills"
+      - name: Assemble and install skills
+        run: ./stitch-skills.sh install
 
       - name: Run Codex skill structure test
         run: ./tests/test_codex_skill_structure.sh
