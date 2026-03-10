@@ -11,14 +11,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Seed Codex/Claude skill dirs from repo skills
+      - name: Assemble skills
+        run: ./stitch-skills.sh assemble
+
+      - name: Install from assembled output
         run: |
           mkdir -p "$HOME/.agents" "$HOME/.claude"
-          cp -a skills "$HOME/.agents/skills"
-          cp -a skills "$HOME/.claude/skills"
+          cp -a build/codex/skills "$HOME/.agents/skills"
+          cp -a build/claude/skills "$HOME/.claude/skills"
 
       - name: Run Codex skill structure test
         run: ./tests/test_codex_skill_structure.sh
 
       - name: Run Claude skill structure test
         run: ./tests/test_claude_skill_structure.sh
+
+      - name: Run skill frontmatter test
+        run: ./tests/test_skill_frontmatter.sh
+
+      - name: Run overlay structure test
+        run: ./tests/test_overlay_structure.sh
+
+      - name: Run stitch assembly test
+        run: ./tests/test_stitch_assembly.sh

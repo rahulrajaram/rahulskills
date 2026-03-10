@@ -1,6 +1,7 @@
 ---
 name: yore-vocabulary-harvest
 description: "Extract candidate vocabulary terms from a Yore index for stopword curation and domain filtering."
+argument-hint: "[--index DIR] [--limit N] [--common-terms N] [--stopwords FILE]"
 ---
 
 # Yore Vocabulary Harvest

@@ -2,64 +2,282 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-COMMON_DIR="$ROOT_DIR/skills"
-LEGACY_CODEX_DIR="$ROOT_DIR/codex"
-SYNC_SCRIPT="$ROOT_DIR/sync-skills.sh"
+SKILLS_DIR="$ROOT_DIR/skills"
+OVERLAYS_DIR="$ROOT_DIR/overlays"
+BUILD_DIR="$ROOT_DIR/build"
+
+CODEX_INSTALL="$HOME/.agents/skills"
+CLAUDE_SKILLS_INSTALL="$HOME/.claude/skills"
+
+CLIS=(claude codex)
 
 usage() {
     cat <<'USAGE'
 Usage: stitch-skills.sh <command>
 
 Commands:
-  repo-layout   Ensure skills/ is canonical and codex -> skills symlink exists
-  install       Push shared skills/ to ~/.agents/skills and ~/.claude/skills
-  check         Run compare + diff checks
-  all           Run repo-layout, then install, then check
+  repo-layout   Validate skills/ and overlays/ directories exist
+  assemble      Build assembled output in build/ from skills/ + overlays/
+  install       Assemble, then copy build/ output to install locations
+  check         Run compare + diff checks against assembled output
+  all           repo-layout + install + check
 USAGE
     exit 1
 }
 
-ensure_repo_layout() {
-    if [[ -d "$COMMON_DIR" && ! -L "$COMMON_DIR" ]]; then
-        :
-    elif [[ -d "$LEGACY_CODEX_DIR" && ! -L "$LEGACY_CODEX_DIR" ]]; then
-        echo "Migrating repo skills: codex/ -> skills/"
-        mv "$LEGACY_CODEX_DIR" "$COMMON_DIR"
-    else
-        mkdir -p "$COMMON_DIR"
-    fi
+# ---------------------------------------------------------------------------
+# Frontmatter helpers (pure awk)
+# ---------------------------------------------------------------------------
 
-    if [[ -L "$LEGACY_CODEX_DIR" ]]; then
-        local target
-        target="$(readlink "$LEGACY_CODEX_DIR")"
-        if [[ "$target" == "skills" || "$target" == "./skills" ]]; then
-            echo "codex symlink is already correct"
-            return 0
+# Print only the frontmatter lines (between --- fences), excluding the fences.
+extract_frontmatter() {
+    awk '
+        NR==1 && $0=="---" { in_fm=1; next }
+        in_fm && $0=="---" { exit }
+        in_fm { print }
+    ' "$1"
+}
+
+# Print everything after the closing --- fence of the frontmatter.
+extract_body() {
+    awk '
+        NR==1 && $0=="---" { in_fm=1; next }
+        in_fm && $0=="---" { in_fm=0; next }
+        !in_fm { print }
+    ' "$1"
+}
+
+# Merge overlay keys into frontmatter.
+# stdin = original frontmatter lines, $1 = overlay file path.
+# Overlay keys overwrite originals; new keys are appended.
+merge_overlay() {
+    local overlay_file="$1"
+    local -a orig_lines=()
+    local -A orig_keys=()
+    local -A overlay_map=()
+    local -a overlay_order=()
+    local line key val
+
+    # Read original frontmatter from stdin
+    while IFS= read -r line; do
+        orig_lines+=("$line")
+        if [[ "$line" =~ ^([A-Za-z0-9_-]+):[[:space:]]*(.*) ]]; then
+            orig_keys["${BASH_REMATCH[1]}"]=1
         fi
-        rm "$LEGACY_CODEX_DIR"
-    elif [[ -e "$LEGACY_CODEX_DIR" ]]; then
-        rm -rf "$LEGACY_CODEX_DIR"
-    fi
+    done
 
-    ln -s skills "$LEGACY_CODEX_DIR"
-    echo "Created compatibility symlink: codex -> skills"
+    # Read overlay file
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" =~ ^# ]] && continue
+        if [[ "$line" =~ ^([A-Za-z0-9_-]+):[[:space:]]*(.*) ]]; then
+            key="${BASH_REMATCH[1]}"
+            val="${BASH_REMATCH[2]}"
+            overlay_map["$key"]="$val"
+            overlay_order+=("$key")
+        fi
+    done < "$overlay_file"
+
+    # Output original lines, replacing values for overlay keys
+    for line in "${orig_lines[@]}"; do
+        if [[ "$line" =~ ^([A-Za-z0-9_-]+):[[:space:]]*(.*) ]]; then
+            key="${BASH_REMATCH[1]}"
+            if [[ -n "${overlay_map[$key]+x}" ]]; then
+                echo "$key: ${overlay_map[$key]}"
+                unset "overlay_map[$key]"
+                continue
+            fi
+        fi
+        echo "$line"
+    done
+
+    # Append any remaining overlay keys not in original
+    for key in "${overlay_order[@]}"; do
+        if [[ -n "${overlay_map[$key]+x}" ]]; then
+            echo "$key: ${overlay_map[$key]}"
+        fi
+    done
+}
+
+# ---------------------------------------------------------------------------
+# Subcommands
+# ---------------------------------------------------------------------------
+
+ensure_repo_layout() {
+    local ok=1
+    if [[ ! -d "$SKILLS_DIR" ]]; then
+        echo "ERROR: skills/ directory not found" >&2
+        ok=0
+    fi
+    if [[ ! -d "$OVERLAYS_DIR" ]]; then
+        echo "ERROR: overlays/ directory not found" >&2
+        ok=0
+    fi
+    [[ "$ok" -eq 1 ]] && echo "repo-layout OK: skills/ and overlays/ present"
+    return $(( ok == 0 ))
+}
+
+manifest_path() {
+    local dir="$1"
+    if [[ -f "$dir/SKILL.md" ]]; then
+        echo "$dir/SKILL.md"
+    elif [[ -f "$dir/skill.md" ]]; then
+        echo "$dir/skill.md"
+    else
+        return 1
+    fi
+}
+
+assemble_skills() {
+    echo "Assembling skills into $BUILD_DIR ..."
+    rm -rf "$BUILD_DIR"
+
+    local skill_dir skill_name manifest cli overlay_file
+    local fm body merged
+
+    for skill_dir in "$SKILLS_DIR"/*/; do
+        [[ -d "$skill_dir" ]] || continue
+        skill_name="$(basename "$skill_dir")"
+
+        manifest="$(manifest_path "$skill_dir")" || {
+            echo "  SKIP (no manifest): $skill_name"
+            continue
+        }
+
+        fm="$(extract_frontmatter "$manifest")"
+        body="$(extract_body "$manifest")"
+
+        for cli in "${CLIS[@]}"; do
+            local out_dir="$BUILD_DIR/$cli/skills/$skill_name"
+            mkdir -p "$out_dir"
+
+            # Merge overlay if present
+            overlay_file="$OVERLAYS_DIR/$cli/${skill_name}.yml"
+            if [[ -f "$overlay_file" ]]; then
+                merged="$(echo "$fm" | merge_overlay "$overlay_file")"
+            else
+                merged="$fm"
+            fi
+
+            # Write assembled SKILL.md
+            {
+                echo "---"
+                echo "$merged"
+                echo "---"
+                echo "$body"
+            } > "$out_dir/SKILL.md"
+
+            # Copy supporting files (scripts/, agents/, templates/, etc.)
+            for sub in "$skill_dir"*/; do
+                [[ -d "$sub" ]] || continue
+                local sub_name
+                sub_name="$(basename "$sub")"
+                cp -a "$sub" "$out_dir/$sub_name"
+            done
+
+            # Copy any non-SKILL.md files at the skill root (e.g. .py, .json)
+            for f in "$skill_dir"*; do
+                [[ -f "$f" ]] || continue
+                local fname
+                fname="$(basename "$f")"
+                [[ "$fname" == "SKILL.md" || "$fname" == "skill.md" ]] && continue
+                cp -a "$f" "$out_dir/$fname"
+            done
+
+        done
+    done
+
+    # Count assembled skills
+    local claude_count codex_count
+    claude_count="$(find "$BUILD_DIR/claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+    codex_count="$(find "$BUILD_DIR/codex/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+    echo "Assembled: claude=$claude_count skills, codex=$codex_count skills"
 }
 
 install_skills() {
     ensure_repo_layout
-    "$SYNC_SCRIPT" push
+    assemble_skills
+
+    echo ""
+    echo "Installing from assembled output ..."
+
+    local skill_name installed=0
+
+    # Codex: ~/.agents/skills/ — overwrite managed skills, leave others untouched
+    mkdir -p "$CODEX_INSTALL"
+    for skill_dir in "$BUILD_DIR/codex/skills"/*/; do
+        [[ -d "$skill_dir" ]] || continue
+        skill_name="$(basename "$skill_dir")"
+        rm -rf "$CODEX_INSTALL/$skill_name"
+        cp -a "$skill_dir" "$CODEX_INSTALL/$skill_name"
+        installed=$((installed + 1))
+    done
+    echo "  Codex: $installed skills -> $CODEX_INSTALL"
+
+    # Claude skills: ~/.claude/skills/ — overwrite managed skills, leave others untouched
+    mkdir -p "$CLAUDE_SKILLS_INSTALL"
+    installed=0
+    for skill_dir in "$BUILD_DIR/claude/skills"/*/; do
+        [[ -d "$skill_dir" ]] || continue
+        skill_name="$(basename "$skill_dir")"
+        rm -rf "$CLAUDE_SKILLS_INSTALL/$skill_name"
+        cp -a "$skill_dir" "$CLAUDE_SKILLS_INSTALL/$skill_name"
+        installed=$((installed + 1))
+    done
+    echo "  Claude skills: $installed skills -> $CLAUDE_SKILLS_INSTALL"
+
+    echo "Done."
 }
 
 check_sync() {
     ensure_repo_layout
-    "$SYNC_SCRIPT" compare-implementations
-    "$SYNC_SCRIPT" diff
+
+    # Ensure build exists
+    if [[ ! -d "$BUILD_DIR/claude/skills" || ! -d "$BUILD_DIR/codex/skills" ]]; then
+        echo "No assembled output found. Running assemble first ..."
+        assemble_skills
+    fi
+
+    local has_issue=0
+
+    echo "=== Checking installed vs assembled ==="
+    for cli_label in codex claude; do
+        local install_dir
+        if [[ "$cli_label" == "codex" ]]; then
+            install_dir="$CODEX_INSTALL"
+        else
+            install_dir="$CLAUDE_SKILLS_INSTALL"
+        fi
+
+        [[ -d "$install_dir" ]] || { echo "  SKIP $cli_label: install dir not found"; continue; }
+
+        local build_skills="$BUILD_DIR/$cli_label/skills"
+        for skill_dir in "$build_skills"/*/; do
+            [[ -d "$skill_dir" ]] || continue
+            local sname
+            sname="$(basename "$skill_dir")"
+            if [[ ! -d "$install_dir/$sname" ]]; then
+                echo "  MISSING [$cli_label]: $sname (not installed)"
+                has_issue=1
+            elif ! diff -rq "$skill_dir" "$install_dir/$sname" > /dev/null 2>&1; then
+                echo "  MODIFIED [$cli_label]: $sname"
+                has_issue=1
+            fi
+        done
+    done
+
+    if [[ "$has_issue" -eq 0 ]]; then
+        echo "PASS: installed skills match assembled output"
+    else
+        echo "FAIL: some skills differ from assembled output"
+        return 1
+    fi
 }
 
 [[ $# -lt 1 ]] && usage
 
 case "$1" in
     repo-layout) ensure_repo_layout ;;
+    assemble)    assemble_skills ;;
     install)     install_skills ;;
     check)       check_sync ;;
     all)

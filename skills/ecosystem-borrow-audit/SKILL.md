@@ -1,6 +1,7 @@
 ---
 name: ecosystem-borrow-audit
 description: "Audit ~/Documents/listings.txt and all depth-1 git repos for borrowable components, missed architectural opportunities, and integration gaps; then run independent gptengage ideate sweeps across multiple sigma values. Use when the user asks for ecosystem review, cross-repo borrowing analysis, missed-opportunity checks, or multi-sigma ideation after repo analysis."
+argument-hint: "[scope-root] [--sigma LIST] [--cli claude|codex|gemini]"
 ---
 
 # Ecosystem Borrow Audit

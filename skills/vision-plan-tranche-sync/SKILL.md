@@ -1,6 +1,7 @@
 ---
 name: vision-plan-tranche-sync
 description: Translate actionable roadmap items into implementation planning and sync open tranches into tranches TOML, with principal-architect fallback when no vision source exists.
+argument-hint: "[--vision FILE] [--plan FILE] [--tranches FILE]"
 ---
 
 # Vision → Implementation → Tranches Sync

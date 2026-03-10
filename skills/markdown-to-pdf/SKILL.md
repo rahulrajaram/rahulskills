@@ -1,6 +1,7 @@
 ---
 name: markdown-to-pdf
 description: "Convert markdown to PDF via pandoc + weasyprint. Use when the user asks to generate a PDF from markdown or says /markdown-to-pdf."
+argument-hint: "<input.md> [--css <style.css>] [--output <output.pdf>]"
 ---
 
 # Markdown to PDF Conversion Skill
