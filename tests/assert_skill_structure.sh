@@ -10,7 +10,8 @@ CLI_NAME="$1"
 INSTALL_ROOT="$2"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_SKILLS_DIR="${REPO_SKILLS_DIR:-$REPO_ROOT/skills}"
+BUILD_DIR="${BUILD_DIR:-$REPO_ROOT/build}"
+BUILD_SKILLS_DIR="$BUILD_DIR/$CLI_NAME/skills"
 REFERENCE_SKILL="${REFERENCE_SKILL:-archdiagram}"
 
 manifest_path() {
@@ -54,8 +55,17 @@ has_key() {
   ' "$manifest"
 }
 
-if [[ ! -d "$REPO_SKILLS_DIR" ]]; then
-  echo "ERROR: repo skills directory not found: $REPO_SKILLS_DIR" >&2
+# Validate against assembled build output if available, otherwise fall back to repo skills
+if [[ -d "$BUILD_SKILLS_DIR" ]]; then
+  SOURCE_DIR="$BUILD_SKILLS_DIR"
+  echo "[$CLI_NAME] validating against assembled build output: $BUILD_SKILLS_DIR"
+else
+  SOURCE_DIR="${REPO_SKILLS_DIR:-$REPO_ROOT/skills}"
+  echo "[$CLI_NAME] no build output found, validating against repo skills: $SOURCE_DIR"
+fi
+
+if [[ ! -d "$SOURCE_DIR" ]]; then
+  echo "ERROR: source skills directory not found: $SOURCE_DIR" >&2
   exit 1
 fi
 
@@ -84,12 +94,12 @@ fi
 echo "[$CLI_NAME] reference skill: $REFERENCE_SKILL"
 echo "[$CLI_NAME] required frontmatter keys: ${required_keys[*]}"
 
-declare -A repo_skills=()
+declare -A source_skills=()
 declare -A installed_skills=()
 
 while IFS= read -r skill; do
-  [[ -n "$skill" ]] && repo_skills["$skill"]=1
-done < <(find "$REPO_SKILLS_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
+  [[ -n "$skill" ]] && source_skills["$skill"]=1
+done < <(find "$SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
 
 while IFS= read -r skill; do
   [[ -n "$skill" ]] && installed_skills["$skill"]=1
@@ -97,8 +107,8 @@ done < <(find "$INSTALL_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | s
 
 failures=0
 
-for skill in "${!repo_skills[@]}"; do
-  repo_dir="$REPO_SKILLS_DIR/$skill"
+for skill in "${!source_skills[@]}"; do
+  source_dir="$SOURCE_DIR/$skill"
   install_dir="$INSTALL_ROOT/$skill"
 
   if [[ ! -d "$install_dir" ]]; then
@@ -107,8 +117,8 @@ for skill in "${!repo_skills[@]}"; do
     continue
   fi
 
-  repo_manifest="$(manifest_path "$repo_dir")" || {
-    echo "FAIL [$CLI_NAME] repo skill missing manifest: $skill"
+  source_manifest="$(manifest_path "$source_dir")" || {
+    echo "FAIL [$CLI_NAME] source skill missing manifest: $skill"
     failures=$((failures + 1))
     continue
   }
@@ -120,8 +130,8 @@ for skill in "${!repo_skills[@]}"; do
   }
 
   for key in "${required_keys[@]}"; do
-    if ! has_key "$key" "$repo_manifest"; then
-      echo "FAIL [$CLI_NAME] repo skill missing key '$key': $skill"
+    if ! has_key "$key" "$source_manifest"; then
+      echo "FAIL [$CLI_NAME] source skill missing key '$key': $skill"
       failures=$((failures + 1))
     fi
     if ! has_key "$key" "$install_manifest"; then
@@ -132,8 +142,8 @@ for skill in "${!repo_skills[@]}"; do
 done
 
 for skill in "${!installed_skills[@]}"; do
-  if [[ -z "${repo_skills[$skill]+x}" ]]; then
-    echo "FAIL [$CLI_NAME] installed-only skill not in repo: $skill"
+  if [[ -z "${source_skills[$skill]+x}" ]]; then
+    echo "FAIL [$CLI_NAME] installed-only skill not in source: $skill"
     failures=$((failures + 1))
   fi
 done
@@ -143,4 +153,4 @@ if [[ "$failures" -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS [$CLI_NAME] ${#repo_skills[@]} skills validated"
+echo "PASS [$CLI_NAME] ${#source_skills[@]} skills validated"

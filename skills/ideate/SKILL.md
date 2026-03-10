@@ -1,6 +1,7 @@
 ---
 name: ideate
 description: "Generate divergent ideas from a seed using evolutionary ideation via gptengage. Use when the user asks for brainstorming, idea generation, ideation, or says /ideate."
+argument-hint: "<seed> [--sigma 1.0] [--depth 2] [--cli claude] [--select]"
 ---
 
 # Ideate

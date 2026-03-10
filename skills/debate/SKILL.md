@@ -1,6 +1,7 @@
 ---
 name: debate
 description: "Run a multi-AI debate (Claude + Codex + Gemini) via gptengage. Use when the user asks for a debate, multi-AI discussion, or says /debate."
+argument-hint: "<topic> [--rounds N] [--participants \"cli:persona,...\"] [--agent CLI] [--synthesize]"
 ---
 
 # Debate
