@@ -14,6 +14,9 @@ STITCH_SCRIPT="$REPO_ROOT/stitch-skills.sh"
 
 CLIS=(claude codex)
 
+# Keys that must only appear via overlays, never in non-overlay builds
+CLI_SPECIFIC_KEYS="allowed-tools"
+
 has_frontmatter_key() {
   local key="$1" file="$2"
   awk -v want="$key" '
@@ -100,6 +103,14 @@ for cli in "${CLIS[@]}"; do
           fi
         fi
       done < "$overlay_file"
+    else
+      # No overlay: CLI-specific keys must NOT appear in assembled output
+      for key in $CLI_SPECIFIC_KEYS; do
+        if has_frontmatter_key "$key" "$assembled_manifest"; then
+          echo "FAIL [$cli/$skill_name] CLI-specific key '$key' leaked (no overlay for $cli)"
+          failures=$((failures + 1))
+        fi
+      done
     fi
   done
 done

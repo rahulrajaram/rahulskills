@@ -140,9 +140,11 @@ pull() {
 
         local sname
         sname="$(basename "$skill_dir")"
-        for key in $CLI_SPECIFIC_KEYS; do
+        IFS=',' read -ra _keys <<< "$CLI_SPECIFIC_KEYS"
+        for key in "${_keys[@]}"; do
+            key="${key## }"; key="${key%% }"
             if has_frontmatter_key "$key" "$manifest"; then
-                echo "  WARN: $sname has '$key' — should be in overlays/$key. Stripping."
+                echo "  WARN: $sname has '$key' — should be in overlays/claude/$sname.yml. Stripping."
                 warnings=$((warnings + 1))
             fi
         done
@@ -239,7 +241,7 @@ compare_implementations() {
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CLAUDE_SRC")
 
     echo "=== Skill Name Parity (repo/codex/claude) ==="
-    for skill in $(echo "${!all_skills[@]}" | tr ' ' '\n' | sort); do
+    while IFS= read -r skill; do
         in_repo="no"
         in_codex="no"
         in_claude="no"
@@ -251,7 +253,7 @@ compare_implementations() {
             printf "  MISMATCH: %-30s repo=%s codex=%s claude=%s\n" "$skill" "$in_repo" "$in_codex" "$in_claude"
             has_issue=1
         fi
-    done
+    done < <(printf '%s\n' "${!all_skills[@]}" | sort)
 
     echo ""
     echo "Summary:"
@@ -277,13 +279,13 @@ status() {
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CODEX_SRC")
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CLAUDE_SRC")
 
-    for skill in $(echo "${!all_skills[@]}" | tr ' ' '\n' | sort); do
+    while IFS= read -r skill; do
         codex="--"
         claude="--"
         [ -d "$CODEX_SRC/$skill" ] && codex="yes"
         [ -d "$CLAUDE_SRC/$skill" ] && claude="yes"
         printf "%-35s %-8s %-8s\n" "$skill" "$codex" "$claude"
-    done
+    done < <(printf '%s\n' "${!all_skills[@]}" | sort)
 
     echo ""
     echo "Totals: codex=$(count_skill_names "$CODEX_SRC"), claude=$(count_skill_names "$CLAUDE_SRC")"

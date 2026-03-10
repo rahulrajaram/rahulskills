@@ -2,7 +2,6 @@
 name: rewrite-commit-messages
 description: "Use when the user wants to rewrite existing git commit messages with git filter-repo, rename commit messages in bulk, normalize noisy auto-generated messages, or safely plan a history-wide message-only rewrite."
 argument-hint: "[commit-range]"
-allowed-tools: Bash, Read, Write, Grep, Glob
 ---
 
 # Rewrite Commit Messages

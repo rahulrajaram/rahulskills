@@ -2,7 +2,6 @@
 name: readme-doctor
 description: "Build and validate project README and CLI help text. Ensures README accuracy against code, CLI help-text congruence across all commands, and correct usage examples. Use when user says /readme-doctor, 'update readme', 'fix help text', 'documentation audit', or asks to validate CLI documentation."
 argument-hint: ""
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob
 ---
 
 # README Doctor

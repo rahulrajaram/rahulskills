@@ -2,7 +2,6 @@
 name: squash-commits
 description: "Analyze git history, identify contiguous thematic groups, and interactively squash them with clean conventional commit messages. Use when user says /squash-commits, 'squash commits', 'clean up git history', 'compress commits', or asks to tidy commit history."
 argument-hint: "[N] [--all] [--batch] [--max-passes M]"
-allowed-tools: Bash, Read, Write, Grep, Glob
 ---
 
 # Squash Commits
