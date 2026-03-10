@@ -1,8 +1,10 @@
 ---
-allowed-tools: Bash(python3:*)
-argument-hint: [optional text]
-description: Read text out loud using Kokoro TTS. Defaults to reading your last response.
+name: speak
+description: "Read text out loud using Kokoro TTS. Defaults to reading your last response."
+argument-hint: "[optional text]"
 ---
+
+# Speak
 
 Use Kokoro TTS to read text out loud.
 

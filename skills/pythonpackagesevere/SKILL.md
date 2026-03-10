@@ -1,6 +1,7 @@
 ---
 name: pythonpackagesevere
 description: "Decompose a Python package into independent projects. Use when the user says 'pythonpackagesevere', 'split package', 'decompose python package', or asks to break a monolith into separate projects."
+argument-hint: "[package-path]"
 ---
 
 # Python Package Decomposition — Structural Split Methodology

@@ -1,11 +1,8 @@
 ---
 name: yarli-introspect
 description: Live introspection of running or completed yarli runs — process health, tranche progress, backend output analysis, stuck detection, and actionable recommendations.
+argument-hint: "[run-dir]"
 allowed-tools:
-  - Bash
-  - Read
-  - Glob
-  - Grep
 ---
 
 # Yarli Run Introspection

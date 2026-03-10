@@ -1,6 +1,7 @@
 ---
 name: archdiagram
 description: "Generate an architecture diagram from the current context or codebase. Use when the user asks for an architecture diagram, system diagram, component diagram, or says /archdiagram. Supports --type for different diagram kinds, --format for output format (ascii default, mermaid, plantuml, d2, dot), and --deep-review for holistic architecture analysis."
+argument-hint: "[description] [--type TYPE] [--format FORMAT] [--deep-review] [--output FILE]"
 ---
 
 # Architecture Diagram

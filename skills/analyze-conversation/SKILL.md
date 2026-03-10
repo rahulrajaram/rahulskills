@@ -1,6 +1,7 @@
 ---
 name: analyze-conversation
 description: Analyze completed conversations for anti-patterns, tooling gaps, and learnings
+argument-hint: "[conversation-id]"
 author: system
 version: 1.0.0
 ---

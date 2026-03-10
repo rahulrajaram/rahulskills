@@ -1,6 +1,7 @@
 ---
 name: check-antipatterns
 description: Real-time checking of current conversation against known anti-patterns
+argument-hint: ""
 author: system
 version: 1.0.0
 ---
