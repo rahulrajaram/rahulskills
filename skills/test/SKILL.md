@@ -2,7 +2,6 @@
 name: test
 description: Run tests with overwatch for streaming output, early failure detection, and timeout management. Use when running test suites (npm test, pytest, playwright, etc.)
 argument-hint: "<test-command>"
-allowed-tools: Bash
 ---
 
 # Test Runner with Overwatch

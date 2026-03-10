@@ -2,7 +2,6 @@
 name: next-todos
 description: "Generate concise next-step to-do lists with each item capped at 20 words."
 argument-hint: ""
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob
 ---
 
 # Next To-Dos

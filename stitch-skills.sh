@@ -11,6 +11,10 @@ CLAUDE_SKILLS_INSTALL="$HOME/.claude/skills"
 
 CLIS=(claude codex)
 
+# Keys that belong in overlays, not in generic SKILL.md.
+# When no overlay exists for a CLI, these keys are stripped from the build.
+CLI_SPECIFIC_KEYS="allowed-tools"
+
 usage() {
     cat <<'USAGE'
 Usage: stitch-skills.sh <command>
@@ -98,6 +102,18 @@ merge_overlay() {
     done
 }
 
+# Strip CLI-specific keys from frontmatter string (stdin -> stdout).
+strip_cli_keys() {
+    awk -v keys="$CLI_SPECIFIC_KEYS" '
+        BEGIN { split(keys, ka, ","); for (i in ka) { gsub(/^ +| +$/, "", ka[i]); strip[ka[i]]=1 } }
+        {
+            key=$0; sub(/:.*/, "", key)
+            if (key in strip) next
+            print
+        }
+    '
+}
+
 # ---------------------------------------------------------------------------
 # Subcommands
 # ---------------------------------------------------------------------------
@@ -150,12 +166,12 @@ assemble_skills() {
             local out_dir="$BUILD_DIR/$cli/skills/$skill_name"
             mkdir -p "$out_dir"
 
-            # Merge overlay if present
+            # Merge overlay if present; otherwise strip CLI-specific keys
             overlay_file="$OVERLAYS_DIR/$cli/${skill_name}.yml"
             if [[ -f "$overlay_file" ]]; then
                 merged="$(echo "$fm" | merge_overlay "$overlay_file")"
             else
-                merged="$fm"
+                merged="$(echo "$fm" | strip_cli_keys)"
             fi
 
             # Write assembled SKILL.md
