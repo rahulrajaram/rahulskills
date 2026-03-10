@@ -2,7 +2,6 @@
 name: install-commithooks
 description: "Install shared commithooks framework into a project. Copies dispatchers and lib into .git/, scaffolds .githooks/ stubs, and wires hook installation into the project's dev setup path. Use when user says /install-commithooks, 'install hooks', 'setup git hooks', 'add commit hooks', or asks to wire up shared commithooks."
 argument-hint: "[hooks-source-path]"
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob
 ---
 
 # Install Commithooks
