@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Lifecycle"
+  short_description: "Prepare, open, and watch a GitHub PR through green CI."
+  default_prompt: "Run /pr-lifecycle: use the commit and squash-commits skills, ensure a feature branch and hook coverage, review the PR locally, run readme-doctor before version checking, decide whether a public package needs a version bump, push the branch, open the PR, wait for CI success, then stop."
