@@ -194,8 +194,6 @@ Compose a **conventional commit** message:
 <type>(<scope>): <subject>
 
 <body — optional, explain WHY not WHAT, wrap at 72 chars>
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
 
 **Types**: `feat` · `fix` · `chore` · `docs` · `refactor` · `test` · `style` · `ci` · `build`
@@ -219,8 +217,6 @@ git commit -m "$(cat <<'EOF'
 <type>(<scope>): <subject>
 
 <body if needed>
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 EOF
 )"
 ```

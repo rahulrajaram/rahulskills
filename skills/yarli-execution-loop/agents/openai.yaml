@@ -1,0 +1,4 @@
+interface:
+  display_name: "Yarli Execution Loop"
+  short_description: "Inspect Yarli state, enqueue durable tranches, and choose continue versus fresh-from-tranches execution."
+  default_prompt: "Inspect current Yarli state first, enqueue any new work durably with `yarli plan tranche add --idempotent`, choose `yarli run continue` only when the continuation snapshot still owns the work, otherwise use `yarli run --fresh-from-tranches`, and end with a `YARLI_DECISION_V1` block."
