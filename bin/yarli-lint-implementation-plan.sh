@@ -94,7 +94,7 @@ in_next_work && /^Operator policy while queue is non-empty:/ {
 {
   line = $0
 
-  if (line ~ /^[0-9]+\. I[0-9A-Z]+ `[^`]+`: (incomplete|blocked|complete)\. tranche_group=[a-z0-9][a-z0-9-]*$/) {
+  if (line ~ /^[0-9]+\. [A-Z][A-Z0-9-]+ `[^`]+`: (incomplete|blocked|complete)\. tranche_group=[a-z0-9][a-z0-9-]*$/) {
     close_stanza(NR)
 
     # Extract tranche_id as second whitespace-delimited token
@@ -120,8 +120,8 @@ in_next_work && /^Operator policy while queue is non-empty:/ {
     next
   }
 
-  if (match(line, /^[0-9]+\. I[0-9A-Z]+ /)) {
-    fail("invalid tranche header format; expected <n>. I<id> `<title>`: <status>. tranche_group=<group>", NR)
+  if (match(line, /^[0-9]+\. [A-Z][A-Z0-9-]+ /)) {
+    fail("invalid tranche header format; expected <n>. <TRANCHE-ID> `<title>`: <status>. tranche_group=<group>", NR)
     next
   }
 
