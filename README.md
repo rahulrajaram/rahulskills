@@ -44,7 +44,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Skills (34)
+### Skills (35)
 
 Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
@@ -66,7 +66,7 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint |
 | `max-columns` | Keep output within a user-specified column width |
 | `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
-| `next-todos` | Generate concise next-step to-do lists capped at 20 words each |
+| `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |
 | `postmortem` | Generate Amazon COE-style 5-whys postmortem reports |
 | `pr-lifecycle` | Create and manage a PR from local prep through green CI |
 | `pythonpackagesevere` | Decompose a Python package into independent projects |
@@ -80,6 +80,7 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
 | `vision-plan-tranche-sync` | Translate roadmap items into implementation tranches |
+| `yarli-execution-loop` | Inspect Yarli state, enqueue tranches, and choose continue vs fresh-from-tranches |
 | `yarli-introspect` | Live introspection of running or completed Yarli runs |
 | `yarli-repo-init` | Initialize and validate Yarli orchestration in a repository |
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
