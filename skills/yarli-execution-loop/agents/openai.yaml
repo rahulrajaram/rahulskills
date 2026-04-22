@@ -1,4 +1,4 @@
 interface:
   display_name: "Yarli Execution Loop"
-  short_description: "Inspect Yarli state, enqueue durable tranches, and choose continue versus fresh-from-tranches execution."
-  default_prompt: "Inspect current Yarli state first, enqueue any new work durably with `yarli plan tranche add --idempotent`, choose `yarli run continue` only when the continuation snapshot still owns the work, otherwise use `yarli run --fresh-from-tranches`, and end with a `YARLI_DECISION_V1` block."
+  short_description: "Inspect Yarli state, supervise active runs, enqueue durable tranches, and choose the right relaunch path without handing off loop control."
+  default_prompt: "Inspect current Yarli state first, keep the agent as the supervisor of any active run, watch healthy runs at a 60-second cadence with delta-only updates, enqueue any new work durably with `yarli plan tranche add --idempotent`, use the repo-local supervisor only as a one-shot launcher when present, choose `yarli run continue` only when the continuation snapshot still owns the work, otherwise use `yarli run --fresh-from-tranches`, and end with a rich `YARLI_DECISION_V1` block including run, tranche, health, action, and next check."
