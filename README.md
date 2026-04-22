@@ -44,7 +44,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Skills (35)
+### Skills (37)
 
 Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
@@ -69,6 +69,7 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |
 | `postmortem` | Generate Amazon COE-style 5-whys postmortem reports |
 | `pr-lifecycle` | Create and manage a PR from local prep through green CI |
+| `privateify` | Lock down a repo to stay private via CI guards, hooks, manifest flags, and agent directives |
 | `pythonpackagesevere` | Decompose a Python package into independent projects |
 | `readme-doctor` | Build and validate project README and CLI help text |
 | `reference-cleaner` | Remove blocklisted references from git history and source files |
@@ -80,9 +81,10 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
 | `vision-plan-tranche-sync` | Translate roadmap items into implementation tranches |
-| `yarli-execution-loop` | Inspect Yarli state, enqueue tranches, and choose continue vs fresh-from-tranches |
+| `yarli-execution-loop` | Supervise Yarli runs, enqueue tranches durably, and choose the right relaunch path |
 | `yarli-introspect` | Live introspection of running or completed Yarli runs |
 | `yarli-repo-init` | Initialize and validate Yarli orchestration in a repository |
+| `yarli-tranche-expander` | Research an epic and enqueue a broad validated Yarli tranche wave |
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
 
