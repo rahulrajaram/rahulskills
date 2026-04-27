@@ -19,6 +19,14 @@ Skills cover workflow automation (git history cleanup, session handoffs, PDF gen
 
 Three shell scripts handle discovery, syncing, and audit across all local projects.
 
+## Agent Context
+
+Skills that invoke agent CLIs or supervise long-running workflows should
+preserve `AGENT_ATTRIBUTION_*` environment variables. When a skill wraps a
+child agent directly, set `AGENT_ATTRIBUTION_CALLER`,
+`AGENT_ATTRIBUTION_PROJECT`, and a stable `AGENT_ATTRIBUTION_SESSION` when one
+is available so downstream tooling can attribute work without parsing prose.
+
 ## Repository Structure
 
 ```
