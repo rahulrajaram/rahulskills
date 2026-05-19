@@ -44,13 +44,14 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Skills (37)
+### Skills (38)
 
 Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
 | Skill | Description |
 |-------|-------------|
 | `analyze-conversation` | Post-mortem analysis of conversations for anti-patterns and learnings |
+| `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |
 | `archdiagram` | Generate architecture diagrams from context or codebase |
 | `check-antipatterns` | Real-time anti-pattern detection during active work |
 | `commit` | Smart commit with file triage, artifact filtering, and secret detection |
