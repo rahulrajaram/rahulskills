@@ -152,4 +152,11 @@ else
   echo
 fi
 
+STALE_CHECK_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/yarli-remediate-stale-runs.sh"
+if command -v yarli >/dev/null 2>&1 && [[ -x "${STALE_CHECK_SCRIPT}" ]]; then
+  echo "=== STALE ACTIVE RUN CHECK ==="
+  (cd "${PROJECT_ROOT}" && "${STALE_CHECK_SCRIPT}" "${PROJECT_ROOT}" --dry-run) || true
+  echo
+fi
+
 echo "=== END INSPECT ==="

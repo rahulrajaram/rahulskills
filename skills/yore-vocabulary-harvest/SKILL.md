@@ -86,4 +86,3 @@ cargo run --quiet -- \
 - `/tmp/vocabulary-harvest.json` (structured)
 - `/tmp/vocabulary-harvest.txt` (optional plain term list)
 - A stable `vocabulary-harvest` artifact that can be passed to the LLM filtering skill
-

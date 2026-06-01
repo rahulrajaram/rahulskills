@@ -6,6 +6,8 @@ Entry point for /analyze-conversation skill.
 
 import sys
 import os
+import json
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -23,21 +25,187 @@ from patterns import (
 )
 
 
+AUTONOMY_USER_MARKERS = (
+    "autonom",
+    "break and ask",
+    "tackle all",
+    "tackle these yourself",
+    "do it",
+    "so what now",
+    "what's happening",
+    "whats happening",
+    "hogging memory",
+    "please figure it out",
+    "are you going to execute",
+    "should we use",
+    "should i kick",
+)
+
+AUTONOMY_ASSISTANT_MARKERS = (
+    "should we use",
+    "should i",
+    "do you want",
+    "would you like",
+    "please confirm",
+    "approve this",
+    "which",
+)
+
+
+def _extract_codex_text(content) -> str:
+    """Extract readable text from a Codex message content list."""
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    texts = []
+    for item in content:
+        if not isinstance(item, dict):
+            if isinstance(item, str):
+                texts.append(item)
+            continue
+        if item.get("type") in {"input_text", "output_text", "text"}:
+            texts.append(item.get("text", ""))
+    return "\n".join(texts)
+
+
+def _safe_json_loads(raw: str) -> dict:
+    try:
+        data = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _codex_tool_item(name: str, arguments: str) -> dict:
+    """Convert a Codex function call into a Claude-shaped tool item."""
+    args = _safe_json_loads(arguments)
+    if name == "exec_command":
+        return {
+            "name": "Bash",
+            "input": {
+                "command": str(args.get("cmd", "")),
+                "description": str(args.get("justification", "")),
+            },
+        }
+    if name in {"apply_patch", "write_stdin", "spawn_agent", "wait_agent"}:
+        return {"name": name, "input": args}
+    return {"name": name, "input": args}
+
+
+def is_codex_conversation_file(conversation_file: str) -> bool:
+    """Return whether a JSONL transcript appears to use Codex event format."""
+    try:
+        with open(conversation_file) as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                event = json.loads(line)
+                if event.get("type") in {"session_meta", "turn_context", "response_item"}:
+                    return True
+                return False
+    except (OSError, json.JSONDecodeError):
+        return False
+    return False
+
+
+def normalize_codex_conversation(conversation_file: str) -> str:
+    """Normalize Codex JSONL events into the message shape used by this analyzer."""
+    normalized = []
+    with open(conversation_file) as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            event = json.loads(line)
+            if event.get("type") != "response_item":
+                continue
+            payload = event.get("payload") or {}
+            payload_type = payload.get("type")
+            timestamp = event.get("timestamp", "")
+            if payload_type == "message":
+                role = payload.get("role")
+                if role not in {"user", "assistant"}:
+                    continue
+                text = _extract_codex_text(payload.get("content"))
+                if not text:
+                    continue
+                normalized.append(
+                    {
+                        "timestamp": timestamp,
+                        "type": role,
+                        "message": {"content": [{"type": "text", "text": text}]},
+                    }
+                )
+            elif payload_type == "function_call":
+                normalized.append(
+                    {
+                        "timestamp": timestamp,
+                        "type": "assistant",
+                        "message": {
+                            "content": [
+                                _codex_tool_item(
+                                    str(payload.get("name", "")),
+                                    str(payload.get("arguments", "")),
+                                )
+                            ]
+                        },
+                    }
+                )
+
+    temp = tempfile.NamedTemporaryFile(
+        mode="w",
+        prefix="analyze-conversation-codex-",
+        suffix=".jsonl",
+        delete=False,
+    )
+    with temp:
+        for message in normalized:
+            temp.write(json.dumps(message) + "\n")
+    return temp.name
+
+
+def find_current_codex_conversation_file() -> str:
+    """Find the most recently updated Codex session JSONL."""
+    sessions_dir = Path.home() / ".codex" / "sessions"
+    candidates = sorted(
+        sessions_dir.glob("**/*.jsonl"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        raise FileNotFoundError("No Codex JSONL sessions found under ~/.codex/sessions")
+    return str(candidates[0])
+
+
 def find_conversation_file(conversation_id=None):
     """Find conversation JSONL file."""
+    if conversation_id == "--current":
+        return find_current_codex_conversation_file()
     if conversation_id:
         # Search in .claude/projects/
         projects_dir = Path.home() / '.claude' / 'projects'
-        for project_dir in projects_dir.iterdir():
-            if project_dir.is_dir():
+        if projects_dir.exists():
+            for project_dir in projects_dir.iterdir():
+                try:
+                    is_project_dir = project_dir.is_dir()
+                except PermissionError:
+                    continue
+                if not is_project_dir:
+                    continue
                 conv_file = project_dir / f'{conversation_id}.jsonl'
-                if conv_file.exists():
-                    return str(conv_file)
+                try:
+                    if conv_file.exists():
+                        return str(conv_file)
+                except PermissionError:
+                    continue
+        # Search Codex sessions by id or filename fragment.
+        sessions_dir = Path.home() / ".codex" / "sessions"
+        for conv_file in sessions_dir.glob("**/*.jsonl"):
+            if conversation_id in conv_file.name:
+                return str(conv_file)
         raise FileNotFoundError(f"Conversation {conversation_id} not found")
     else:
-        # Use current conversation (most recent JSONL in current project)
-        # This would need to be determined by the skill runner
-        raise ValueError("No conversation ID provided - current conversation detection not yet implemented")
+        return find_current_codex_conversation_file()
 
 
 # Commands that are normal development patterns - don't suggest tools for these
@@ -135,16 +303,23 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    original_conversation_file = conversation_file
+    analysis_file = conversation_file
+    normalized_temp_file = None
+    if is_codex_conversation_file(conversation_file):
+        normalized_temp_file = normalize_codex_conversation(conversation_file)
+        analysis_file = normalized_temp_file
+
     # Extract conversation ID from filename
-    conv_id = Path(conversation_file).stem
+    conv_id = Path(original_conversation_file).stem
 
     # Run analysis
     print(f"Analyzing conversation: {conv_id}...")
-    stats = analyze_conversation(conversation_file)
-    messages = load_messages(conversation_file)
+    stats = analyze_conversation(analysis_file)
+    messages = load_messages(analysis_file)
 
     # Check project context for existing tools/docs
-    project_context = check_project_context(conversation_file)
+    project_context = check_project_context(original_conversation_file)
 
     # Extract detailed patterns
     print("Extracting anti-patterns...")
@@ -154,6 +329,16 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     verify_patterns = find_missing_verification(messages)
     tool_opps = find_tool_opportunities(messages)
     timeline = extract_conversation_timeline(messages)
+    autonomy_user_signals = [
+        msg
+        for msg in stats.user_messages
+        if any(marker in msg.lower() for marker in AUTONOMY_USER_MARKERS)
+    ]
+    autonomy_assistant_signals = [
+        msg
+        for msg in stats.assistant_messages
+        if "?" in msg and any(marker in msg.lower() for marker in AUTONOMY_ASSISTANT_MARKERS)
+    ]
 
     # Generate report
     report_lines = []
@@ -162,7 +347,9 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     report_lines.append(f"# Conversation Retrospective: {conv_id}")
     report_lines.append("")
     report_lines.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    report_lines.append(f"**Conversation File:** `{conversation_file}`")
+    report_lines.append(f"**Conversation File:** `{original_conversation_file}`")
+    if normalized_temp_file:
+        report_lines.append("**Runtime Adapter:** Codex JSONL normalized for analysis")
     report_lines.append("")
     report_lines.append("---")
     report_lines.append("")
@@ -177,6 +364,10 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     report_lines.append(f"3. **Scope Expansions**: {len(scope_patterns)} instances")
     report_lines.append(f"4. **Unverified Values**: {len(verify_patterns)} instances")
     report_lines.append(f"5. **Tool Discovery Gaps**: {len(stats.file_writes)} scripts written (potential duplicates)")
+    report_lines.append(
+        f"6. **Autonomy Break Signals**: {len(autonomy_user_signals)} user prompts, "
+        f"{len(autonomy_assistant_signals)} assistant routing questions"
+    )
     report_lines.append("")
 
     report_lines.append("### Top Tool Opportunities")
@@ -206,6 +397,51 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     report_lines.append("")
     report_lines.append("---")
     report_lines.append("")
+
+    # Autonomy analysis
+    report_lines.append("## Autonomy Break Analysis")
+    report_lines.append("")
+    report_lines.append(
+        "This section flags places where long-running autonomous work may have "
+        "degraded into workflow selection, user re-prompting, or unnecessary "
+        "help requests."
+    )
+    report_lines.append("")
+    report_lines.append(f"- **User re-prompt / frustration signals**: {len(autonomy_user_signals)}")
+    report_lines.append(f"- **Assistant routing questions**: {len(autonomy_assistant_signals)}")
+    report_lines.append("")
+    if autonomy_user_signals:
+        report_lines.append("### User Signals")
+        report_lines.append("")
+        for signal in autonomy_user_signals[:10]:
+            report_lines.append(f"- {signal.replace(chr(10), ' ')[:220]}")
+        report_lines.append("")
+    if autonomy_assistant_signals:
+        report_lines.append("### Assistant Routing Questions")
+        report_lines.append("")
+        for signal in autonomy_assistant_signals[:10]:
+            report_lines.append(f"- {signal.replace(chr(10), ' ')[:220]}")
+        report_lines.append("")
+    if autonomy_user_signals or autonomy_assistant_signals:
+        report_lines.append("### Recommended Operating Rule")
+        report_lines.append("")
+        report_lines.append(
+            "When the user requests long-running autonomous work, proceed through "
+            "the next concrete task and pause only for destructive operations, "
+            "pushes/deploys, dependency additions, secrets, material product/API "
+            "decisions, or a real local blocker. Treat status updates as progress "
+            "reports, not stopping points."
+        )
+        report_lines.append("")
+        report_lines.append(
+            "Routing hierarchy: direct request => direct execution; explicit "
+            "`$skill` => use that skill; no explicit skill => normal engineering "
+            "loop; `/goal` only for narrow multi-step objectives; Yarli only when "
+            "durability or background orchestration matters."
+        )
+        report_lines.append("")
+        report_lines.append("---")
+        report_lines.append("")
 
     # Conversation Summary
     report_lines.append("## Conversation Summary")
@@ -445,17 +681,23 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     with open(report_file, 'w') as f:
         f.write('\n'.join(report_lines))
 
+    if normalized_temp_file:
+        try:
+            os.unlink(normalized_temp_file)
+        except OSError:
+            pass
+
     print(f"\n✅ Report generated: {report_file}")
     return str(report_file)
 
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Usage: generate_report.py <conversation-file>")
-        print("   or: generate_report.py --id <conversation-id>")
-        sys.exit(1)
+        conversation_file = find_conversation_file()
 
-    if sys.argv[1] == '--id':
+    elif sys.argv[1] == '--current':
+        conversation_file = find_conversation_file("--current")
+    elif sys.argv[1] == '--id':
         if len(sys.argv) < 3:
             print("Error: Conversation ID required")
             sys.exit(1)

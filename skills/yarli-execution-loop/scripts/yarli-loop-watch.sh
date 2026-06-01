@@ -26,6 +26,8 @@ elif [[ -f "${PROJECT_ROOT}/.yarli/yarli-supervisor.log" ]]; then
   LOG_PATH="${PROJECT_ROOT}/.yarli/yarli-supervisor.log"
 fi
 
+STALE_CHECK_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/yarli-remediate-stale-runs.sh"
+
 while true; do
   printf '\n=== %s ===\n' "$(date -Iseconds)"
   printf 'active: '
@@ -40,6 +42,17 @@ while true; do
   )
   printf 'proc: '
   pgrep -af 'yarli run --fresh-from-tranches --stream|yarli run continue --stream|yarli run --stream' | head -n 1 || true
+  echo
+  printf 'stale: '
+  if [[ -x "${STALE_CHECK_SCRIPT}" ]]; then
+    (
+      cd "${PROJECT_ROOT}"
+      "${STALE_CHECK_SCRIPT}" "${PROJECT_ROOT}" --dry-run \
+        | awk '/^stale_run_detected:/ {print; found=1} /^stale_runs_detected:/ {summary=$0} END {if (found) exit 0; if (summary) print summary; else print "unknown"}'
+    )
+  else
+    echo "stale checker unavailable"
+  fi
   echo 'latest note:'
   if [[ -n "${LOG_PATH}" && -f "${LOG_PATH}" ]]; then
     tac "${LOG_PATH}" | awk '($0 !~ /shell: /) && ($0 !~ /command started/) && ($0 !~ /Reading additional input/) && ($0 !~ /^$/) {print; count++; if (count==3) exit}'

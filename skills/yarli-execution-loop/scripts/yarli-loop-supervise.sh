@@ -10,10 +10,15 @@ fi
 PROJECT_ROOT="$(cd "${PROJECT_ROOT}" && pwd)"
 
 SUPERVISOR="${PROJECT_ROOT}/scripts/yarli_supervisor.py"
+STALE_REMEDIATION="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/yarli-remediate-stale-runs.sh"
 
 if [[ ! -f "${SUPERVISOR}" ]]; then
   echo "repo-local Yarli supervisor not found at ${SUPERVISOR}" >&2
   exit 3
+fi
+
+if [[ -x "${STALE_REMEDIATION}" ]]; then
+  "${STALE_REMEDIATION}" "${PROJECT_ROOT}" --fix
 fi
 
 HAS_MAX_LAUNCHES=0

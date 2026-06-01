@@ -8,6 +8,16 @@ argument-hint: "[pr hint]"
 
 Take a local worktree to an open GitHub PR with passing CI, then stop.
 
+## Autonomy Routing
+
+An explicit PR lifecycle request is approval to run the local preparation
+workflow through branch preparation, commits, validation, push, PR creation, and
+CI watching, subject to the safety stops below. Do not ask whether to use
+`/goal`, Yarli, commit, or squash workflows; invoke the required sub-skills and
+continue. Still stop for push/auth failures, risky history rewrites, failing
+checks, unresolved review findings, visibility risk, or any user-visible release
+decision that cannot be inferred from repo policy.
+
 ## Preconditions
 
 - Work inside a git repository with a GitHub remote.
@@ -91,22 +101,37 @@ Take a local worktree to an open GitHub PR with passing CI, then stop.
 - If you make a version bump, commit it normally so hooks run, then rerun the
   quick local review and `readme-doctor`.
 
-### 9. Push The Feature Branch
+### 9. Run Repo-Local CI Mirror
+
+- If `scripts/run_ci_mirror.sh` exists, run `scripts/run_ci_mirror.sh --list`
+  to record the available local mirror gates.
+- Then run `scripts/run_ci_mirror.sh` before pushing.
+- If the mirror fails, stop and report the failing gate names instead of
+  pushing.
+- For faster iteration before the final pre-push check, you may run
+  `scripts/run_ci_mirror.sh --no-pytest`, but treat it as a partial mirror that
+  skips the top-level `pytest+ratchet+ruff+complexity` gate.
+- If no `scripts/run_ci_mirror.sh` exists, skip this step.
+
+### 10. Push The Feature Branch
 
 - Push the current feature branch with upstream tracking.
 - Stop on any push rejection or auth failure.
 
-### 10. Open The PR
+### 11. Open The PR
 
 - Use `gh pr create`.
 - Prefer `--fill` when the existing commit history is already clean; otherwise
   provide an explicit title and body built from the branch diff.
 - Capture the PR number and URL.
 
-### 11. Wait For Build Success
+### 12. Wait For Build Success
 
 - Use `gh pr checks <pr-number> --watch` when available, otherwise watch the
   corresponding GitHub Actions run.
+- After the watch reports green, run `bash scripts/ci_gate.sh --commit $(git rev-parse HEAD)`
+  from the repo root when that script exists so skipped, neutral, or stale
+  required checks still stop the flow.
 - If CI fails, notify the user and stop.
 - If CI passes, notify the user and stop. The user owns review, merge, and all
   follow-up after that point.

@@ -22,6 +22,28 @@ Create and update skills for Claude and Codex in a consistent, lightweight forma
 2. Plan reusable resources (scripts, references, assets) if any.
 3. Scaffold and/or update SKILL.md content for the target skill.
 4. Apply the same content in both skill roots when requested for both runtimes.
-5. Run validation for the runtime(s) being edited (`quick_validate.py` when available).
+5. Run dual-runtime validation for edited skills with `python scripts/validate.py <skill-name>`.
 6. Keep docs concise and avoid non-essential auxiliary files.
 
+## Validation
+
+From either `~/.agents/skills/skill-creator` or `~/.claude/skills/skill-creator`, run:
+
+```bash
+python scripts/validate.py <skill-name>
+```
+
+The validator checks that `~/.agents/skills/<skill-name>/SKILL.md` and
+`~/.claude/skills/<skill-name>/SKILL.md` both exist, both have frontmatter with
+`name` and `description`, and are byte-identical. Runtime-only metadata
+exceptions must be explicit before they are allowed:
+
+```bash
+python scripts/validate.py <skill-name> --allow-runtime-metadata-diff
+```
+
+Run the built-in fixture test with:
+
+```bash
+python scripts/validate.py --self-test
+```

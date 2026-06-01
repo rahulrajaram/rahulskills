@@ -9,6 +9,16 @@ argument-hint: "[message hint]"
 Create a single well-formed commit after assessing every visible changed file
 to determine whether it should actually be committed.
 
+## Autonomy Routing
+
+A commit request is approval to triage, stage appropriate files, compose a
+conventional commit message, and create the commit without turning the routine
+path into an approval loop. Ask only when the assessment contains REVIEW items,
+ALLOWED overrides, secrets, destructive cleanup, global ignore choices, or a
+message/scope decision that materially affects user intent. Do not ask whether
+to use another workflow wrapper unless the user is really requesting history
+cleanup, PR creation, or handoff.
+
 ## Usage
 
 ```
@@ -127,12 +137,15 @@ File assessment:
 **ALLOWED files must be shown distinctly** — never buried in COMMIT.
 The user needs to see at a glance that an override is in play.
 
-Then ask:
-> Proceed? ALLOWED files will be included. Resolve REVIEW items. (y/n)
-
 **Never silently skip a SKIP file.** Name every one so the user can override.
 
-Wait for explicit confirmation before touching `git add`.
+If the table contains REVIEW items, ALLOWED files, secrets, destructive cleanup,
+or an ignore-location choice, ask:
+> Resolve REVIEW/ALLOWED/SKIP decisions before staging. Proceed? (y/n)
+
+If all staged files are ordinary COMMIT verdicts and all SKIP handling is
+unambiguous, continue without a second approval; the user's commit request is
+the approval.
 
 ### Step 3b — Persist ignores for SKIP'd files
 
@@ -208,7 +221,9 @@ Rules:
   `Permitted overrides: VISION.md (see .githooks/commit-allow)`
 - If the user provided a message hint, incorporate it
 
-Show the proposed message to the user. Wait for approval or edits.
+Use the proposed message without asking for approval unless the user requested
+interactive review, supplied conflicting message guidance, or the correct
+subject/scope is materially ambiguous. Include the final message in the summary.
 
 ### Step 6 — Commit
 

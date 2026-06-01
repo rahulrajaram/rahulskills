@@ -14,13 +14,30 @@ Performs comprehensive post-mortem analysis of conversations to extract:
 - Universal rules violated (15 infrastructure work rules)
 - Recommendations for improvement
 
+## Autonomy Routing
+
+When invoked, generate the retrospective artifact directly. Do not turn the
+analysis into a choice between `/goal`, Yarli, or direct execution. If the report
+identifies clear low-risk wording or tooling fixes and the user asked to fix the
+problem, continue into those fixes after reporting the findings; otherwise stop
+after producing the retrospective.
+
 ## Usage
 
 `/analyze-conversation [conversation-id]`
 
+The underlying report generator can also be run directly:
+
+```bash
+python ~/.agents/skills/analyze-conversation/generate_report.py --current
+python ~/.agents/skills/analyze-conversation/generate_report.py --id <conversation-id>
+python ~/.agents/skills/analyze-conversation/generate_report.py <conversation-jsonl>
+```
+
 ## Arguments
 
 - `conversation-id` (optional): ID of conversation to analyze. If omitted, analyzes current conversation.
+- `--current`: Analyze the most recently updated Codex JSONL session under `~/.codex/sessions`.
 
 ## Output
 
@@ -125,6 +142,8 @@ The analyzer reuses the analysis scripts created during retrospective analysis a
 - Severity ranking (HIGH/MEDIUM/LOW)
 - Actionable recommendations
 - Success metric tracking
+- Codex JSONL normalization for `~/.codex/sessions` transcripts
+- Autonomy-break detection for user re-prompts and assistant workflow-routing questions
 
 ## Benefits
 
