@@ -8,6 +8,15 @@ argument-hint: "[cli[,cli...]] <prompt> [--model MODEL] [--session NAME] [--cont
 
 Invoke one or more AI CLI tools through gptengage.
 
+## Autonomy Routing
+
+This skill delegates work; it does not transfer responsibility away from the
+orchestrating agent. Invoke the requested CLI(s), then inspect and integrate the
+result when the user asked for execution. If the subprocess cannot write, times
+out, or returns only a plan, continue locally when the next engineering step is
+clear. Do not ask whether to use `/goal`, Yarli, or direct execution unless that
+choice changes safety, shared state, durability, or user-visible behavior.
+
 ## Workflow
 
 1. Parse user arguments.

@@ -2,12 +2,21 @@
 name: "yarli-tranche-expander"
 description: "Research an epic, discover implementation gaps and architecture hotspots, and enqueue a broad validated Yarli tranche wave without losing sight of the overarching goals."
 argument-hint: "[--project-root PATH] [--goal TEXT] [--start-key NXT-###] [--apply]"
-allowed-tools: "Bash, Read, Grep, Glob, Edit, Write"
 ---
 
 # Yarli Tranche Expander
 
 Use this skill when the user asks to expand a Yarli backlog, enqueue many tranches, discover missing work, or make sure nothing slips through the cracks.
+
+## Autonomy Routing
+
+This skill is for durable backlog expansion, not ordinary implementation
+routing. If the user explicitly invokes it, research and enqueue the tranche
+wave without asking whether to use Yarli. Do not recommend this skill when the
+user simply asked to implement the next local task. After expansion, if the user
+asks to execute selected tranches, proceed directly or hand off to
+`yarli-execution-loop` only when durable/background orchestration materially
+helps.
 
 ## Preamble
 

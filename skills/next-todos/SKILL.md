@@ -8,6 +8,15 @@ argument-hint: ""
 
 Use when the user asks for the next set of prioritized actions.
 
+## Autonomy Routing
+
+This skill produces executable work, not a workflow-selection checkpoint.
+After generating todos, if the user selects an item, says to tackle them, or
+otherwise signals execution, proceed with the selected or top-priority todo by
+default. Do not ask whether to use `/goal`, Yarli, or direct execution unless
+that choice materially changes durability, shared state, safety, or user-visible
+behavior.
+
 ## Trigger
 - User asks for "next tasks", "what should I do next", or equivalent planning output.
 

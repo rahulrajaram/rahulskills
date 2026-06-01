@@ -8,6 +8,15 @@ argument-hint: ""
 
 Use this workflow whenever a user wants a clean, accurate shell handoff.
 
+## Autonomy Routing
+
+A handoff request is approval to complete the handoff workflow rather than ask
+whether to commit, update docs, or generate the continuation prompt. Continue
+through the ordered steps unless a repository choice, destructive action,
+secret, push/deploy, or multi-repo ambiguity requires explicit confirmation. Do
+not ask whether to use `/goal`, Yarli, or direct execution during handoff; the
+handoff itself is the requested workflow.
+
 ## Workflow
 
 ### Step 1: Capture repo state
