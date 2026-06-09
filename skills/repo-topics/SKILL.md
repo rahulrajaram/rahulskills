@@ -54,7 +54,7 @@ Gather signals to determine relevant topics:
    - `.github/workflows/` → `github-actions`, `ci-cd`
    - `terraform/` / `*.tf` → `terraform`, `infrastructure-as-code`
    - `SKILL.md` / skills directory → `ai-agents`, `skills`
-   - `yarli.toml` → `orchestration`
+   - `agent.toml` → `orchestration`
    - CLI entry points (`cli.py`, `main.rs`, `bin/`) → `cli-tools`
 4. **README content**: Scan for keywords that suggest domains:
    - "machine learning" / "ML" / "model" → `machine-learning`

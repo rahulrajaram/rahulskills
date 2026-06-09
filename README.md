@@ -15,9 +15,18 @@ This repo collects skills (prompt-based automation units) for two AI coding assi
 
 Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `skills/` directory in this repo is the single source of truth, synced to both locations.
 
-Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yarli orchestration, Yore vocabulary curation).
+Pi Coding Agent resolves skills from `~/.pi/agent/skills/` first, then the
+assembled Codex location at `~/.agents/skills/`, then project-local
+`.pi/skills/` and `.agents/skills/`; the first match wins. Run
+[`install-pi-skills.sh`](#install-pi-skills.sh) after cloning or pulling to link
+every repo skill into `~/.pi/agent/skills/` so Pi loads the repository copies
+directly and never a stale shadowing copy. Invoke a skill explicitly in Pi as
+`/skill:<name>`; for example, `/skill:handoff extract` resumes work from
+`NEXT_SHELL_PROMPT.md`.
 
-Three shell scripts handle discovery, syncing, and audit across all local projects.
+Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yore vocabulary curation).
+
+Four shell scripts handle discovery, syncing, Pi linking, and audit across all local projects.
 
 ## Repository Structure
 
@@ -27,9 +36,13 @@ rahulskills/
   overlays/claude/<name>.yml  # Claude-only overrides (allowed-tools, etc.)
   overlays/codex/.gitkeep  # Codex overrides (empty for now)
   build/                   # Gitignored — assembled output from stitch step
-  bin/                     # Shared assistant shell helpers (Yarli lint/sanitize, etc.)
+  bin/                     # Shared assistant shell helpers
   audit-skills.sh          # Pre-commit guard against private reference leaks
+  install-pi-skills.sh     # Symlink repo skills into ~/.pi/agent/skills for Pi
   stitch-skills.sh         # Assemble skills + overlays, install to CLI locations
+  runtime-exclusions/      # Runtime-owned names that must not be installed twice
+  scripts/audit_catalog.py # Audit resolved roots for collisions and portability
+  capabilities/skills.toml # Dependencies, effects, layers, and overlap contracts
   scan-skills.sh           # Cross-project skill discovery and reporting
   sync-skills.sh           # Bidirectional sync between repo and installed locations
   setup.sh                 # Contributor bootstrap (hooks + optional skill deploy)
@@ -44,30 +57,35 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Skills (38)
+### Skills (39)
 
 Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
 | Skill | Description |
 |-------|-------------|
 | `analyze-conversation` | Post-mortem analysis of conversations for anti-patterns and learnings |
-| `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |
 | `archdiagram` | Generate architecture diagrams from context or codebase |
+| `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |
+| `autonomy-loop` | Drive an epic as a principal-architect loop with bounded execution and controlled reactor chaining |
 | `check-antipatterns` | Real-time anti-pattern detection during active work |
 | `commit` | Smart commit with file triage, artifact filtering, and secret detection |
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
 | `ecosystem-borrow-audit` | Cross-repo borrowing analysis and multi-sigma ideation sweeps |
 | `fp-refine` | Transform imperative code into functional-programming-first structures |
+| `frame-goals-constraints` | Turn complex product and system direction into a living, customer-legible product thesis |
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
-| `handoff` | Commit workspace state and generate next-shell continuation prompt |
+| `grilling` | Hard, dependency-aware questions with human-first rendering; speculative factory research, internal debate, and a plain-language orchestrator close |
+| `grill-me` | Alias trigger that invokes the grilling skill |
+| `handoff` | Commit and write `NEXT_SHELL_PROMPT.md`, or load it to resume work |
+| `humanize` | Rewrite rigorous narratives for human readers without weakening their truth |
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
 | `install-commithooks` | Install shared commithooks framework into a project |
 | `invokellm` | Invoke one or more AI CLIs via gptengage, defaulting to gemini, claude, and codex |
-| `kokoro-tts` | Read text out loud using Kokoro TTS |
 | `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint |
 | `max-columns` | Keep output within a user-specified column width |
 | `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
 | `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |
+| `objective-to-dag-decomposition` | Decompose vague objectives into typed reasoning trees, an execution DAG, and phased plans |
 | `postmortem` | Generate Amazon COE-style 5-whys postmortem reports |
 | `pr-lifecycle` | Create and manage a PR from local prep through green CI |
 | `privateify` | Lock down a repo to stay private via CI guards, hooks, manifest flags, and agent directives |
@@ -79,17 +97,28 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `skill-creator` | Guide for creating effective skills for Claude and Codex |
 | `speak` | Read text out loud using Kokoro TTS |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
+| `system-memory-audit` | Audit Linux system-wide memory health, swap, PSI, and top consumers |
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
-| `vision-plan-tranche-sync` | Translate roadmap items into implementation tranches |
-| `yarli-execution-loop` | Supervise Yarli runs, enqueue tranches durably, and choose the right relaunch path |
-| `yarli-introspect` | Live introspection of running or completed Yarli runs |
-| `yarli-repo-init` | Initialize and validate Yarli orchestration in a repository |
-| `yarli-tranche-expander` | Research an epic and enqueue a broad validated Yarli tranche wave |
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
 
 ## Shell Scripts
+
+### `install-pi-skills.sh`
+
+Symlink every repo skill into the Pi coding agent's skill directory so Pi loads
+the repository copies directly (repo = single source of truth).
+
+```bash
+./install-pi-skills.sh           # Link all repo skills into ~/.pi/agent/skills
+./install-pi-skills.sh grilling  # Link a single skill
+./install-pi-skills.sh -n        # Dry run
+```
+
+Pi resolves `~/.pi/agent/skills/` before `~/.agents/skills/`, so existing real
+directories are moved to `<name>.pre-pi-sync` and replaced with symlinks pointing
+back at this repo; nothing is deleted. Honors `.exclude-skills`.
 
 ### `stitch-skills.sh`
 
@@ -113,6 +142,8 @@ Bidirectional sync between this repo and installed locations. Push delegates to 
 ./sync-skills.sh diff      # Show differences between assembled output and installed
 ./sync-skills.sh status    # List which skills exist where
 ./sync-skills.sh compare-implementations  # Validate Codex/Claude skill parity
+./sync-skills.sh audit-catalog --strict   # Fail on divergent loaded skill names
+./sync-skills.sh capability-health --mcp figma  # Check commands/MCPs/platforms
 ```
 
 Respects per-machine exclusion list in `.exclude-skills` (one skill name per line, gitignored).
@@ -128,20 +159,6 @@ Discover skills, scripts, agents, and build targets across all local projects li
 ```
 
 Tags each discovered item as `[COLLECTED]`, `[EXCLUDED]`, or `[NEW]` relative to this repo.
-
-### Skill Structure Tests
-
-Validate skill construction separately for Codex and Claude installs.
-
-```bash
-./tests/test_codex_skill_structure.sh
-./tests/test_claude_skill_structure.sh
-```
-
-Both tests infer required frontmatter keys from a real installed reference
-skill (`archdiagram` by default), then validate every repo skill and installed
-skill against that shape.
-
 ### `audit-skills.sh`
 
 Pre-commit guard that scans skill files for private references (project names in blocklists, personal filesystem paths).
@@ -159,8 +176,7 @@ Uses patterns from `.blocklist.local`. Also matches personal home-directory path
 Reusable helper scripts that skills can call from any repo without depending on a specific project checkout.
 
 Current helpers:
-- `bin/yarli-lint-implementation-plan.sh`
-- `bin/yarli-sanitize-continuation.sh`
+- `bin/` helper scripts
 
 ## Installation
 

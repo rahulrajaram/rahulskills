@@ -239,6 +239,12 @@ Write to `./package-decomposition/phase3-split-log.md`:
 
 **Goal:** Verify each project works independently and together.
 
+Creating environments is local state and installing declared dependencies can
+download packages and execute build hooks. First show the exact environment
+paths, package sources, and install commands; obtain explicit approval before
+creating environments or installing/removing dependencies. Until approved, run
+only checks supported by already-present environments and report the gap.
+
 ### Steps
 
 1. **Per-project isolated verification**

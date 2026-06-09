@@ -1,78 +1,30 @@
 ---
 name: ideate
-description: "Generate divergent ideas from a seed using evolutionary ideation via gptengage. Use when the user asks for brainstorming, idea generation, ideation, or says /ideate."
+description: "Generate a divergent idea tree from a seed through gptengage. Use for brainstorming, evolutionary ideation, or when the user says /ideate or $ideate."
 argument-hint: "<seed> [--sigma 1.0] [--depth 2] [--cli claude] [--select]"
 ---
 
 # Ideate
 
-Generate a tree of divergent ideas from a seed concept through gptengage.
+Read the shared
+[`../../references/gptengage-invocation.md`](../../references/gptengage-invocation.md)
+contract and the selected
+[`../../references/gptengage-ideate.md`](../../references/gptengage-ideate.md)
+recipe before calling a backend.
 
 ## Workflow
 
-1. Parse user arguments.
-Extract:
-- `<SEED>` — the seed idea to diverge from.
-- Any optional flags (--sigma, --depth, --cli, --select, --output, --timeout, --color, --pager).
+1. Parse the seed, creativity, depth, backend, selection, output, and timeout
+   options using the operation recipe.
+2. Run only through `~/.local/bin/gptengage ideate`. Keep the default sigma 1,
+   depth 2, and Claude backend unless the user supplied alternatives.
+3. Capture the full tree, validate JSON output when requested, and distinguish
+   backend failure from partial tree generation.
 
-2. Run ideation.
+## Boundaries
 
-```bash
-~/.local/bin/gptengage ideate "<SEED>" [OPTIONS] 2>&1
-```
-
-Use `timeout 600` wrapper since ideation generates multiple AI calls:
-
-```bash
-timeout 600 ~/.local/bin/gptengage ideate "<SEED>" [OPTIONS] 2>&1
-```
-
-3. Display the full output to the user.
-
-## Options Reference
-
-| Flag | Description | Example |
-|------|-------------|---------|
-| `--sigma N` | Creativity: 0.5 (conservative), 1.0 (notable), 1.5 (reimagining), 2.0 (radical) | `--sigma 1.5` |
-| `--depth N` | Tree depth: 1 (L1 only) or 2 (L1 + L2) (default: 2) | `--depth 1` |
-| `--cli CLI` | Which CLI to use (default: claude) | `--cli codex` |
-| `--select` | Interactively select which L1 ideas to expand | |
-| `-o, --output FORMAT` | Output: text or json (default: text) | `--output json` |
-| `-t, --timeout SECS` | Timeout per invocation (default: 120) | `--timeout 180` |
-| `--color MODE` | Color: auto, truecolor, 256, none | `--color truecolor` |
-| `--pager` | Display in scrollable pager | |
-
-## Sigma Creativity Levels
-
-| Sigma | Style | Description |
-|-------|-------|-------------|
-| 0.5 | Conservative | Incremental improvements on the seed |
-| 1.0 | Notable | Meaningfully different approaches (default) |
-| 1.5 | Reimagining | Reframes the problem space |
-| 2.0 | Radical | Wild, boundary-breaking divergence |
-
-## Examples
-
-```bash
-# Quick brainstorm (3 ideas, depth 1)
-~/.local/bin/gptengage ideate "Build a social app for pet owners" --sigma 1.0 --depth 1
-
-# Full tree with high creativity
-~/.local/bin/gptengage ideate "AI tutoring platform" --sigma 2.0
-
-# Interactive selection of which ideas to expand
-~/.local/bin/gptengage ideate "Marketplace for freelancers" --sigma 1.5 --select
-
-# JSON output for programmatic use
-~/.local/bin/gptengage ideate "Build an app" --output json
-
-# Using a different CLI
-~/.local/bin/gptengage ideate "New CLI tool" --cli codex
-```
-
-## Guardrails
-
-- Pass all user arguments through to gptengage directly.
-- If the command fails, report the error and suggest running `gptengage status` to check CLI availability.
-- Do not invent or modify the user's seed idea.
-- Ideation is long-running; use appropriate timeout (600s default wrapper).
+- Tree cost grows exponentially with depth; disclose unusually deep requests.
+- Accept normal depth 1-5 and sigma 0-3. Use `--force` above those limits only
+  when the user explicitly requested the out-of-range value and its cost.
+- Use `--select` only when interactive selection is actually available.
+- Never change the seed merely to produce more interesting output.

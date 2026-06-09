@@ -436,8 +436,8 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         report_lines.append(
             "Routing hierarchy: direct request => direct execution; explicit "
             "`$skill` => use that skill; no explicit skill => normal engineering "
-            "loop; `/goal` only for narrow multi-step objectives; Yarli only when "
-            "durability or background orchestration matters."
+            "loop; `/goal` only for narrow multi-step objectives; durable "
+            "background runs only when durability or managed scheduling matters."
         )
         report_lines.append("")
         report_lines.append("---")

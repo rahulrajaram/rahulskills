@@ -10,6 +10,7 @@ CODEX_INSTALL="$HOME/.agents/skills"
 CLAUDE_SKILLS_INSTALL="$HOME/.claude/skills"
 
 CLIS=(claude codex)
+RUNTIME_EXCLUSIONS_DIR="$ROOT_DIR/runtime-exclusions"
 
 # Keys that belong in overlays, not in generic SKILL.md.
 # When no overlay exists for a CLI, these keys are stripped from the build.
@@ -143,6 +144,13 @@ manifest_path() {
     fi
 }
 
+is_runtime_excluded() {
+    local cli="$1" skill_name="$2"
+    local exclusions="$RUNTIME_EXCLUSIONS_DIR/$cli.txt"
+    [[ -f "$exclusions" ]] || return 1
+    grep -qxF "$skill_name" <(grep -v '^[[:space:]]*#' "$exclusions" | sed '/^[[:space:]]*$/d')
+}
+
 assemble_skills() {
     echo "Assembling skills into $BUILD_DIR ..."
     rm -rf "$BUILD_DIR"
@@ -163,6 +171,10 @@ assemble_skills() {
         body="$(extract_body "$manifest")"
 
         for cli in "${CLIS[@]}"; do
+            if is_runtime_excluded "$cli" "$skill_name"; then
+                echo "  SKIP [$cli] runtime-owned conflict: $skill_name"
+                continue
+            fi
             local out_dir="$BUILD_DIR/$cli/skills/$skill_name"
             mkdir -p "$out_dir"
 
@@ -187,6 +199,7 @@ assemble_skills() {
                 [[ -d "$sub" ]] || continue
                 local sub_name
                 sub_name="$(basename "$sub")"
+                [[ "$sub_name" == "__pycache__" ]] && continue
                 cp -a "$sub" "$out_dir/$sub_name"
             done
 
@@ -196,11 +209,26 @@ assemble_skills() {
                 local fname
                 fname="$(basename "$f")"
                 [[ "$fname" == "SKILL.md" || "$fname" == "skill.md" ]] && continue
+                [[ "$fname" == *.pyc || "$fname" == *.pyo ]] && continue
                 cp -a "$f" "$out_dir/$fname"
             done
 
+            # Runtime caches are never capability source and must not be
+            # deployed merely because a local verification imported a helper.
+            find "$out_dir" -type d -name __pycache__ -prune -exec rm -rf {} +
+            find "$out_dir" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+
         done
     done
+
+    # Shared primitives live one level above installed skill directories so
+    # skill links such as ../../references/<name>.md resolve in every runtime.
+    if [[ -d "$ROOT_DIR/references" ]]; then
+        for cli in "${CLIS[@]}"; do
+            mkdir -p "$BUILD_DIR/$cli/references"
+            cp -a "$ROOT_DIR/references/." "$BUILD_DIR/$cli/references/"
+        done
+    fi
 
     # Count assembled skills
     local claude_count codex_count
@@ -228,6 +256,10 @@ install_skills() {
         installed=$((installed + 1))
     done
     echo "  Codex: $installed skills -> $CODEX_INSTALL"
+    if [[ -d "$BUILD_DIR/codex/references" ]]; then
+        mkdir -p "$(dirname "$CODEX_INSTALL")/references"
+        cp -a "$BUILD_DIR/codex/references/." "$(dirname "$CODEX_INSTALL")/references/"
+    fi
 
     # Claude skills: ~/.claude/skills/ — overwrite managed skills, leave others untouched
     mkdir -p "$CLAUDE_SKILLS_INSTALL"
@@ -240,6 +272,10 @@ install_skills() {
         installed=$((installed + 1))
     done
     echo "  Claude skills: $installed skills -> $CLAUDE_SKILLS_INSTALL"
+    if [[ -d "$BUILD_DIR/claude/references" ]]; then
+        mkdir -p "$(dirname "$CLAUDE_SKILLS_INSTALL")/references"
+        cp -a "$BUILD_DIR/claude/references/." "$(dirname "$CLAUDE_SKILLS_INSTALL")/references/"
+    fi
 
     echo "Done."
 }
