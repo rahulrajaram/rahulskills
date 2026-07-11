@@ -31,17 +31,23 @@ def evaluate(
         config = raw if isinstance(raw, dict) else {}
         commands = [str(item) for item in config.get("commands", [])]
         mcps = [str(item) for item in config.get("mcps", [])]
+        optional_mcps = [str(item) for item in config.get("optional_mcps", [])]
         platforms = [str(item).lower() for item in config.get("platforms", [])]
         missing_commands = [command for command in commands if shutil.which(command) is None]
         missing_mcps = [mcp for mcp in mcps if mcp not in loaded_mcps]
+        missing_optional_mcps = [mcp for mcp in optional_mcps if mcp not in loaded_mcps]
         current_platform = platform.system().lower()
         missing_platforms = platforms if platforms and current_platform not in platforms else []
         results[name] = {
             "available": not missing_commands and not missing_mcps and not missing_platforms,
             "missing_commands": missing_commands,
             "missing_mcps": missing_mcps,
+            "missing_optional_mcps": missing_optional_mcps,
             "missing_platforms": missing_platforms,
+            "degraded": bool(missing_optional_mcps),
             "effect": config.get("effect", "unknown"),
+            "effects": config.get("effects", [config.get("effect", "unknown")]),
+            "approval_boundaries": config.get("approval_boundaries", []),
             "layer": config.get("layer", "workflow"),
             "overlaps": config.get("overlaps", []),
         }

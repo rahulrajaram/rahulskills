@@ -33,11 +33,13 @@ def test_evaluate_reports_missing_commands_and_mcps(monkeypatch) -> None:
     assert report["skills"]["demo"]["available"] is False
     assert report["skills"]["demo"]["missing_commands"] == ["absent"]
     assert report["skills"]["demo"]["missing_mcps"] == ["missing"]
+    assert report["skills"]["demo"]["effects"] == ["readonly"]
+    assert report["skills"]["demo"]["approval_boundaries"] == []
 
 
 def test_loads_repository_manifest() -> None:
     manifest = capability_health.load_manifest(capability_health.DEFAULT_MANIFEST)
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == 2
     assert "figma" in manifest["skills"]
     assert set(manifest["mcps"]) == {
         "cultivar",
@@ -52,3 +54,13 @@ def test_repository_manifest_covers_every_source_skill() -> None:
     assert capability_health.undeclared_source_skills(
         manifest, capability_health.REPO / "skills"
     ) == []
+
+
+def test_optional_mcp_degrades_without_making_skill_unavailable() -> None:
+    manifest = capability_health.load_manifest(capability_health.DEFAULT_MANIFEST)
+    report = capability_health.evaluate(manifest, set())
+    openai_docs = report["skills"]["openai-docs"]
+
+    assert openai_docs["available"] is True
+    assert openai_docs["degraded"] is True
+    assert openai_docs["missing_optional_mcps"] == ["openai_docs"]

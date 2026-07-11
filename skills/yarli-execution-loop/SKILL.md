@@ -6,6 +6,10 @@ argument-hint: "[project-root]"
 
 # Yarli Execution Loop
 
+Read [`../../references/yarli-primitives.md`](../../references/yarli-primitives.md)
+for shared inspect and enqueue boundaries. This skill owns mutating supervision
+decisions, not duplicate primitive policy.
+
 Use this skill when the user wants an agent to monitor Yarli, queue newly discovered work durably, and keep execution moving without losing state or giving up supervision.
 
 ## Autonomy Routing
@@ -38,6 +42,13 @@ Resolve the user's intent before choosing execution behavior:
 - "Inspect", "status", or "what state is it in" means `inspect-only`.
 - "Queue this work" or "add tranches" means `enqueue-only` unless the user also asked to execute.
 
+Monitoring, supervision, continuation, or launch intent does not authorize
+cancelling, repairing, or relaunching a recorded run. Those interventions are
+separate mutations and require an explicit preview and user approval.
+An initial launch explicitly requested by the user is authorized; any new launch
+after a prior run failed, disappeared, was cancelled, or was repaired is a
+relaunch and requires fresh approval with the proposed command and reason.
+
 Default mode for `$yarli-execution-loop` is `supervise-loop`.
 
 ## Default Stop Rules
@@ -69,7 +80,9 @@ In bare `$yarli-execution-loop` / `supervise-loop` mode, do not yield control ba
 - Use `yarli run continue` only for work already owned by the continuation snapshot and only when no drift is present.
 - Use `yarli run --fresh-from-tranches` after new tranche enqueue or other live-plan changes.
 - Treat refusal as non-terminal. Convert it into a narrowed retry, a follow-up tranche enqueue, or stop-and-summarize.
-- Treat orphaned active runs as repairable state, not an automatic stop condition. When an active/verifying run points at a missing workspace and is older than the stale threshold, auto-cancel it with the bundled remediation helper before launching again.
+- Treat orphaned active runs as potentially repairable state. Detect them with
+  the bundled helper's dry-run mode, show the evidence, and obtain explicit
+  approval before cancellation or relaunch.
 - Re-inspect Yarli state after each material execution step.
 - Record notable interventions, cancellations, or repeated failures into memory/checkpoints when those tools are available.
 
@@ -154,7 +167,8 @@ This wrapper must perform at most one top-level launch by default and then retur
 - no architectural or refusal-recovery intervention is required yet
 
 The repo-local supervisor is an actuator for ordinary launch policy, not a replacement supervisor.
-Before launch, the wrapper should run the bundled stale-run remediation helper in fix mode so orphaned `RunActive` / `RunVerifying` rows do not block the next real launch.
+Before launch, run the bundled stale-run remediation helper in dry-run mode. If
+it finds candidates, stop for approval before using fix mode or launching.
 
 After the wrapper or a manual launch returns, immediately re-inspect state and switch into watch mode. Do not treat "launch succeeded" as the end of the turn unless the user explicitly asked for a one-shot launch.
 
@@ -164,7 +178,12 @@ After the wrapper or a manual launch returns, immediately re-inspect state and s
 - Continuation exists, no drift is reported, and the remaining work belongs to the continuation snapshot: use `yarli run continue`.
 - Drift is reported, or you just enqueued new tranches, or live plan state changed after the previous run started: use `yarli run --fresh-from-tranches`.
 - If prompt selection matters, add `--prompt-file <path>` to `yarli run` or `yarli run --fresh-from-tranches`.
-- Before any fresh launch or continue attempt, run `bash "$SKILL_DIR/scripts/yarli-remediate-stale-runs.sh" [project-root] --fix` when stale-run symptoms are possible. The helper auto-cancels orphaned active/verifying runs whose recorded workspace directories are missing and older than the default `300` second threshold (`YARLI_STALE_RUN_MIN_AGE_SECONDS` overrides it).
+- Before any fresh launch or continue attempt, run
+  `bash "$SKILL_DIR/scripts/yarli-remediate-stale-runs.sh" [project-root]`
+  when stale-run symptoms are possible. The default is read-only. Show each
+  candidate and the exact `--fix` command, then require approval before running
+  it as `--fix --confirmed`. Never combine repair approval with launch/relaunch
+  approval implicitly.
 
 Use this fallback only when the repo-local supervisor does not exist, or when you intentionally need to override it for an exceptional case.
 
@@ -192,14 +211,17 @@ If re-inspection finds a healthy active run or more eligible work with no blocke
 - If the same verification or helper command fails `2` times, inspect the exact failure before retrying again.
 - If the same tranche stays active for more than `10` minutes with no edit, verification, or worker-note movement, classify it as `slow`.
 - If the active process disappears without a matching completion or cancellation update, inspect before relaunching.
-- If an active/verifying run still exists in Yarli but its `workspace_dir` is missing and its last update is older than the stale threshold, auto-cancel it with the remediation helper and then re-inspect state.
+- If an active/verifying run still exists in Yarli but its `workspace_dir` is
+  missing and its last update is older than the stale threshold, propose
+  cancellation with the remediation helper and wait for approval.
 - If blocked or no-eligible-tranche conditions appear, stop and summarize instead of thrashing.
 
 ## Step 8: Intervention Ladder
 
 1. Inspect live state.
 2. Inspect process health, log tail, and `yarli run explain-exit` when relevant.
-3. Auto-remediate orphaned active runs with `scripts/yarli-remediate-stale-runs.sh --fix` when the run is active/verifying, the workspace is missing, and the stale threshold is met.
+3. Preview orphaned active runs with `scripts/yarli-remediate-stale-runs.sh`.
+   Obtain approval before `--fix`, cancellation, or relaunch.
 4. Classify the loop as `healthy`, `slow`, `stuck`, `blocked`, or `idle`.
 5. Choose exactly one action: keep watching, narrow a retry, enqueue a follow-up tranche, do one launch, use `fresh-from-tranches`, or stop-and-summarize.
 

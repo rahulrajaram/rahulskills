@@ -18,7 +18,12 @@ if [[ ! -f "${SUPERVISOR}" ]]; then
 fi
 
 if [[ -x "${STALE_REMEDIATION}" ]]; then
-  "${STALE_REMEDIATION}" "${PROJECT_ROOT}" --fix
+  REMEDIATION_OUTPUT="$("${STALE_REMEDIATION}" "${PROJECT_ROOT}" --dry-run)"
+  printf '%s\n' "${REMEDIATION_OUTPUT}"
+  if ! grep -q 'stale_runs_detected: 0' <<<"${REMEDIATION_OUTPUT}"; then
+    echo "stale run candidates require explicit approval before repair or launch" >&2
+    exit 4
+  fi
 fi
 
 HAS_MAX_LAUNCHES=0

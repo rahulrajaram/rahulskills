@@ -1,4 +1,4 @@
-schema_version = 1
+schema_version = 2
 
 [mcps.haake_memory]
 role = "durable-memory"
@@ -33,7 +33,7 @@ layer = "workflow"
 overlaps = ["figma"]
 
 [skills.openai-docs]
-mcps = ["openai_docs"]
+optional_mcps = ["openai_docs"]
 effect = "readonly"
 layer = "workflow"
 
@@ -49,6 +49,8 @@ layer = "workflow"
 [skills.skill-installer]
 commands = ["git"]
 effect = "external-call"
+effects = ["network-read", "home-write", "dependency-install"]
+approval_boundaries = ["download", "install", "activate"]
 layer = "workflow"
 
 [skills.invokellm]
@@ -76,11 +78,15 @@ layer = "workflow"
 [skills.markdown-to-pdf]
 commands = ["pandoc", "weasyprint"]
 effect = "local-write"
+effects = ["local-write"]
+approval_boundaries = ["overwrite-output", "dependency-install"]
 layer = "workflow"
 
 [skills.yarli-execution-loop]
 commands = ["yarli"]
-effect = "local-write"
+effect = "destructive"
+effects = ["readonly", "local-write", "destructive"]
+approval_boundaries = ["cancel", "repair", "launch", "relaunch"]
 layer = "composer"
 overlaps = ["yarli-introspect", "autonomy-loop"]
 
@@ -107,11 +113,15 @@ layer = "workflow"
 [skills.pr-lifecycle]
 commands = ["git", "gh"]
 effect = "remote-write"
+effects = ["local-write", "history-rewrite", "network-read", "remote-write"]
+approval_boundaries = ["version-change", "push", "pr-create"]
 layer = "composer"
 overlaps = ["commit", "squash-commits", "readme-doctor"]
 
 [skills.speak]
+commands = ["python3"]
 effect = "local-process"
+effects = ["local-process", "audio-output"]
 layer = "workflow"
 
 [skills.check-antipatterns]
@@ -140,6 +150,8 @@ overlaps = ["autonomous-execution-contract", "yarli-execution-loop"]
 [skills.commit]
 commands = ["git"]
 effect = "local-write"
+effects = ["local-write"]
+approval_boundaries = ["review-file", "allowed-override", "secret", "ignore-policy-change"]
 layer = "workflow"
 
 [skills.ecosystem-borrow-audit]
@@ -153,12 +165,14 @@ layer = "workflow"
 
 [skills.git-status-report]
 commands = ["git"]
-effect = "readonly"
+effect = "external-call"
+effects = ["readonly", "network-read", "local-git-ref-write"]
 layer = "primitive"
 
 [skills.handoff]
 commands = ["git"]
 effect = "local-write"
+effects = ["local-write"]
 layer = "composer"
 overlaps = ["commit"]
 
@@ -174,6 +188,8 @@ layer = "primitive"
 [skills.memleak-investigate]
 platforms = ["linux"]
 effect = "readonly"
+effects = ["readonly", "privileged-observe"]
+approval_boundaries = ["sudo", "attach", "trace", "signal", "restart"]
 layer = "workflow"
 
 [skills.next-todos]
@@ -195,6 +211,8 @@ layer = "workflow"
 
 [skills.pythonpackagesevere]
 effect = "local-write"
+effects = ["local-write", "dependency-install"]
+approval_boundaries = ["dependency-install"]
 layer = "composer"
 
 [skills.readme-doctor]
@@ -223,6 +241,7 @@ layer = "workflow"
 [skills.system-memory-audit]
 platforms = ["linux"]
 effect = "readonly"
+effects = ["readonly"]
 layer = "workflow"
 overlaps = ["memleak-investigate"]
 
@@ -242,4 +261,6 @@ layer = "primitive"
 [skills.yore-vocabulary-llm-filter]
 commands = ["gptengage"]
 effect = "external-call"
+effects = ["external-call", "local-write", "home-write"]
+approval_boundaries = ["external-data-send", "proposal-write", "merge-local", "merge-global"]
 layer = "workflow"

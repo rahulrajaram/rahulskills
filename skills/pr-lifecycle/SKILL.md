@@ -10,9 +10,9 @@ Take a local worktree to an open GitHub PR with passing CI, then stop.
 
 ## Autonomy Routing
 
-An explicit PR lifecycle request is approval to run the local preparation
-workflow through branch preparation, commits, validation, push, PR creation, and
-CI watching, subject to the safety stops below. Do not ask whether to use
+An explicit PR lifecycle request authorizes local preparation, commits, and
+validation. It does not override global or repository approval requirements for
+pushes, PR creation, or release/version changes. Do not ask whether to use
 `/goal`, Yarli, commit, or squash workflows; invoke the required sub-skills and
 continue. Still stop for push/auth failures, risky history rewrites, failing
 checks, unresolved review findings, visibility risk, or any user-visible release
@@ -96,7 +96,8 @@ decision that cannot be inferred from repo policy.
 - Use the PR diff to decide whether the shipped package behavior or artifact
   changed enough to warrant a release.
 - If the local version is already published and the PR changes shipped package
-  behavior or artifacts, make the smallest correct SemVer bump.
+  behavior or artifacts, propose the smallest correct SemVer bump and explain
+  why. Obtain explicit user approval before editing or committing version files.
 - If the local version has not been published yet, do not bump the version.
 - If you make a version bump, commit it normally so hooks run, then rerun the
   quick local review and `readme-doctor`.
@@ -115,11 +116,17 @@ decision that cannot be inferred from repo policy.
 
 ### 10. Push The Feature Branch
 
-- Push the current feature branch with upstream tracking.
+- Show the branch, remote, commits to be sent, and exact push command. Obtain
+  explicit user approval immediately before pushing, even when this skill was
+  explicitly invoked.
+- After approval, push the current feature branch with upstream tracking.
 - Stop on any push rejection or auth failure.
 
 ### 11. Open The PR
 
+- Treat PR creation as an external shared-state write. Obtain explicit approval
+  unless the user's current request explicitly and unambiguously authorized
+  opening the PR (approval to push alone is insufficient).
 - Use `gh pr create`.
 - Prefer `--fill` when the existing commit history is already clean; otherwise
   provide an explicit title and body built from the branch diff.

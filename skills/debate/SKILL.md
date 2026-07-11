@@ -6,6 +6,10 @@ argument-hint: "<topic> [--rounds N] [--participants \"cli:persona,...\"] [--age
 
 # Debate
 
+Backend calls follow
+[`../../references/gptengage-invocation.md`](../../references/gptengage-invocation.md).
+This skill adds debate orchestration only.
+
 Run a structured multi-AI debate through gptengage.
 
 ## Workflow

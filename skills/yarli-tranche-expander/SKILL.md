@@ -6,6 +6,9 @@ argument-hint: "[--project-root PATH] [--goal TEXT] [--start-key NXT-###] [--app
 
 # Yarli Tranche Expander
 
+All writes use the shared idempotent enqueue boundary documented in
+[`../../references/yarli-primitives.md`](../../references/yarli-primitives.md).
+
 Use this skill when the user asks to expand a Yarli backlog, enqueue many tranches, discover missing work, or make sure nothing slips through the cracks.
 
 ## Autonomy Routing

@@ -9,7 +9,8 @@ else
 fi
 PROJECT_ROOT="$(cd "${PROJECT_ROOT}" && pwd)"
 
-MODE="fix"
+MODE="dry-run"
+CONFIRMED=0
 MIN_AGE_SECONDS="${YARLI_STALE_RUN_MIN_AGE_SECONDS:-300}"
 
 while [[ $# -gt 0 ]]; do
@@ -20,6 +21,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --fix)
       MODE="fix"
+      shift
+      ;;
+    --confirmed)
+      CONFIRMED=1
       shift
       ;;
     --min-age-seconds)
@@ -36,6 +41,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "${MODE}" == "fix" && "${CONFIRMED}" -ne 1 ]]; then
+  echo "--fix requires --confirmed after explicit user approval" >&2
+  exit 2
+fi
 
 if ! command -v yarli >/dev/null 2>&1; then
   echo "yarli unavailable"
@@ -149,7 +159,7 @@ while IFS= read -r run_id; do
     if [[ "${MODE}" == "fix" ]]; then
       (
         cd "${PROJECT_ROOT}" &&
-          yarli run cancel --reason "auto-cancel orphaned active run with missing workspace (yarli-execution-loop)" "${run_id}"
+          yarli run cancel --reason "user-approved cancellation of orphaned active run with missing workspace" "${run_id}"
       )
       FIXED=$((FIXED + 1))
       echo "stale_run_fixed: run_id=${run_id}"

@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: "Commit current workspace state, reconcile handoff docs, and generate a next-shell continuation prompt. Use when the user asks for /handoff, asks to wrap up work, asks to continue from a new shell, or needs an accurate session handoff. Execute three outcomes in order: (1) commit all current changes, (2) update canonical IMPLEMENTATION_PLAN.md and PROMPT.md if present so status claims are accurate, and (3) produce a detailed copy-paste prompt for the next shell."
+description: "Reconcile handoff docs, commit the resulting coherent workspace through the commit skill, and generate a next-shell continuation prompt. Use for /handoff, wrap-up, or cross-shell continuation."
 argument-hint: ""
 ---
 
@@ -36,13 +36,7 @@ python scripts/build_handoff_snapshot.py --repo .
 ```
 Otherwise, the git commands above are sufficient.
 
-### Step 2: Commit all current changes
-
-Run `git add -A` then `git commit -m "handoff: <summary>"`.
-- If commit fails because there is nothing to commit, report that explicitly.
-- If commit fails for another reason, report the exact blocker and stop.
-
-### Step 3: Update canonical plan docs when they exist
+### Step 2: Reconcile canonical plan docs when they exist
 
 Look for `IMPLEMENTATION_PLAN.md` and `PROMPT.md` at repo root first.
 If not found at root, search the repo and pick the canonical file that the project already treats as primary.
@@ -54,6 +48,19 @@ Update these files to match reality:
 Do not invent completed work.
 
 If neither file exists, skip this step and note their absence.
+
+### Step 3: Commit the coherent handoff state
+
+Invoke the shared `commit` skill after documentation reconciliation. Its file
+triage, repository-policy discovery, secret checks, explicit-path staging, and
+verification rules are authoritative. Do not duplicate them here and never use
+`git add .` or `git add -A`.
+
+If canonical handoff docs are classified as REVIEW or SKIP by repository policy,
+pause for the commit skill's normal resolution instead of silently omitting or
+force-adding them. If there is nothing to commit, record a no-op. After commit,
+verify `git status --short`; a dirty tree is an incomplete handoff and must be
+reported or reconciled before producing the continuation prompt.
 
 ### Step 4: Gather session context for the prompt
 

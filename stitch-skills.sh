@@ -214,6 +214,15 @@ assemble_skills() {
         done
     done
 
+    # Shared primitives live one level above installed skill directories so
+    # skill links such as ../../references/<name>.md resolve in every runtime.
+    if [[ -d "$ROOT_DIR/references" ]]; then
+        for cli in "${CLIS[@]}"; do
+            mkdir -p "$BUILD_DIR/$cli/references"
+            cp -a "$ROOT_DIR/references/." "$BUILD_DIR/$cli/references/"
+        done
+    fi
+
     # Count assembled skills
     local claude_count codex_count
     claude_count="$(find "$BUILD_DIR/claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
@@ -240,6 +249,10 @@ install_skills() {
         installed=$((installed + 1))
     done
     echo "  Codex: $installed skills -> $CODEX_INSTALL"
+    if [[ -d "$BUILD_DIR/codex/references" ]]; then
+        mkdir -p "$(dirname "$CODEX_INSTALL")/references"
+        cp -a "$BUILD_DIR/codex/references/." "$(dirname "$CODEX_INSTALL")/references/"
+    fi
 
     # Claude skills: ~/.claude/skills/ — overwrite managed skills, leave others untouched
     mkdir -p "$CLAUDE_SKILLS_INSTALL"
@@ -252,6 +265,10 @@ install_skills() {
         installed=$((installed + 1))
     done
     echo "  Claude skills: $installed skills -> $CLAUDE_SKILLS_INSTALL"
+    if [[ -d "$BUILD_DIR/claude/references" ]]; then
+        mkdir -p "$(dirname "$CLAUDE_SKILLS_INSTALL")/references"
+        cp -a "$BUILD_DIR/claude/references/." "$(dirname "$CLAUDE_SKILLS_INSTALL")/references/"
+    fi
 
     echo "Done."
 }

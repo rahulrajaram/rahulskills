@@ -6,6 +6,10 @@ argument-hint: "[run-dir]"
 
 # Yarli Run Introspection
 
+This skill supplies the read-only inspection primitive documented in
+[`../../references/yarli-primitives.md`](../../references/yarli-primitives.md).
+It must not cancel, repair, enqueue, launch, or relaunch runs.
+
 Use this skill when the user asks to check a yarli run's health, diagnose a stuck process, or understand what a running/completed yarli session is doing.
 
 **Trigger phrases:** `/yarli-introspect`, "check yarli run", "yarli status", "is yarli stuck", "introspect run"

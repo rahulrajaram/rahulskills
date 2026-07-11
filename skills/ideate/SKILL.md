@@ -6,6 +6,10 @@ argument-hint: "<seed> [--sigma 1.0] [--depth 2] [--cli claude] [--select]"
 
 # Ideate
 
+Backend calls follow
+[`../../references/gptengage-invocation.md`](../../references/gptengage-invocation.md).
+This skill adds evolutionary ideation only.
+
 Generate a tree of divergent ideas from a seed concept through gptengage.
 
 ## Workflow

@@ -39,7 +39,9 @@ python ~/.agents/skills/analyze-conversation/generate_report.py <conversation-js
 
 ## Output
 
-Generates a comprehensive retrospective report in markdown format at `~/.claude/retrospectives/[conversation-id].md`
+Generates a retrospective report at
+`~/.claude/retrospectives/[conversation-id]_retrospective.md`. The directory is
+created on first successful run.
 
 ## Shared taxonomy
 
@@ -135,11 +137,12 @@ The generated report includes:
 
 ## Implementation
 
-This skill uses Python scripts located in `~/.claude/skills/analyze-conversation/`:
+This skill uses scripts beside this manifest (normally
+`~/.agents/skills/analyze-conversation/`):
 
 - **analyzer.py**: Main analysis engine that parses JSONL conversations
 - **patterns.py**: Pattern detectors for each anti-pattern type
-- **templates/**: Markdown templates for report generation
+- **generate_report.py**: CLI, Codex transcript normalization, and report writer
 
 The analyzer reuses the analysis scripts created during retrospective analysis and enhances them with:
 - Report generation in structured markdown
@@ -148,6 +151,12 @@ The analyzer reuses the analysis scripts created during retrospective analysis a
 - Success metric tracking
 - Codex JSONL normalization for `~/.codex/sessions` transcripts
 - Autonomy-break detection for user re-prompts and assistant workflow-routing questions
+
+If `--current` cannot identify a readable transcript, list the newest candidate
+JSONL files under `~/.codex/sessions` without printing their contents and ask the
+user to choose. Do not silently analyze a different session. On malformed or
+unreadable JSONL, report the path and parse/access error; do not emit a partial
+report as if it were complete.
 
 ## Benefits
 

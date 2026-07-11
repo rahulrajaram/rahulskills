@@ -6,6 +6,9 @@ argument-hint: "[scope-root] [--sigma LIST] [--cli claude|codex|gemini]"
 
 # Ecosystem Borrow Audit
 
+All gptengage calls follow
+[`../../references/gptengage-invocation.md`](../../references/gptengage-invocation.md).
+
 Run a repeatable ecosystem audit across `${WORKSPACE_ROOT:-$HOME/Documents}` and produce an evidence-backed backlog of borrowable components, missed opportunities, and ideation-driven follow-ups.
 
 ## Inputs

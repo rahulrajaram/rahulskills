@@ -69,6 +69,12 @@ echo "Repo skills: $repo_count"
 # Check all skills produce output for each CLI
 for cli in "${CLIS[@]}"; do
   build_skill_dir="$BUILD_DIR/$cli/skills"
+  for shared_reference in history-rewrite-safety.md gptengage-invocation.md yarli-primitives.md; do
+    if [[ ! -f "$BUILD_DIR/$cli/references/$shared_reference" ]]; then
+      echo "FAIL [$cli] missing shared reference: $shared_reference"
+      failures=$((failures + 1))
+    fi
+  done
   if [[ ! -d "$build_skill_dir" ]]; then
     echo "FAIL: no assembled output for $cli"
     failures=$((failures + 1))

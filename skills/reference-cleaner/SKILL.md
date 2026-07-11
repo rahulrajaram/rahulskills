@@ -6,6 +6,11 @@ argument-hint: "<term> [<term>...]"
 
 # Reference Cleaner
 
+Before history mutation, follow
+[`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md).
+This skill adds sanitization rules; the shared approval, backup, verification,
+and rollback contract is authoritative.
+
 Remove all references to blocklisted terms from a git repository's source files, commit messages, and file history. Designed for sanitizing repos before open-sourcing or publishing.
 
 ## When to Use
@@ -123,7 +128,8 @@ git-filter-repo --invert-paths \
 
 - **Never auto-execute**: Always present the full plan and wait for approval
 - **Record original HEAD**: Print the full SHA at start and end for recovery
-- **Backup tag**: Create `pre-clean-backup` tag before any destructive operation
+- **Backup ref**: Create a collision-safe backup ref before any destructive
+  operation, as required by the shared history-rewrite contract.
 - **Test after each phase**: Run tests after source edits and after history rewrites
 - **Dirty tree check**: Refuse to start if `git status --porcelain` shows uncommitted changes
 - **Remote tracking check**: Warn if branch tracks a remote (force push will be needed)

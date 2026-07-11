@@ -1,218 +1,60 @@
 ---
 name: check-antipatterns
-description: "Check the current in-progress conversation for known anti-patterns and immediate course corrections. Use for live checks, before risky operations, when work feels stuck, or when the user explicitly says /check-antipatterns. Do not use for completed-session postmortems; use analyze-conversation instead."
-argument-hint: ""
+description: "Check an in-progress conversation for known anti-patterns and immediate course corrections. Use for live checks, before risky operations, when work feels stuck, or for /check-antipatterns. Do not use for completed-session postmortems; use analyze-conversation."
+argument-hint: "[conversation-jsonl]"
 ---
 
 # Anti-Pattern Checker
 
-Monitors current conversation for anti-patterns and provides immediate warnings and suggestions.
+Run a read-only live check against the current conversation and return warnings,
+positive practices, a compliance score, and immediate corrections. This is a
+course-correction primitive, not a retrospective report generator.
 
-## Usage
+## Preconditions and invocation
 
-`/check-antipatterns`
+The implementation is `checker.py` beside this manifest and requires one
+readable JSONL transcript path:
 
-Analyzes the CURRENT conversation up to this point and provides:
-- ⚠️ **Warnings**: Anti-patterns detected
-- ✅ **Good Practices**: Positive behaviors observed
-- 📊 **Compliance Score**: Percentage of rules followed
-- 💡 **Recommendations**: Actionable next steps
-
-## What It Checks
-
-### 1. Retry-Without-Diagnosis
-**Detection**: Same command run 2+ times in last 10 messages without diagnostic commands between attempts
-
-**Warning Example**:
-```
-⚠️ Retry-Without-Diagnosis (Message 45-48)
-   - Command 'pytest tests/e2e/' run 2 times
-   - No diagnostic commands between attempts
-   → Suggestion: Check logs before retrying:
-     kubectl logs deployment/control-plane --tail=50
+```bash
+python3 "$SKILL_DIR/checker.py" <conversation-jsonl>
 ```
 
-### 2. Credential Usage Without Verification
-**Detection**: Message contains PASSWORD/SECRET/KEY/TOKEN but no `kubectl get secret` in last 20 messages
+Use the runtime-provided current transcript path when available. Otherwise list
+the newest candidates under `~/.codex/sessions` without displaying transcript
+contents. If more than one is plausible, ask the user to select; do not guess.
+The checker prints to stdout and does not create a report file.
 
-**Warning Example**:
-```
-⚠️ Potential Credential Assumption (Message 30)
-   - Used PASSWORD env var without reading from K8s secret
-   → Suggestion: Read from K8s secret:
-     kubectl get secret <name> -o jsonpath='{.data.key}' | base64 -d
-```
+If the transcript is missing, unreadable, malformed, or uses an unsupported
+event shape, report the exact path and error and recommend
+`analyze-conversation` only after the session is complete.
 
-### 3. Scope Expansion
-**Detection**: Creating new files in directories not mentioned in original request
+## Canonical rules
 
-**Warning Example**:
-```
-⚠️ Potential Scope Expansion (Message 55)
-   - Creating new service 'myproject-discovery' not in original task
-   → Suggestion: Confirm with user:
-     "This expands scope to include service discovery. Should I proceed?"
-```
+`rules.json` beside the checker is the canonical rule taxonomy. The current
+implementation analyzes the full transcript for credential/tool-discovery
+signals and the last 50 messages for retry/preflight signals. Do not claim that
+separate detector modules, `config.json`, automatic periodic execution, scope
+expansion detection, or all fifteen rules are executable unless the code gains
+those features.
 
-### 4. Missing Preflight Checks
-**Detection**: About to run pytest with "integration" or "e2e" but no cluster/pod status checks in last 10 messages
+Interpret heuristic findings as prompts to inspect evidence, not proof of a
+violation. Never print credential values or other transcript secrets in output.
 
-**Warning Example**:
-```
-⚠️ Missing Preflight Check (Message 50)
-   - About to run E2E test
-   - No environment validation in last 10 messages
-   → Suggestion: Run preflight validation:
-     myproject-preflight --test e2e
-     OR manually verify: clusters running, pods ready, services healthy
-```
+## Output contract
 
-### 5. Tool Discovery Gap
-**Detection**: Conversation length > 50 messages but never ran `ls ~/.local/bin` or `ls ./scripts/`
+Return the checker's four result classes:
 
-**Warning Example**:
-```
-⚠️ Tool Discovery Gap (Message 75)
-   - 75 messages without checking for existing tools
-   → Suggestion: Check for existing tools:
-     ls ~/.local/bin ~/bin ./scripts/
-     cat TOOLS.md (if exists)
-```
+- warnings with evidence locations and a concrete correction;
+- observed good practices;
+- recommendations relevant to the current work; and
+- the computed compliance score.
 
-### 6. Unverified External Values
-**Detection**: Using IP addresses or URLs without running verification commands
+Then state whether work can continue, needs a local correction first, or needs
+user authorization. Do not mutate files, run remediation commands, or turn a
+live check into a completed-session postmortem.
 
-### 7. Error Message Skimming
-**Detection**: Command failed but next action doesn't reference the error message
+## Routing
 
-### 8. All 15 Universal Rules
-Checks compliance with all infrastructure work rules:
-1. Never hardcode credentials
-2. Always diagnose before retry
-3. Stop and ask when scope expands
-4. Verify entire dependency chain
-5. Discover tools before reinventing
-6. External values must be verified
-7. Read error messages completely
-8. Verify prerequisites before complex operations
-9. Document assumptions explicitly
-10. One command, one purpose
-11. Check pod events on K8s failures
-12. Verify ConfigMap/Secret exists before using
-13. Background services require health checks
-14. Cross-cluster operations need network verification
-15. Integration tests are not unit tests
-
-## Example Output
-
-```
-Analyzing current conversation for anti-patterns...
-
-⚠️  WARNINGS (2 found):
-
-1. Retry-Without-Diagnosis (Message 45-48)
-   - Command 'pytest tests/e2e/' run 2 times
-   - No diagnostic commands between attempts
-   → Suggestion: Check logs before retrying:
-     kubectl logs deployment/control-plane --tail=50
-
-2. Missing Preflight Check (Message 50)
-   - About to run E2E test
-   - No environment validation in last 10 messages
-   → Suggestion: Run myproject-preflight --test e2e
-
-✅ GOOD PRACTICES (3 found):
-
-1. Credential Retrieved from Secret (Message 30)
-   - Used kubectl get secret instead of hardcoding
-   ✓ Follows Rule 1: Never hardcode credentials
-
-2. Diagnostic Before Retry (Message 35-38)
-   - Ran kubectl describe before retrying failed command
-   ✓ Follows Rule 2: Diagnose before retry
-
-3. Scope Confirmation (Message 40)
-   - Asked user before expanding scope
-   ✓ Follows Rule 3: Stop and ask when scope expands
-
-RECOMMENDATIONS:
-  - Fix 2 warnings before proceeding
-  - Consider implementing myproject-preflight tool
-  - Current anti-pattern score: 2/15 (87% compliance)
-
-📊 COMPLIANCE SCORE: 87% (Target: 95%+)
-```
-
-## How It Works
-
-This skill analyzes the last N messages (default: 50) of the current conversation and runs multiple pattern detectors:
-
-1. **Load Conversation**: Reads current conversation JSONL file
-2. **Extract Recent Messages**: Focuses on last 50 messages for performance
-3. **Run Detectors**: Each detector checks for specific anti-pattern
-4. **Identify Good Practices**: Also recognizes positive behaviors
-5. **Generate Report**: Shows warnings, good practices, and compliance score
-
-## Implementation
-
-Located in `~/.claude/skills/check-antipatterns/`:
-
-- **checker.py**: Main checker that coordinates all detectors
-- **detectors/**: Individual pattern detectors
-  - `retry.py`: Retry-without-diagnosis detector
-  - `credentials.py`: Credential assumption detector
-  - `scope.py`: Scope expansion detector
-  - `preflight.py`: Missing preflight check detector
-  - `tools.py`: Tool discovery gap detector
-- **rules.json**: 15 universal rules for infrastructure work
-
-## When to Use
-
-- **Periodically**: Every ~50 messages during long conversations
-- **Before major operations**: Before running E2E tests, deployments, or complex multi-step operations
-- **When feeling stuck**: If repeatedly encountering failures
-- **After significant work**: Before wrapping up a feature or task
-
-## Benefits
-
-- **Real-time feedback**: Catch anti-patterns while working, not after
-- **Learning tool**: Reinforces good practices through positive recognition
-- **Course correction**: Adjust behavior before wasting too much effort
-- **Prevents bad habits**: Consistent checking builds better reflexes
-
-## Related Skills
-
-- `/analyze-conversation`: Post-mortem analysis of completed conversations
-- Both skills work together in a learning loop:
-  1. `/check-antipatterns` prevents issues during work
-  2. `/analyze-conversation` identifies what wasn't caught
-  3. Learnings improve both skills over time
-
-## Configuration
-
-The checker can be tuned via `~/.claude/skills/check-antipatterns/config.json`:
-
-```json
-{
-  "lookback_messages": 50,
-  "retry_threshold": 2,
-  "tool_discovery_threshold": 50,
-  "preflight_lookback": 10,
-  "credential_lookback": 20,
-  "severity_levels": {
-    "credential": "HIGH",
-    "retry": "MEDIUM",
-    "scope": "MEDIUM",
-    "preflight": "HIGH",
-    "tools": "LOW"
-  }
-}
-```
-
-## Future Enhancements
-
-- **Auto-fix suggestions**: Generate exact commands to fix detected issues
-- **CI/CD integration**: Run as pre-commit hook or in CI pipeline
-- **Custom detectors**: Allow users to define project-specific anti-patterns
-- **Metrics tracking**: Store compliance scores over time
-- **Learning from violations**: Update detectors based on new anti-patterns discovered by `/analyze-conversation`
+- Use this skill during active work.
+- Use `analyze-conversation` after a session is complete when a durable markdown
+  report and longitudinal/tooling analysis are wanted.

@@ -6,6 +6,10 @@ argument-hint: "[cli[,cli...]] <prompt> [--model MODEL] [--session NAME] [--cont
 
 # Invoke LLM
 
+Follow the shared
+[`../../references/gptengage-invocation.md`](../../references/gptengage-invocation.md)
+contract before invoking a backend.
+
 Invoke one or more AI CLI tools through gptengage.
 
 ## Autonomy Routing

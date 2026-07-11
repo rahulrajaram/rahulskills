@@ -6,6 +6,10 @@ argument-hint: "[--vision FILE] [--plan FILE] [--tranches FILE]"
 
 # Vision → Implementation → Tranches Sync
 
+When synchronization creates tranches, use the shared enqueue boundary in
+[`../../references/yarli-primitives.md`](../../references/yarli-primitives.md)
+instead of duplicating collision or approval policy.
+
 Use this skill when the user asks to keep execution planning synchronized between:
 
 1. A vision roadmap file (`VISION.md` default)

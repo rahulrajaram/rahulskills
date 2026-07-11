@@ -22,7 +22,8 @@ behavior.
 
 ## Workflow
 1. Inspect context from repo status, recent edits, and user intent.
-2. If `yarli.toml` exists in project root, run `yarli plan validate` before drafting tasks.
+2. Treat planning as read-only. Repository tooling may inform tasks, but its
+   presence never authorizes mutation or enqueueing.
 3. Produce a prioritized ordered list of executable tasks.
 4. Write each item as a full imperative sentence that states a clear objective (e.g. "Add input validation to the /login endpoint so malformed emails are rejected before hitting the database.").
 5. Start every item with an imperative verb (Add, Fix, Remove, Update, Extract, Replace, Wire, Validate, etc.).
@@ -30,26 +31,10 @@ behavior.
 7. Keep each item to one sentence, 30 words or fewer.
 8. Make each item specific and testable, with filenames or commands where useful.
 9. If intent is unclear, ask one focused clarifying question.
-10. If `yarli.toml` exists, enqueue **every** drafted task as an incomplete tranche:
-   - Determine the next numeric prefix from existing `NXT-<NNN>` keys:
-   ```bash
-   next_index=$(rg 'key = "NXT-[0-9]{3}"' .yarli/tranches.toml | sed -E 's/.*NXT-([0-9]{3}).*/\1/' | sort -n | tail -n1)
-   next_index=$((next_index + 0))
-   ```
-   - For each drafted item (in final numbered output order), add sequentially:
-   ```bash
-   idx=1
-   while IFS= read -r task; do
-      key="NXT-$(printf '%03d' "$((next_index + idx))")"
-      yarli plan tranche add --key "$key" --summary "$task" --group "next-todos"
-      idx=$((idx + 1))
-   done <<< "<raw_task_lines>"
-   ```
-   - Set `next_index` to `0` when no prior `NXT` keys exist.
-   - Use exact quoted task summaries without truncation.
-   - Example: `yarli plan tranche add --key NXT-009 --summary "..." --group "next-todos"`.
-   - Do not skip any drafted item.
-11. Run `yarli plan validate` again after enqueuing all tranches.
+10. Enqueue only when the user explicitly asks to queue/enqueue the tasks. Route
+    that separate mutation through the shared Yarli enqueue primitive in
+    [`../../references/yarli-primitives.md`](../../references/yarli-primitives.md);
+    preview keys and summaries, use idempotent adds, and validate afterward.
 
 ## Output contract
 - Return only a numbered list.

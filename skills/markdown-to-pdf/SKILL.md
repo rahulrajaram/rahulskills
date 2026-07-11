@@ -10,9 +10,10 @@ Convert a markdown file to a styled PDF using pandoc with the weasyprint engine.
 
 ## Workflow
 
-1. **Check dependencies** — verify `pandoc` and `weasyprint` are installed. If either is missing, print install instructions and stop:
-   - pandoc: `sudo apt install pandoc`
-   - weasyprint: `pip install weasyprint`
+1. **Check dependencies** — verify `pandoc` and `weasyprint` are installed. If
+   either is missing, report the missing command and stop. Do not install it or
+   recommend an unpinned privileged/global install unless the user asks for
+   installation and approves the source, destination, and command.
 
 2. **Parse arguments** from the user's request:
    - `<input.md>` — required, the markdown file to convert.
@@ -23,7 +24,10 @@ Convert a markdown file to a styled PDF using pandoc with the weasyprint engine.
 
 4. **Output path** — if `--output` was given, use that. Otherwise, replace the `.md` extension on the input file with `.pdf`.
 
-5. **Remove old PDF** — if a file already exists at the output path, delete it.
+5. **Handle an existing PDF** — if the output exists, show the path and ask
+   before replacing it unless the user explicitly requested overwrite. Preserve
+   the old file until the new PDF has been generated and validated, then replace
+   atomically where possible.
 
 6. **Convert** — run:
    ```bash
