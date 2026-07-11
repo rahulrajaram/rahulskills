@@ -11,6 +11,7 @@ SKILLS_DIR="$REPO_ROOT/skills"
 OVERLAYS_DIR="$REPO_ROOT/overlays"
 BUILD_DIR="$REPO_ROOT/build"
 STITCH_SCRIPT="$REPO_ROOT/stitch-skills.sh"
+RUNTIME_EXCLUSIONS_DIR="$REPO_ROOT/runtime-exclusions"
 
 CLIS=(claude codex)
 
@@ -36,6 +37,17 @@ manifest_path() {
     [[ -f "$dir/$name" ]] && echo "$dir/$name" && return 0
   done
   return 1
+}
+
+is_runtime_excluded() {
+  local cli="$1" skill="$2" file="$RUNTIME_EXCLUSIONS_DIR/$cli.txt"
+  [[ -f "$file" ]] && grep -qxF "$skill" <(grep -v '^[[:space:]]*#' "$file" | sed '/^[[:space:]]*$/d')
+}
+
+runtime_exclusion_count() {
+  local cli="$1" file="$RUNTIME_EXCLUSIONS_DIR/$cli.txt"
+  [[ -f "$file" ]] || { echo 0; return; }
+  grep -v '^[[:space:]]*#' "$file" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' '
 }
 
 # Run assemble
@@ -64,8 +76,9 @@ for cli in "${CLIS[@]}"; do
   fi
 
   build_count="$(find "$build_skill_dir" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
-  if [[ "$build_count" -ne "$repo_count" ]]; then
-    echo "FAIL [$cli] expected $repo_count assembled skills, got $build_count"
+  expected_count=$((repo_count - $(runtime_exclusion_count "$cli")))
+  if [[ "$build_count" -ne "$expected_count" ]]; then
+    echo "FAIL [$cli] expected $expected_count assembled skills, got $build_count"
     failures=$((failures + 1))
   else
     echo "PASS [$cli] $build_count skills assembled"
@@ -76,6 +89,14 @@ for cli in "${CLIS[@]}"; do
     [[ -d "$skill_dir" ]] || continue
     skill_name="$(basename "$skill_dir")"
     manifest_path "$skill_dir" > /dev/null 2>&1 || continue
+
+    if is_runtime_excluded "$cli" "$skill_name"; then
+      if [[ -d "$build_skill_dir/$skill_name" ]]; then
+        echo "FAIL [$cli] runtime-excluded skill was assembled: $skill_name"
+        failures=$((failures + 1))
+      fi
+      continue
+    fi
 
     assembled_dir="$build_skill_dir/$skill_name"
     if [[ ! -d "$assembled_dir" ]]; then

@@ -30,6 +30,9 @@ rahulskills/
   bin/                     # Shared assistant shell helpers (Yarli lint/sanitize, etc.)
   audit-skills.sh          # Pre-commit guard against private reference leaks
   stitch-skills.sh         # Assemble skills + overlays, install to CLI locations
+  runtime-exclusions/      # Runtime-owned names that must not be installed twice
+  scripts/audit_catalog.py # Audit resolved roots for collisions and portability
+  capabilities/skills.toml # Dependencies, effects, layers, and overlap contracts
   scan-skills.sh           # Cross-project skill discovery and reporting
   sync-skills.sh           # Bidirectional sync between repo and installed locations
   setup.sh                 # Contributor bootstrap (hooks + optional skill deploy)
@@ -114,6 +117,8 @@ Bidirectional sync between this repo and installed locations. Push delegates to 
 ./sync-skills.sh diff      # Show differences between assembled output and installed
 ./sync-skills.sh status    # List which skills exist where
 ./sync-skills.sh compare-implementations  # Validate Codex/Claude skill parity
+./sync-skills.sh audit-catalog --strict   # Fail on divergent loaded skill names
+./sync-skills.sh capability-health --mcp figma  # Check commands/MCPs/platforms
 ```
 
 Respects per-machine exclusion list in `.exclude-skills` (one skill name per line, gitignored).

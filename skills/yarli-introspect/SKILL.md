@@ -38,7 +38,7 @@ Use this skill when the user asks to check a yarli run's health, diagnose a stuc
 | Audit log | `.yarl/audit.jsonl` | Structured audit events |
 | Run artifacts | `.yarl/runs/{run_id}.jsonl` | Per-run backend output |
 | Codex session logs | `~/.codex/sessions/YYYY/MM/DD/*.jsonl` | Token counts, context compactions, commands, agent messages |
-| Worktree state | `~/Documents/worktree/yarli/run-{id}/` | Parallel workspace directories |
+| Worktree state | `${WORKSPACE_ROOT:-$HOME/Documents}/worktree/yarli/run-{id}/` | Parallel workspace directories |
 | Process table | `ps aux` | Running yarli/codex PIDs, elapsed time, CPU/RSS |
 | CLI commands | `yarli run status`, `yarli run explain-exit` | Rich run/task state |
 
@@ -47,7 +47,7 @@ Use this skill when the user asks to check a yarli run's health, diagnose a stuc
 Run the data-gathering script, then analyze its output:
 
 ```bash
-bash /home/rahul/.agents/skills/yarli-introspect/scripts/introspect.sh [run_id]
+bash "$SKILL_DIR/scripts/introspect.sh" [run_id]
 ```
 
 Parse the script output, then provide:

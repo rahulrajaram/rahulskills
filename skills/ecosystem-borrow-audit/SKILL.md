@@ -1,18 +1,18 @@
 ---
 name: ecosystem-borrow-audit
-description: "Audit ~/Documents/listings.txt and all depth-1 git repos for borrowable components, missed architectural opportunities, and integration gaps; then run independent gptengage ideate sweeps across multiple sigma values. Use when the user asks for ecosystem review, cross-repo borrowing analysis, missed-opportunity checks, or multi-sigma ideation after repo analysis."
+description: "Audit a workspace listing and all depth-1 git repos for borrowable components, missed architectural opportunities, and integration gaps; then run independent gptengage ideate sweeps across multiple sigma values. Use when the user asks for ecosystem review, cross-repo borrowing analysis, missed-opportunity checks, or multi-sigma ideation after repo analysis."
 argument-hint: "[scope-root] [--sigma LIST] [--cli claude|codex|gemini]"
 ---
 
 # Ecosystem Borrow Audit
 
-Run a repeatable ecosystem audit across `~/Documents` and produce an evidence-backed backlog of borrowable components, missed opportunities, and ideation-driven follow-ups.
+Run a repeatable ecosystem audit across `${WORKSPACE_ROOT:-$HOME/Documents}` and produce an evidence-backed backlog of borrowable components, missed opportunities, and ideation-driven follow-ups.
 
 ## Inputs
 
 Extract from user request:
-- Scope root (default: `~/Documents`)
-- Listings file path (default: `~/Documents/listings.txt`)
+- Scope root (default: `${WORKSPACE_ROOT:-$HOME/Documents}`)
+- Listings file path (default: `$WORKSPACE_ROOT/listings.txt`)
 - Repo depth (default: depth 1)
 - Ideate sigma list (default: `0.25, 0.5, 1, 1.5`)
 - Ideate CLI preference (`codex`, `claude`, or `gemini`; default: `claude`)
@@ -21,7 +21,7 @@ Extract from user request:
 
 1. Normalize paths and scope.
 - Verify listings path exists; correct typo if user wrote `Documetns`.
-- Enumerate all depth-1 git repos under `~/Documents`.
+- Enumerate all depth-1 git repos under `$WORKSPACE_ROOT`.
 - Build unified catalog: listings entries + git repos.
 
 2. Run tier-1 scan across the unified catalog.

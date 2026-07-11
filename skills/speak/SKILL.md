@@ -12,6 +12,7 @@ Use Kokoro TTS to read text out loud.
 
 **If no arguments (default):** Read your most recent response from this conversation out loud. Look at the last message you sent to the user and read that text.
 
+Read [references/kokoro.md](references/kokoro.md) for backend and voice details.
 Run this Python code with the appropriate text:
 
 ```bash

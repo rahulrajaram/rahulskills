@@ -1,9 +1,7 @@
 ---
 name: check-antipatterns
-description: Real-time checking of current conversation against known anti-patterns
+description: "Check the current in-progress conversation for known anti-patterns and immediate course corrections. Use for live checks, before risky operations, when work feels stuck, or when the user explicitly says /check-antipatterns. Do not use for completed-session postmortems; use analyze-conversation instead."
 argument-hint: ""
-author: system
-version: 1.0.0
 ---
 
 # Anti-Pattern Checker

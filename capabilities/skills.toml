@@ -1,0 +1,245 @@
+schema_version = 1
+
+[mcps.haake_memory]
+role = "durable-memory"
+effects = ["readonly", "writable", "destructive"]
+health_tool = "get_latest_checkpoint"
+
+[mcps.selfimprovemeta]
+role = "tool-ecosystem-governance"
+effects = ["readonly", "writable", "privileged"]
+health_tool = "graph_stats"
+
+[mcps.gptqueue_shared]
+role = "external-agent-coordination"
+effects = ["readonly", "writable", "destructive"]
+health_tool = "get_queue_status"
+conflicts = ["native-collaboration"]
+
+[mcps.cultivar]
+role = "repository-source-context"
+effects = ["readonly"]
+health_tool = "daemon_status"
+
+[skills.figma]
+mcps = ["figma"]
+effect = "readonly"
+layer = "primitive"
+
+[skills.figma-implement-design]
+mcps = ["figma"]
+effect = "local-write"
+layer = "workflow"
+overlaps = ["figma"]
+
+[skills.openai-docs]
+mcps = ["openai_docs"]
+effect = "readonly"
+layer = "workflow"
+
+[skills.imagegen]
+mcps = ["image_gen"]
+effect = "external-call"
+layer = "workflow"
+
+[skills.plugin-creator]
+effect = "local-write"
+layer = "workflow"
+
+[skills.skill-installer]
+commands = ["git"]
+effect = "external-call"
+layer = "workflow"
+
+[skills.invokellm]
+commands = ["gptengage"]
+effect = "external-call"
+layer = "primitive"
+
+[skills.debate]
+commands = ["gptengage"]
+effect = "external-call"
+layer = "workflow"
+overlaps = ["invokellm"]
+
+[skills.ideate]
+commands = ["gptengage"]
+effect = "external-call"
+layer = "workflow"
+overlaps = ["invokellm"]
+
+[skills.test]
+commands = ["overwatch"]
+effect = "local-process"
+layer = "workflow"
+
+[skills.markdown-to-pdf]
+commands = ["pandoc", "weasyprint"]
+effect = "local-write"
+layer = "workflow"
+
+[skills.yarli-execution-loop]
+commands = ["yarli"]
+effect = "local-write"
+layer = "composer"
+overlaps = ["yarli-introspect", "autonomy-loop"]
+
+[skills.yarli-introspect]
+commands = ["yarli"]
+effect = "readonly"
+layer = "primitive"
+
+[skills.yarli-repo-init]
+commands = ["yarli"]
+effect = "local-write"
+layer = "workflow"
+
+[skills.yarli-tranche-expander]
+commands = ["yarli"]
+effect = "local-write"
+layer = "workflow"
+
+[skills.repo-topics]
+commands = ["gh"]
+effect = "remote-write"
+layer = "workflow"
+
+[skills.pr-lifecycle]
+commands = ["git", "gh"]
+effect = "remote-write"
+layer = "composer"
+overlaps = ["commit", "squash-commits", "readme-doctor"]
+
+[skills.speak]
+effect = "local-process"
+layer = "workflow"
+
+[skills.check-antipatterns]
+effect = "readonly"
+layer = "primitive"
+overlaps = ["analyze-conversation"]
+
+[skills.analyze-conversation]
+effect = "local-write"
+layer = "workflow"
+overlaps = ["check-antipatterns"]
+
+[skills.archdiagram]
+effect = "local-write"
+layer = "workflow"
+
+[skills.autonomous-execution-contract]
+effect = "local-write"
+layer = "composer"
+
+[skills.autonomy-loop]
+effect = "local-write"
+layer = "composer"
+overlaps = ["autonomous-execution-contract", "yarli-execution-loop"]
+
+[skills.commit]
+commands = ["git"]
+effect = "local-write"
+layer = "workflow"
+
+[skills.ecosystem-borrow-audit]
+commands = ["git", "gptengage"]
+effect = "external-call"
+layer = "composer"
+
+[skills.fp-refine]
+effect = "local-write"
+layer = "workflow"
+
+[skills.git-status-report]
+commands = ["git"]
+effect = "readonly"
+layer = "primitive"
+
+[skills.handoff]
+commands = ["git"]
+effect = "local-write"
+layer = "composer"
+overlaps = ["commit"]
+
+[skills.install-commithooks]
+commands = ["git"]
+effect = "local-write"
+layer = "workflow"
+
+[skills.max-columns]
+effect = "readonly"
+layer = "primitive"
+
+[skills.memleak-investigate]
+platforms = ["linux"]
+effect = "readonly"
+layer = "workflow"
+
+[skills.next-todos]
+effect = "readonly"
+layer = "primitive"
+
+[skills.objective-to-dag-decomposition]
+effect = "readonly"
+layer = "workflow"
+
+[skills.postmortem]
+effect = "local-write"
+layer = "workflow"
+
+[skills.privateify]
+commands = ["git", "gh"]
+effect = "local-write"
+layer = "workflow"
+
+[skills.pythonpackagesevere]
+effect = "local-write"
+layer = "composer"
+
+[skills.readme-doctor]
+effect = "local-write"
+layer = "workflow"
+
+[skills.reference-cleaner]
+commands = ["git", "git-filter-repo"]
+effect = "destructive"
+layer = "workflow"
+
+[skills.rewrite-commit-messages]
+commands = ["git", "git-filter-repo"]
+effect = "destructive"
+layer = "workflow"
+
+[skills.skill-creator]
+effect = "local-write"
+layer = "workflow"
+
+[skills.squash-commits]
+commands = ["git"]
+effect = "destructive"
+layer = "workflow"
+
+[skills.system-memory-audit]
+platforms = ["linux"]
+effect = "readonly"
+layer = "workflow"
+overlaps = ["memleak-investigate"]
+
+[skills.tui-web-design-orchestrator]
+effect = "readonly"
+layer = "workflow"
+
+[skills.vision-plan-tranche-sync]
+commands = ["yarli"]
+effect = "local-write"
+layer = "workflow"
+
+[skills.yore-vocabulary-harvest]
+effect = "local-write"
+layer = "primitive"
+
+[skills.yore-vocabulary-llm-filter]
+commands = ["gptengage"]
+effect = "external-call"
+layer = "workflow"

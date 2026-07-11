@@ -54,6 +54,8 @@ Commands:
   diff      Show differences between assembled output and installed skills
   status    List which skills exist where
   compare-implementations  Compare skill parity across repo, Codex, and Claude
+  audit-catalog            Audit loaded roots for divergent names and bloat
+  capability-health        Report unavailable command/MCP/platform dependencies
 
 Installed locations:
   Codex skills:     ~/.agents/skills/
@@ -298,6 +300,8 @@ case "$1" in
     push)   push ;;
     diff)   do_diff ;;
     compare-implementations) compare_implementations ;;
+    audit-catalog) python3 "$SKILLS_DIR/scripts/audit_catalog.py" "${@:2}" ;;
+    capability-health) python3 "$SKILLS_DIR/scripts/capability_health.py" "${@:2}" ;;
     status) status ;;
     *)      usage ;;
 esac

@@ -10,6 +10,7 @@ CODEX_INSTALL="$HOME/.agents/skills"
 CLAUDE_SKILLS_INSTALL="$HOME/.claude/skills"
 
 CLIS=(claude codex)
+RUNTIME_EXCLUSIONS_DIR="$ROOT_DIR/runtime-exclusions"
 
 # Keys that belong in overlays, not in generic SKILL.md.
 # When no overlay exists for a CLI, these keys are stripped from the build.
@@ -143,6 +144,13 @@ manifest_path() {
     fi
 }
 
+is_runtime_excluded() {
+    local cli="$1" skill_name="$2"
+    local exclusions="$RUNTIME_EXCLUSIONS_DIR/$cli.txt"
+    [[ -f "$exclusions" ]] || return 1
+    grep -qxF "$skill_name" <(grep -v '^[[:space:]]*#' "$exclusions" | sed '/^[[:space:]]*$/d')
+}
+
 assemble_skills() {
     echo "Assembling skills into $BUILD_DIR ..."
     rm -rf "$BUILD_DIR"
@@ -163,6 +171,10 @@ assemble_skills() {
         body="$(extract_body "$manifest")"
 
         for cli in "${CLIS[@]}"; do
+            if is_runtime_excluded "$cli" "$skill_name"; then
+                echo "  SKIP [$cli] runtime-owned conflict: $skill_name"
+                continue
+            fi
             local out_dir="$BUILD_DIR/$cli/skills/$skill_name"
             mkdir -p "$out_dir"
 
