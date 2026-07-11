@@ -69,6 +69,14 @@ echo "Repo skills: $repo_count"
 # Check all skills produce output for each CLI
 for cli in "${CLIS[@]}"; do
   build_skill_dir="$BUILD_DIR/$cli/skills"
+  if find "$build_skill_dir" -type d -name __pycache__ -print -quit | grep -q .; then
+    echo "FAIL [$cli] Python cache directory leaked into assembled skills"
+    failures=$((failures + 1))
+  fi
+  if find "$build_skill_dir" -type f \( -name '*.pyc' -o -name '*.pyo' \) -print -quit | grep -q .; then
+    echo "FAIL [$cli] compiled Python artifact leaked into assembled skills"
+    failures=$((failures + 1))
+  fi
   for shared_reference in history-rewrite-safety.md gptengage-invocation.md yarli-primitives.md; do
     if [[ ! -f "$BUILD_DIR/$cli/references/$shared_reference" ]]; then
       echo "FAIL [$cli] missing shared reference: $shared_reference"

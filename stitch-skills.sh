@@ -199,6 +199,7 @@ assemble_skills() {
                 [[ -d "$sub" ]] || continue
                 local sub_name
                 sub_name="$(basename "$sub")"
+                [[ "$sub_name" == "__pycache__" ]] && continue
                 cp -a "$sub" "$out_dir/$sub_name"
             done
 
@@ -208,8 +209,14 @@ assemble_skills() {
                 local fname
                 fname="$(basename "$f")"
                 [[ "$fname" == "SKILL.md" || "$fname" == "skill.md" ]] && continue
+                [[ "$fname" == *.pyc || "$fname" == *.pyo ]] && continue
                 cp -a "$f" "$out_dir/$fname"
             done
+
+            # Runtime caches are never capability source and must not be
+            # deployed merely because a local verification imported a helper.
+            find "$out_dir" -type d -name __pycache__ -prune -exec rm -rf {} +
+            find "$out_dir" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 
         done
     done
