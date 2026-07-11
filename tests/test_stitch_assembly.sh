@@ -77,7 +77,13 @@ for cli in "${CLIS[@]}"; do
     echo "FAIL [$cli] compiled Python artifact leaked into assembled skills"
     failures=$((failures + 1))
   fi
-  for shared_reference in history-rewrite-safety.md gptengage-invocation.md yarli-primitives.md; do
+  for shared_reference in \
+    history-rewrite-safety.md \
+    gptengage-invocation.md \
+    gptengage-invoke.md \
+    gptengage-debate.md \
+    gptengage-ideate.md \
+    yarli-primitives.md; do
     if [[ ! -f "$BUILD_DIR/$cli/references/$shared_reference" ]]; then
       echo "FAIL [$cli] missing shared reference: $shared_reference"
       failures=$((failures + 1))
