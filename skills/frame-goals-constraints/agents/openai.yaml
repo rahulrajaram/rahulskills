@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frame Goals and Constraints"
+  short_description: "Clarify complex decisions before solutioning"
+  default_prompt: "Use $frame-goals-constraints to frame this problem in terms of goals, environment, constraints, actors, competing concerns, and decision boundaries."

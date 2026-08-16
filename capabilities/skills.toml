@@ -163,6 +163,11 @@ layer = "composer"
 effect = "local-write"
 layer = "workflow"
 
+[skills.frame-goals-constraints]
+effect = "readonly"
+layer = "primitive"
+overlaps = ["objective-to-dag-decomposition"]
+
 [skills.git-status-report]
 commands = ["git"]
 effect = "external-call"

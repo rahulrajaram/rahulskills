@@ -62,6 +62,7 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
 | `ecosystem-borrow-audit` | Cross-repo borrowing analysis and multi-sigma ideation sweeps |
 | `fp-refine` | Transform imperative code into functional-programming-first structures |
+| `frame-goals-constraints` | Frame complex decisions through goals, environment, constraints, actors, and competing concerns |
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
 | `handoff` | Commit workspace state and generate next-shell continuation prompt |
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
