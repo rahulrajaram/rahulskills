@@ -1,6 +1,8 @@
 from pathlib import Path
 import importlib.util
 import sys
+import tempfile
+import unittest
 
 
 MODULE_PATH = Path(__file__).parents[1] / "scripts" / "audit_catalog.py"
@@ -20,24 +22,31 @@ def write_skill(root: Path, directory: str, name: str, body: str = "body") -> No
     )
 
 
-def test_audit_reports_only_divergent_name_collisions(tmp_path: Path) -> None:
-    first = tmp_path / "first"
-    second = tmp_path / "second"
-    write_skill(first, "one", "shared")
-    write_skill(second, "two", "shared", "different")
-    write_skill(first, "solo", "solo")
+class CatalogAuditTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name)
 
-    report = audit_catalog.audit([first, second], line_budget=400)
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
 
-    assert list(report["collisions"]) == ["shared"]
-    assert report["summary"]["unique_names"] == 2
+    def test_audit_reports_only_divergent_name_collisions(self) -> None:
+        first = self.root / "first"
+        second = self.root / "second"
+        write_skill(first, "one", "shared")
+        write_skill(second, "two", "shared", "different")
+        write_skill(first, "solo", "solo")
 
+        report = audit_catalog.audit([first, second], line_budget=400)
 
-def test_audit_reports_size_and_personal_paths(tmp_path: Path) -> None:
-    root = tmp_path / "skills"
-    write_skill(root, "large", "large", "/home/example/tool\n" * 10)
+        self.assertEqual(list(report["collisions"]), ["shared"])
+        self.assertEqual(report["summary"]["unique_names"], 2)
 
-    report = audit_catalog.audit([root], line_budget=5)
+    def test_audit_reports_size_and_personal_paths(self) -> None:
+        root = self.root / "skills"
+        write_skill(root, "large", "large", "/home/example/tool\n" * 10)
 
-    assert report["summary"]["oversized"] == 1
-    assert report["summary"]["personal_paths"] == 1
+        report = audit_catalog.audit([root], line_budget=5)
+
+        self.assertEqual(report["summary"]["oversized"], 1)
+        self.assertEqual(report["summary"]["personal_paths"], 1)

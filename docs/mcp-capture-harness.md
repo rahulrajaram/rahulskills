@@ -22,9 +22,12 @@ python3 scripts/mcp_contract_capture.py \
   -- /path/to/configured/server mcp
 ```
 
-Each label may refer to a file, directory, or symlink. Repeat `--source` and
-`--runtime` for multiple artifacts. Labels must match exactly. The output
-directory must not already exist, preventing accidental evidence overwrite.
+Each label may refer to a file, directory, or symlink. Labels start with an
+alphanumeric character, contain only letters, digits, `.`, `_`, or `-`, and
+must be unique within each side. Repeat `--source` and `--runtime` for multiple
+artifacts; labels must match exactly. The output directory must not already
+exist, preventing accidental evidence overwrite. Assembly uses a unique sibling
+staging directory and never removes a pre-existing staging path.
 
 ## Output contract
 

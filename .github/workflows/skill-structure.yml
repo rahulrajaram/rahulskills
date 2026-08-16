@@ -28,3 +28,6 @@ jobs:
 
       - name: Run stitch assembly test
         run: ./tests/test_stitch_assembly.sh
+
+      - name: Run Python tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py'

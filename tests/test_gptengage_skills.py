@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+import unittest
 
 
 REPO = Path(__file__).parents[1]
@@ -41,31 +42,32 @@ def metadata(text: str) -> dict[str, str]:
     return result
 
 
-def test_manifests_are_concise_compatible_routers() -> None:
-    for name, (argument_hint, operation_reference) in SKILLS.items():
-        text = (REPO / "skills" / name / "SKILL.md").read_text()
-        frontmatter = metadata(text)
-        assert frontmatter["name"] == name
-        assert frontmatter["argument-hint"] == argument_hint
-        assert f"/{name}" in frontmatter["description"]
-        assert f"${name}" in frontmatter["description"]
-        assert "gptengage-invocation.md" in text
-        assert operation_reference in text
-        assert "| Flag |" not in text
-        assert len(text.splitlines()) <= 60
+class GptengageSkillTests(unittest.TestCase):
+    def test_manifests_are_concise_compatible_routers(self) -> None:
+        for name, (argument_hint, operation_reference) in SKILLS.items():
+            with self.subTest(skill=name):
+                text = (REPO / "skills" / name / "SKILL.md").read_text()
+                frontmatter = metadata(text)
+                self.assertEqual(frontmatter["name"], name)
+                self.assertEqual(frontmatter["argument-hint"], argument_hint)
+                self.assertIn(f"/{name}", frontmatter["description"])
+                self.assertIn(f"${name}", frontmatter["description"])
+                self.assertIn("gptengage-invocation.md", text)
+                self.assertIn(operation_reference, text)
+                self.assertNotIn("| Flag |", text)
+                self.assertLessEqual(len(text.splitlines()), 60)
 
+    def test_operation_contracts_preserve_required_boundaries(self) -> None:
+        common = (REPO / "references" / "gptengage-invocation.md").read_text()
+        invoke = (REPO / "references" / "gptengage-invoke.md").read_text()
+        debate = (REPO / "references" / "gptengage-debate.md").read_text()
+        ideate = (REPO / "references" / "gptengage-ideate.md").read_text()
 
-def test_operation_contracts_preserve_required_boundaries() -> None:
-    common = (REPO / "references" / "gptengage-invocation.md").read_text()
-    invoke = (REPO / "references" / "gptengage-invoke.md").read_text()
-    debate = (REPO / "references" / "gptengage-debate.md").read_text()
-    ideate = (REPO / "references" / "gptengage-ideate.md").read_text()
-
-    for phrase in ("outbound data", "--write", "sessions", "argument vector"):
-        assert phrase in common
-    assert "gemini`, `claude`, then\n  `codex" in invoke
-    assert "defaults to 600 seconds" in invoke
-    assert "synthesis adds another external call" in debate
-    assert "per-invocation" in debate
-    assert "depth is 1-5" in ideate
-    assert "require `--force`" in ideate
+        for phrase in ("outbound data", "--write", "sessions", "argument vector"):
+            self.assertIn(phrase, common)
+        self.assertIn("gemini`, `claude`, then\n  `codex", invoke)
+        self.assertIn("defaults to 600 seconds", invoke)
+        self.assertIn("synthesis adds another external call", debate)
+        self.assertIn("per-invocation", debate)
+        self.assertIn("depth is 1-5", ideate)
+        self.assertIn("require `--force`", ideate)

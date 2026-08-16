@@ -121,9 +121,18 @@ if updated:
         except ValueError:
             continue
 
-stale = bool(missing_workspace_dirs) and (
-    age_seconds is None or age_seconds >= min_age_seconds
+stale = (
+    bool(missing_workspace_dirs)
+    and age_seconds is not None
+    and age_seconds >= min_age_seconds
 )
+
+if missing_workspace_dirs and age_seconds is None:
+    reason = "workspace missing but update age is unknown"
+elif stale:
+    reason = "missing workspace for active run"
+else:
+    reason = "workspace still present or active run too recent"
 
 payload = {
     "run_id": run_id,
@@ -133,11 +142,7 @@ payload = {
     "workspace_dirs": workspace_dirs,
     "missing_workspace_dirs": missing_workspace_dirs,
     "stale": stale,
-    "reason": (
-        "missing workspace for active run"
-        if stale
-        else "workspace still present or active run too recent"
-    ),
+    "reason": reason,
 }
 print(json.dumps(payload))
 PY

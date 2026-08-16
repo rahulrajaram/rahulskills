@@ -1,12 +1,28 @@
 ---
 name: handoff
-description: "Reconcile handoff docs, commit the resulting coherent workspace through the commit skill, and generate a next-shell continuation prompt. Use for /handoff, wrap-up, or cross-shell continuation."
-argument-hint: ""
+description: "Reconcile handoff docs, commit the coherent workspace through the commit skill, and write a next-shell continuation prompt to HANDOFF.md at the package root. Use for $handoff or /handoff, wrap-up, cross-shell continuation, and $handoff extract or /handoff extract to emit an existing HANDOFF.md."
+argument-hint: "[extract]"
 ---
 
 # Handoff
 
 Use this workflow whenever a user wants a clean, accurate shell handoff.
+
+## Mode Routing
+
+- With no argument, run the write workflow below.
+- With `extract`, run only the extract workflow. Do not reconcile docs, commit,
+  or rewrite `HANDOFF.md`.
+- Reject unknown arguments with the supported forms: `$handoff` and
+  `$handoff extract` (or equivalent slash forms in clients that support them).
+
+## Extract Workflow
+
+1. Resolve the package root with `git rev-parse --show-toplevel`.
+2. Read `<PACKAGE_ROOT>/HANDOFF.md`. If it is missing, report the exact expected
+   path and stop without changing repository state.
+3. Emit the file contents verbatim, without a surrounding Markdown fence or
+   added commentary. This preserves the same prompt for direct reuse.
 
 ## Autonomy Routing
 
@@ -49,7 +65,7 @@ Do not invent completed work.
 
 If neither file exists, skip this step and note their absence.
 
-### Step 3: Commit the coherent handoff state
+### Step 3: Commit the coherent workspace state
 
 Invoke the shared `commit` skill after documentation reconciliation. Its file
 triage, repository-policy discovery, secret checks, explicit-path staging, and
@@ -59,8 +75,8 @@ verification rules are authoritative. Do not duplicate them here and never use
 If canonical handoff docs are classified as REVIEW or SKIP by repository policy,
 pause for the commit skill's normal resolution instead of silently omitting or
 force-adding them. If there is nothing to commit, record a no-op. After commit,
-verify `git status --short`; a dirty tree is an incomplete handoff and must be
-reported or reconciled before producing the continuation prompt.
+verify `git status --short`; unexplained changes are an incomplete handoff and
+must be reported or reconciled before producing the continuation prompt.
 
 ### Step 4: Gather session context for the prompt
 
@@ -75,9 +91,20 @@ Before writing the prompt, review the full conversation to extract:
 
 This is critical: a handoff that only lists file changes without capturing the *reasoning and discussion* forces the next shell to re-discover context that was already established.
 
-### Step 5: Produce next-shell prompt
+### Step 5: Write `HANDOFF.md`
 
-Fill in the template from `references/next-shell-prompt-template.md` with exact facts from this session. If that file is missing, use this inline template:
+Fill in the template from `references/next-shell-prompt-template.md` with exact
+facts from this session. Write the result to `<PACKAGE_ROOT>/HANDOFF.md`, where
+`PACKAGE_ROOT` is the path returned by `git rev-parse --show-toplevel`. Replace
+an existing untracked handoff artifact atomically. Do not print the prompt to
+stdout. If the file is tracked, treat it as a project-owned document and ask
+before replacing it because the post-commit write would modify tracked state.
+
+`HANDOFF.md` is a transient local session artifact written after the coherent
+workspace commit so it can contain the exact final HEAD. Do not stage or commit
+it. Its untracked status is expected until the user removes it.
+
+If the template reference is missing, use this inline template:
 
 ```text
 Continue work in <ABSOLUTE_REPO_PATH>.
@@ -126,12 +153,18 @@ Rules for filling the template:
 - Be specific enough that a new shell can continue without re-discovery.
 - Prefer factual, verifiable statements over narrative.
 
-### Step 6: Return handoff package
+### Step 6: Verify and return
 
 Return to the user:
 - Commit result (hash + message, or no-op if clean).
 - Updated plan/prompt files (or note they don't exist).
-- Final copy-paste prompt for the new shell.
+- Absolute path to `HANDOFF.md`.
+- The extraction command: `$handoff extract`.
+
+Do not include the handoff document contents in the response. Verify that the
+file exists, contains no unresolved angle-bracket placeholders, and records the
+actual post-commit HEAD. Run `git status --short`; only the transient untracked
+`HANDOFF.md` may remain unexplained.
 
 ## Guardrails
 - Preserve user intent and existing project conventions.
@@ -139,3 +172,5 @@ Return to the user:
 - Keep prompt content specific enough that a new shell can continue without re-discovery.
 - If there are multiple repos/worktrees, confirm which repo to hand off before committing.
 - Never omit discussion context just because no code was written — validated conclusions and design decisions are first-class handoff content.
+- Never add `HANDOFF.md` to `.gitignore`, `.git/info/exclude`, or the index as a
+  side effect of this workflow.

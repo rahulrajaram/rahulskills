@@ -21,6 +21,18 @@ role = "repository-source-context"
 effects = ["readonly"]
 health_tool = "daemon_status"
 
+[mcps.figma]
+role = "design-source-context"
+effects = ["readonly", "network-read"]
+
+[mcps.image_gen]
+role = "image-generation"
+effects = ["external-call", "local-write"]
+
+[mcps.openai_docs]
+role = "official-documentation"
+effects = ["readonly", "network-read"]
+
 [skills.figma]
 mcps = ["figma"]
 effect = "readonly"

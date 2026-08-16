@@ -64,7 +64,7 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `fp-refine` | Transform imperative code into functional-programming-first structures |
 | `frame-goals-constraints` | Frame complex decisions through goals, environment, constraints, actors, and competing concerns |
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
-| `handoff` | Commit workspace state and generate next-shell continuation prompt |
+| `handoff` | Commit workspace state and write or extract a root `HANDOFF.md` |
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
 | `install-commithooks` | Install shared commithooks framework into a project |
 | `invokellm` | Invoke one or more AI CLIs via gptengage, defaulting to gemini, claude, and codex |
@@ -143,6 +143,7 @@ Validate skill construction separately for Codex and Claude installs.
 ```bash
 ./tests/test_codex_skill_structure.sh
 ./tests/test_claude_skill_structure.sh
+python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
 Both tests infer required frontmatter keys from a real installed reference

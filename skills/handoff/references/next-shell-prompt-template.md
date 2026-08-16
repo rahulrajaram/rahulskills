@@ -1,7 +1,8 @@
-# Next-Shell Prompt Template
+# `HANDOFF.md` Template
 
-Use this template to produce the final copy-paste prompt for a new shell.
-Every placeholder MUST be replaced with a concrete value or removed entirely.
+Use this template to write the continuation prompt to `HANDOFF.md` at the
+package root. Every placeholder MUST be replaced with a concrete value or
+removed entirely.
 
 ```text
 Continue work in <ABSOLUTE_REPO_PATH>.

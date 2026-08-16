@@ -1,4 +1,4 @@
 interface:
   display_name: "Handoff"
-  short_description: "Commit changes, sync plan docs, and generate next-shell prompt."
-  default_prompt: "Run /handoff: commit all current changes, update IMPLEMENTATION_PLAN.md and PROMPT.md if present, and produce a detailed next-shell continuation prompt with completed work and next tasks."
+  short_description: "Commit changes and write a reusable HANDOFF.md."
+  default_prompt: "Use $handoff to reconcile and commit the workspace, then write the continuation prompt to HANDOFF.md at the package root."

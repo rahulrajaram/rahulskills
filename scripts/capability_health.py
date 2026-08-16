@@ -74,6 +74,18 @@ def undeclared_source_skills(manifest: dict[str, object], skills_root: Path) -> 
     return sorted(source - declared)
 
 
+def undeclared_mcp_dependencies(manifest: dict[str, object]) -> list[str]:
+    declared = set(manifest.get("mcps", {}))
+    referenced = {
+        str(mcp)
+        for config in manifest.get("skills", {}).values()
+        if isinstance(config, dict)
+        for key in ("mcps", "optional_mcps")
+        for mcp in config.get(key, [])
+    }
+    return sorted(referenced - declared)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -85,6 +97,9 @@ def main() -> int:
     report = evaluate(load_manifest(args.manifest), set(args.mcp) | set(filter(None, env_mcps)))
     report["undeclared_source_skills"] = undeclared_source_skills(
         load_manifest(args.manifest), REPO / "skills"
+    )
+    report["undeclared_mcp_dependencies"] = undeclared_mcp_dependencies(
+        load_manifest(args.manifest)
     )
     unavailable = [name for name, item in report["skills"].items() if not item["available"]]
     missing_mcps = [name for name, item in report["mcps"].items() if not item["loaded"]]
@@ -102,10 +117,17 @@ def main() -> int:
             print(f"UNAVAILABLE {name}: {', '.join(reasons)}")
         for name in report["undeclared_source_skills"]:
             print(f"UNDECLARED {name}")
+        for name in report["undeclared_mcp_dependencies"]:
+            print(f"UNDECLARED MCP {name}")
         print(f"MCP capabilities: {len(report['mcps'])} declared, {len(missing_mcps)} not loaded")
         for name in missing_mcps:
             print(f"MCP NOT LOADED {name}")
-    return int(args.strict and bool(unavailable + report["undeclared_source_skills"]))
+    strict_failures = (
+        unavailable
+        + report["undeclared_source_skills"]
+        + report["undeclared_mcp_dependencies"]
+    )
+    return int(args.strict and bool(strict_failures))
 
 
 if __name__ == "__main__":

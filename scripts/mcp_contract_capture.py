@@ -6,9 +6,11 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import selectors
 import shutil
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
 from difflib import unified_diff
@@ -19,6 +21,7 @@ from typing import Any, Iterable
 VOLATILE_KEYS = frozenset(
     {"captured_at", "created_at", "pid", "started_at", "timestamp"}
 )
+ARTIFACT_LABEL = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 
 @dataclass(frozen=True)
@@ -80,6 +83,11 @@ def parse_artifact(raw: str) -> Artifact:
     label, separator, path = raw.partition("=")
     if not separator or not label or not path:
         raise argparse.ArgumentTypeError("expected LABEL=PATH")
+    if not ARTIFACT_LABEL.fullmatch(label) or label in {".", ".."}:
+        raise argparse.ArgumentTypeError(
+            "LABEL must start with an alphanumeric character and contain only "
+            "letters, digits, '.', '_', or '-'"
+        )
     return Artifact(label=label, path=Path(path).expanduser().absolute())
 
 
@@ -179,6 +187,8 @@ def capture_session(command: list[str], timeout: float) -> Capture:
                 process.kill()
                 process.wait(timeout=2)
         stderr_lines.extend(process.stderr.readlines())
+        process.stdout.close()
+        process.stderr.close()
     return Capture(
         initialize=responses[1],
         tools_list=responses[2],
@@ -257,8 +267,14 @@ def copy_rollback_artifact(artifact: Artifact, root: Path) -> Path:
 def paired_artifacts(
     sources: Iterable[Artifact], runtimes: Iterable[Artifact]
 ) -> list[tuple[Artifact, Artifact]]:
-    source_by_label = {artifact.label: artifact for artifact in sources}
-    runtime_by_label = {artifact.label: artifact for artifact in runtimes}
+    source_items = list(sources)
+    runtime_items = list(runtimes)
+    source_by_label = {artifact.label: artifact for artifact in source_items}
+    runtime_by_label = {artifact.label: artifact for artifact in runtime_items}
+    if len(source_by_label) != len(source_items):
+        raise ValueError("source artifact labels must be unique")
+    if len(runtime_by_label) != len(runtime_items):
+        raise ValueError("runtime artifact labels must be unique")
     if source_by_label.keys() != runtime_by_label.keys():
         missing_runtime = sorted(source_by_label.keys() - runtime_by_label.keys())
         missing_source = sorted(runtime_by_label.keys() - source_by_label.keys())
@@ -267,6 +283,16 @@ def paired_artifacts(
             f"missing source={missing_source}"
         )
     return [(source_by_label[label], runtime_by_label[label]) for label in sorted(source_by_label)]
+
+
+def create_staging_dir(output_dir: Path) -> Path:
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    return Path(
+        tempfile.mkdtemp(
+            prefix=f".{output_dir.name}.staging-",
+            dir=output_dir.parent,
+        )
+    )
 
 
 def write_report(
@@ -332,10 +358,7 @@ def main() -> int:
         source.label: compare_artifacts(source, runtime)
         for source, runtime in pairs
     }
-    staging = args.output_dir.with_name(args.output_dir.name + ".staging")
-    if staging.exists():
-        shutil.rmtree(staging)
-    staging.mkdir(parents=True)
+    staging = create_staging_dir(args.output_dir)
     try:
         rollback_paths = {
             runtime.label: str(
@@ -351,9 +374,11 @@ def main() -> int:
             comparisons,
             rollback_paths,
         )
-        shutil.move(str(staging / "report"), args.output_dir)
         if (staging / "rollback").exists():
-            shutil.move(str(staging / "rollback"), args.output_dir / "rollback")
+            shutil.move(str(staging / "rollback"), staging / "report" / "rollback")
+        if args.output_dir.exists():
+            parser.error(f"output directory appeared during capture: {args.output_dir}")
+        (staging / "report").rename(args.output_dir)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
     return int(args.fail_on_diff and any(not item["equal"] for item in comparisons.values()))
