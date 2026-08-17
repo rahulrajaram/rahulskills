@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: "Reconcile handoff docs, commit the coherent workspace through the commit skill, and write a next-shell continuation prompt to HANDOFF.md at the package root. Use for $handoff or /handoff, wrap-up, cross-shell continuation, and $handoff extract or /handoff extract to emit an existing HANDOFF.md."
+description: "Reconcile handoff docs, commit the coherent workspace through the commit skill, and write a next-shell continuation prompt to NEXT_SHELL_PROMPT.md at the package root. Use for $handoff or /handoff, wrap-up, cross-shell continuation, and $handoff extract or /handoff extract to emit an existing NEXT_SHELL_PROMPT.md."
 argument-hint: "[extract]"
 ---
 
@@ -12,14 +12,14 @@ Use this workflow whenever a user wants a clean, accurate shell handoff.
 
 - With no argument, run the write workflow below.
 - With `extract`, run only the extract workflow. Do not reconcile docs, commit,
-  or rewrite `HANDOFF.md`.
+  or rewrite `NEXT_SHELL_PROMPT.md`.
 - Reject unknown arguments with the supported forms: `$handoff` and
   `$handoff extract` (or equivalent slash forms in clients that support them).
 
 ## Extract Workflow
 
 1. Resolve the package root with `git rev-parse --show-toplevel`.
-2. Read `<PACKAGE_ROOT>/HANDOFF.md`. If it is missing, report the exact expected
+2. Read `<PACKAGE_ROOT>/NEXT_SHELL_PROMPT.md`. If it is missing, report the exact expected
    path and stop without changing repository state.
 3. Emit the file contents verbatim, without a surrounding Markdown fence or
    added commentary. This preserves the same prompt for direct reuse.
@@ -91,16 +91,16 @@ Before writing the prompt, review the full conversation to extract:
 
 This is critical: a handoff that only lists file changes without capturing the *reasoning and discussion* forces the next shell to re-discover context that was already established.
 
-### Step 5: Write `HANDOFF.md`
+### Step 5: Write `NEXT_SHELL_PROMPT.md`
 
 Fill in the template from `references/next-shell-prompt-template.md` with exact
-facts from this session. Write the result to `<PACKAGE_ROOT>/HANDOFF.md`, where
+facts from this session. Write the result to `<PACKAGE_ROOT>/NEXT_SHELL_PROMPT.md`, where
 `PACKAGE_ROOT` is the path returned by `git rev-parse --show-toplevel`. Replace
 an existing untracked handoff artifact atomically. Do not print the prompt to
 stdout. If the file is tracked, treat it as a project-owned document and ask
 before replacing it because the post-commit write would modify tracked state.
 
-`HANDOFF.md` is a transient local session artifact written after the coherent
+`NEXT_SHELL_PROMPT.md` is a transient local session artifact written after the coherent
 workspace commit so it can contain the exact final HEAD. Do not stage or commit
 it. Its untracked status is expected until the user removes it.
 
@@ -158,13 +158,13 @@ Rules for filling the template:
 Return to the user:
 - Commit result (hash + message, or no-op if clean).
 - Updated plan/prompt files (or note they don't exist).
-- Absolute path to `HANDOFF.md`.
+- Absolute path to `NEXT_SHELL_PROMPT.md`.
 - The extraction command: `$handoff extract`.
 
 Do not include the handoff document contents in the response. Verify that the
 file exists, contains no unresolved angle-bracket placeholders, and records the
 actual post-commit HEAD. Run `git status --short`; only the transient untracked
-`HANDOFF.md` may remain unexplained.
+`NEXT_SHELL_PROMPT.md` may remain unexplained.
 
 ## Guardrails
 - Preserve user intent and existing project conventions.
@@ -172,5 +172,5 @@ actual post-commit HEAD. Run `git status --short`; only the transient untracked
 - Keep prompt content specific enough that a new shell can continue without re-discovery.
 - If there are multiple repos/worktrees, confirm which repo to hand off before committing.
 - Never omit discussion context just because no code was written — validated conclusions and design decisions are first-class handoff content.
-- Never add `HANDOFF.md` to `.gitignore`, `.git/info/exclude`, or the index as a
+- Never add `NEXT_SHELL_PROMPT.md` to `.gitignore`, `.git/info/exclude`, or the index as a
   side effect of this workflow.

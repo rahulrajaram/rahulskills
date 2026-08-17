@@ -1,6 +1,6 @@
-# `HANDOFF.md` Template
+# `NEXT_SHELL_PROMPT.md` Template
 
-Use this template to write the continuation prompt to `HANDOFF.md` at the
+Use this template to write the continuation prompt to `NEXT_SHELL_PROMPT.md` at the
 package root. Every placeholder MUST be replaced with a concrete value or
 removed entirely.
 

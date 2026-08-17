@@ -86,7 +86,7 @@ pattern. Contradictions between repository policy and these heuristics are
 REVIEW, not silent SKIP.
 
 **Untracked planning / AI session artifacts**
-- `VISION.md`, `IMPLEMENTATION_PLAN.md`, `PROMPT.md`, `RALPH_PROMPT.md`, `HANDOFF.md`
+- `VISION.md`, `IMPLEMENTATION_PLAN.md`, `PROMPT.md`, `RALPH_PROMPT.md`, `NEXT_SHELL_PROMPT.md`
 - `IDEAS.md`, `DECISIONS_LOG.txt`, `RFC_INSTRUCTIONS.md`, `ISSUES_FOUND.md`
 - `PHASE_*_SUMMARY.md`, `PHASE_*_IMPLEMENTATION.md`
 - `*VALIDATION*.md`, `*VALIDATION*.txt`, `UNDOCUMENTED_APIS*.md`

@@ -30,7 +30,7 @@ class HandoffSkillTests(unittest.TestCase):
         frontmatter = _mapping(text.split("---", 2)[1])
 
         self.assertEqual(frontmatter["argument-hint"], "[extract]")
-        self.assertIn("<PACKAGE_ROOT>/HANDOFF.md", text)
+        self.assertIn("<PACKAGE_ROOT>/NEXT_SHELL_PROMPT.md", text)
         self.assertIn("Do not print the prompt to stdout", normalized)
         self.assertIn("$handoff extract", text)
 
@@ -48,7 +48,7 @@ class HandoffSkillTests(unittest.TestCase):
 
         self.assertIn("Do not stage or commit", handoff)
         self.assertIn(".git/info/exclude", handoff)
-        self.assertIn("`HANDOFF.md`", commit)
+        self.assertIn("`NEXT_SHELL_PROMPT.md`", commit)
 
     def test_openai_metadata_uses_dollar_invocation(self) -> None:
         metadata = _mapping(AGENT_PATH.read_text())
@@ -56,10 +56,10 @@ class HandoffSkillTests(unittest.TestCase):
         self.assertGreaterEqual(len(metadata["short_description"]), 25)
         self.assertLessEqual(len(metadata["short_description"]), 64)
         self.assertIn("$handoff", metadata["default_prompt"])
-        self.assertIn("HANDOFF.md", metadata["default_prompt"])
+        self.assertIn("NEXT_SHELL_PROMPT.md", metadata["default_prompt"])
 
     def test_reference_template_targets_handoff_file(self) -> None:
         template = TEMPLATE_PATH.read_text()
 
-        self.assertIn("# `HANDOFF.md` Template", template)
+        self.assertIn("# `NEXT_SHELL_PROMPT.md` Template", template)
         self.assertIn("package root", template)

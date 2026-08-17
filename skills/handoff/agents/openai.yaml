@@ -1,4 +1,4 @@
 interface:
   display_name: "Handoff"
-  short_description: "Commit changes and write a reusable HANDOFF.md."
-  default_prompt: "Use $handoff to reconcile and commit the workspace, then write the continuation prompt to HANDOFF.md at the package root."
+  short_description: "Commit changes and write a reusable NEXT_SHELL_PROMPT.md."
+  default_prompt: "Use $handoff to reconcile and commit the workspace, then write the continuation prompt to NEXT_SHELL_PROMPT.md at the package root."
