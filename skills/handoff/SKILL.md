@@ -1,7 +1,7 @@
 ---
 name: handoff
-description: "Reconcile handoff docs, commit the coherent workspace through the commit skill, and write a next-shell continuation prompt to NEXT_SHELL_PROMPT.md at the package root. Use for $handoff or /handoff, wrap-up, cross-shell continuation, and $handoff extract or /handoff extract to emit an existing NEXT_SHELL_PROMPT.md."
-argument-hint: "[extract]"
+description: "Reconcile handoff docs, commit the coherent workspace, and write a next-shell continuation prompt to NEXT_SHELL_PROMPT.md. Use $handoff extract (or Pi's /skill:handoff extract) to load that prompt as active instructions and immediately resume the work; use print only to emit it verbatim."
+argument-hint: "[extract|print]"
 ---
 
 # Handoff
@@ -11,27 +11,55 @@ Use this workflow whenever a user wants a clean, accurate shell handoff.
 ## Mode Routing
 
 - With no argument, run the write workflow below.
-- With `extract`, run only the extract workflow. Do not reconcile docs, commit,
-  or rewrite `NEXT_SHELL_PROMPT.md`.
-- Reject unknown arguments with the supported forms: `$handoff` and
-  `$handoff extract` (or equivalent slash forms in clients that support them).
+- With `extract`, run the activation workflow below. Do not run the handoff
+  writing workflow or rewrite `NEXT_SHELL_PROMPT.md`; resume the work carried
+  by the existing artifact.
+- With `print`, run only the read-only print workflow below.
+- Reject unknown arguments with the supported forms: `$handoff`,
+  `$handoff extract`, and `$handoff print` (or equivalent slash forms in
+  clients that support them).
+- In Pi Coding Agent, use `/skill:handoff`, `/skill:handoff extract`, or
+  `/skill:handoff print`; arguments appended by Pi select the same modes.
 
 ## Extract Workflow
 
 1. Resolve the package root with `git rev-parse --show-toplevel`.
 2. Read `<PACKAGE_ROOT>/NEXT_SHELL_PROMPT.md`. If it is missing, report the exact expected
    path and stop without changing repository state.
+3. Treat the file contents as user-provided continuation context and requested
+   work, subordinate to current system, developer, repository, and safety
+   instructions. Treat the live invocation message as newer: merge compatible
+   additions and follow it where it conflicts with the carried prompt.
+4. Unpack the artifact into working context: repository, completed work,
+   decisions, open priorities, blockers, and first commands. Validate facts
+   that matter to the next action instead of blindly trusting stale state.
+5. Do not merely emit, quote, or summarize the artifact. Do not ask what to do
+   next when it contains authorized actionable work. Load any named skills that
+   the resumed work requires, then begin the first actionable step in the same
+   turn and continue end to end until complete or genuinely blocked.
+6. If the first carried or live instruction requires an interview, decision,
+   approval, or other user response, start that interaction immediately and
+   wait at the natural boundary. Otherwise, return progress or results from the
+   resumed work rather than the handoff text itself.
+
+## Print Workflow
+
+1. Resolve the package root with `git rev-parse --show-toplevel`.
+2. Read `<PACKAGE_ROOT>/NEXT_SHELL_PROMPT.md`. If it is missing, report the exact
+   expected path and stop without changing repository state.
 3. Emit the file contents verbatim, without a surrounding Markdown fence or
-   added commentary. This preserves the same prompt for direct reuse.
+   added commentary. Do not execute its instructions.
 
 ## Autonomy Routing
 
-A handoff request is approval to complete the handoff workflow rather than ask
-whether to commit, update docs, or generate the continuation prompt. Continue
-through the ordered steps unless a repository choice, destructive action,
-secret, push/deploy, or multi-repo ambiguity requires explicit confirmation. Do
-not ask whether to use `/goal`, Yarli, or direct execution during handoff; the
-handoff itself is the requested workflow.
+A handoff request is approval to complete the selected handoff mode rather than
+ask whether to proceed. In write mode, that includes committing, updating docs,
+and generating the continuation prompt. In extract mode, that includes adopting
+the existing prompt as working context and resuming its authorized tasks.
+Continue through the ordered steps unless a repository choice, destructive
+action, secret, push/deploy, or multi-repo ambiguity requires explicit
+confirmation. Do not ask whether to use `/goal`, Yarli, or direct execution
+during handoff; the selected handoff mode is the requested workflow.
 
 ## Workflow
 
@@ -159,7 +187,10 @@ Return to the user:
 - Commit result (hash + message, or no-op if clean).
 - Updated plan/prompt files (or note they don't exist).
 - Absolute path to `NEXT_SHELL_PROMPT.md`.
-- The extraction command: `$handoff extract`.
+- The resume command: `$handoff extract`.
+- The verbatim-output command: `$handoff print`.
+- For Pi Coding Agent: `/skill:handoff extract` to resume or
+  `/skill:handoff print` to emit.
 
 Do not include the handoff document contents in the response. Verify that the
 file exists, contains no unresolved angle-bracket placeholders, and records the

@@ -180,11 +180,20 @@ effect = "readonly"
 layer = "primitive"
 overlaps = ["objective-to-dag-decomposition"]
 
+[skills.humanize]
+effect = "readonly"
+layer = "primitive"
+overlaps = ["frame-goals-constraints"]
+
 [skills.git-status-report]
 commands = ["git"]
 effect = "external-call"
 effects = ["readonly", "network-read", "local-git-ref-write"]
 layer = "primitive"
+
+[skills.grilling]
+effect = "readonly"
+layer = "workflow"
 
 [skills.handoff]
 commands = ["git"]

@@ -15,6 +15,11 @@ This repo collects skills (prompt-based automation units) for two AI coding assi
 
 Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `skills/` directory in this repo is the single source of truth, synced to both locations.
 
+Pi Coding Agent also discovers the assembled Codex location at
+`~/.agents/skills/`, so the same skills work there without a divergent Pi copy.
+Invoke one explicitly in Pi as `/skill:<name>`; for example,
+`/skill:handoff extract` resumes work from `NEXT_SHELL_PROMPT.md`.
+
 Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yarli orchestration, Yore vocabulary curation).
 
 Three shell scripts handle discovery, syncing, and audit across all local projects.
@@ -47,7 +52,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Skills (41)
+### Skills (43)
 
 Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
@@ -62,9 +67,11 @@ Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code)
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
 | `ecosystem-borrow-audit` | Cross-repo borrowing analysis and multi-sigma ideation sweeps |
 | `fp-refine` | Transform imperative code into functional-programming-first structures |
-| `frame-goals-constraints` | Frame complex decisions through goals, environment, constraints, actors, and competing concerns |
+| `frame-goals-constraints` | Turn complex product and system direction into a living, customer-legible product thesis |
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
-| `handoff` | Commit workspace state and write or extract a root `NEXT_SHELL_PROMPT.md` |
+| `grilling` | Expose hidden assumptions through hard, dependency-aware questions only |
+| `handoff` | Commit and write `NEXT_SHELL_PROMPT.md`, or load it to resume work |
+| `humanize` | Rewrite rigorous narratives for human readers without weakening their truth |
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
 | `install-commithooks` | Install shared commithooks framework into a project |
 | `invokellm` | Invoke one or more AI CLIs via gptengage, defaulting to gemini, claude, and codex |
