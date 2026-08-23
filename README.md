@@ -60,7 +60,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Skills (39)
+### Skills (40)
 
 Synced to both `~/.codex/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
@@ -71,6 +71,7 @@ Synced to both `~/.codex/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 | `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |
 | `autonomy-loop` | Drive an epic as a principal-architect loop with bounded execution and controlled reactor chaining |
 | `check-antipatterns` | Real-time anti-pattern detection during active work |
+| `clear-writing` | Edit dense, awkward, repetitive, or AI-generated prose into clear, direct, readable writing as an editor, not a ghostwriter; default and grill modes |
 | `commit` | Smart commit with file triage, artifact filtering, and secret detection |
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
 | `ecosystem-borrow-audit` | Cross-repo borrowing analysis and multi-sigma ideation sweeps |

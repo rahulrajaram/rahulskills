@@ -334,6 +334,39 @@ falsified, explicitly unresolved with a resolution path, or no longer capable
 of changing the active decision. Preserve the raw research and unanswered
 questions for branches that may reopen.
 
+## Type each unresolved uncertainty
+
+Every unresolved `U-*` node carries one type that says why it is open and what
+would close it. Use the same taxonomy as the `clear-writing` skill's grill mode,
+so a single vocabulary covers both editing and interrogation: the reason an
+editor flags a sentence is the reason a plan's claim is unproven. Assign the
+most specific. If several types apply, record the primary one and note the
+others.
+
+- **CITATION** — a factual claim should be supported by a source. Closed by finding the source.
+- **VERIFY** — a number, fact, or external claim must be checked. Closed by confirming against a primary or otherwise documented source.
+- **JUSTIFY** — a conclusion does not clearly follow from the preceding reasoning. Closed by stating the missing inference.
+- **EVIDENCE** — a claim needs data, an example, an experiment, or other empirical support. Closed by producing it.
+- **DEFINE** — an important term is ambiguous or overloaded. Closed by fixing its operational meaning.
+- **ASSUMPTION** — the argument rests on an unstated premise. Closed by surfacing and testing the premise.
+- **COUNTERARGUMENT** — a strong obvious objection goes unanswered. Closed by addressing it.
+- **INVESTIGATE** — the claim requires deeper technical or external investigation. Closed by scoping and running that investigation.
+- **HUMAN** — the text presents a choice only the user can decide. Closed by the user; never close it on their behalf.
+
+Typing is not a license to over-flag. Mark only gaps whose resolution could
+materially change truth, credibility, logical validity, decision quality, or
+reader understanding. Do not type an ordinary statement merely because it
+could theoretically cite a source.
+
+The type maps to what the griller asks next and what the respondent resolves.
+Filter the respondent's resolution precisely: it must close the stated type,
+not restyle the claim to sound more confident or less exposed. Do not let a
+clean restatement hide the evidence gap.
+
+The type is internal machine vocabulary, the same as a `U-*` identifier. It
+may appear in the private control envelope and the explicit diagnostic view,
+never in a numbered question or in ordinary human-facing prose.
+
 ## Repeat this cycle
 
 This cycle has two halves. Steps 1–4 form the **default human loop** for both

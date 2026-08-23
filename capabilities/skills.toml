@@ -141,6 +141,10 @@ commands = ["git"]
 effect = "local-write"
 effects = ["local-write"]
 approval_boundaries = ["review-file", "allowed-override", "secret", "ignore-policy-change"]
+
+[skills.clear-writing]
+effect = "readonly"
+layer = "primitive"
 layer = "workflow"
 
 [skills.ecosystem-borrow-audit]
