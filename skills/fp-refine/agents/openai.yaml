@@ -1,0 +1,4 @@
+interface:
+  display_name: "FP Refine"
+  short_description: "Transform imperative code into FP-first, immutable, DSL-oriented structures."
+  default_prompt: "Run /fp-refine: diagnose imperative anti-patterns and apply declarative FP refactoring to the target code."

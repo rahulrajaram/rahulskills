@@ -164,7 +164,7 @@ For each root cause, generate at least one action item:
 
 ## Example Queries
 
-For Striation orchestration failures:
+For orchestration failures:
 ```sql
 -- Get orchestration status
 SELECT id, status, current_phase, created_at, updated_at

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Humanize a Narrative"
+  short_description: "Turn rigorous analysis into clear human language"
+  default_prompt: "Use $humanize to rewrite this narrative for its intended human audience without changing its claims, uncertainty, or commitments."

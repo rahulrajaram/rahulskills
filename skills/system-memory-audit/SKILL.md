@@ -1,139 +1,105 @@
 ---
 name: system-memory-audit
-description: Audit system-wide memory health, kernel tunables, swap pressure, and top memory consumers, then recommend safe tuning actions.
-argument-hint: "[optional output script path]"
+description: Audit Linux system-wide memory health, swap activity, PSI, kernel tunables, and top consumers. Use for system memory health or tuning; for one named process with longitudinal growth, use memleak-investigate.
+argument-hint: ""
 ---
 
 # System Memory Audit
 
-Comprehensive system-wide memory health audit with kernel tunable analysis and tuning recommendations.
+Produce a read-only, evidence-backed snapshot. High usage, nonzero swap, or a
+large process is not by itself evidence of a leak or harmful pressure.
 
-## When to Use
+## Routing and safety
 
-Use when the user says "memory audit", "system memory audit", "tune memory", "memory tuning", "check memory health", or asks why the system is swapping/thrashing.
+- Use this skill for whole-system health, contention, and tunable review.
+- Use `memleak-investigate` for a specific process across time.
+- The audit is read-only. Restarting/killing processes, changing OOM scores,
+  applying `sysctl`, and writing `/etc/sysctl.d` are separate privileged actions
+  that require an explicit proposal and user approval.
+- Do not install missing tools. Fall back to `/proc` and disclose limitations.
 
-Distinct from `/memleak-investigate` which traces per-process memory leaks with eBPF. This skill is a system-wide health audit + kernel tunable review.
-
-## Instructions
-
-Execute these phases in order, presenting findings after each phase.
-
-### Phase 1: System Overview
-
-Run these commands and summarize the results:
+## 1. Establish pressure and activity
 
 ```bash
 free -h
-cat /proc/meminfo | head -30
+sed -n '1,30p' /proc/meminfo
 vmstat 1 3
+cat /proc/pressure/memory 2>/dev/null || true
+cat /proc/pressure/io 2>/dev/null || true
 ```
 
-Check if deepmetrics is available and if so, extract PSI and top consumers:
-```bash
-command -v deepmetrics && deepmetrics --headless --once --no-bpf 2>/dev/null | jq -r 'select(.type=="system") | .psi' || echo "deepmetrics not available, using /proc directly"
-```
+Report `MemAvailable`, swap used, and `vmstat` swap-in/swap-out rates. PSI
+thresholds are workload- and window-dependent; describe sustained `some`/`full`
+stall time rather than applying universal warning percentages.
 
-Read PSI directly if needed:
-```bash
-cat /proc/pressure/memory 2>/dev/null || echo "PSI not available (kernel < 4.20)"
-cat /proc/pressure/cpu 2>/dev/null
-cat /proc/pressure/io 2>/dev/null
-```
+If `deepmetrics` is already installed, it may add context, but its absence is
+not an error and does not authorize installation.
 
-Highlight:
-- Total/used/available/cached memory
-- Swap usage and whether swap is actively being used
-- PSI pressure values (avg10 > 5% = warning, > 25% = critical)
-- vmstat si/so columns (swap in/out activity)
-
-### Phase 2: Kernel Tunable Audit
-
-Read current values and compare to recommended ranges:
+## 2. Read tunables without prescribing constants
 
 ```bash
-cat /proc/sys/vm/overcommit_memory      # 0=heuristic, 1=always, 2=never
-cat /proc/sys/vm/overcommit_ratio       # % of RAM for overcommit (when mode=2)
-cat /proc/sys/vm/swappiness             # 0-200, default 60
-cat /proc/sys/vm/vfs_cache_pressure     # default 100
-cat /proc/sys/vm/dirty_ratio            # default 20
-cat /proc/sys/vm/dirty_background_ratio # default 10
-cat /proc/sys/vm/min_free_kbytes        # minimum free memory reserved
-cat /proc/sys/vm/zone_reclaim_mode      # 0 or 1
+for key in overcommit_memory overcommit_ratio swappiness \
+  vfs_cache_pressure dirty_ratio dirty_background_ratio min_free_kbytes \
+  zone_reclaim_mode; do
+  printf '%s=' "$key"
+  cat "/proc/sys/vm/$key"
+done
 cat /proc/sys/kernel/pid_max
 ```
 
-Recommended ranges by workload:
-- **Developer workstation**: swappiness=10-30, dirty_ratio=10-20, min_free_kbytes=128000-256000
-- **Database server**: swappiness=1-10, overcommit_memory=2, dirty_ratio=5-10
-- **General server**: swappiness=30-60, dirty_ratio=15-25
+Compare values with kernel documentation, RAM size, NUMA layout, storage,
+allocator/database guidance, and observed workload. Do not label fixed ranges as
+universally safe. In particular, low swappiness is not always better,
+`overcommit_memory=2` can break workloads, and `min_free_kbytes` must not be set
+from a fixed workstation-sized range without kernel/RAM analysis.
 
-Flag any value outside the recommended range for the detected workload type.
+## 3. Enumerate actual consumers
 
-### Phase 3: Top Memory Consumers
+Sort by RSS bytes, not `%MEM`, and inspect every readable PID rather than the
+first directory entries:
 
 ```bash
-# Top 20 by RSS
-ps aux --sort=-%mem | head -21
+ps -e -o pid=,rss=,vsz=,comm= --sort=-rss | head -20
 
-# Per-process swap usage (top 20)
-for pid in $(ls /proc/ | grep -E '^[0-9]+$' | head -200); do
-  swap=$(grep VmSwap /proc/$pid/status 2>/dev/null | awk '{print $2}')
-  comm=$(cat /proc/$pid/comm 2>/dev/null)
-  if [ -n "$swap" ] && [ "$swap" -gt 0 ] 2>/dev/null; then
-    echo "$swap $pid $comm"
-  fi
+for status in /proc/[0-9]*/status; do
+  pid=${status#/proc/}; pid=${pid%/status}
+  awk -v pid="$pid" '
+    /^Name:/ {name=$2}
+    /^VmSwap:/ {swap=$2}
+    END {if (swap+0 > 0) print swap, pid, name}
+  ' "$status" 2>/dev/null
 done | sort -rn | head -20
 
-# OOM score ranking (top 20 most likely to be killed)
-for pid in $(ls /proc/ | grep -E '^[0-9]+$' | head -200); do
-  score=$(cat /proc/$pid/oom_score 2>/dev/null)
-  comm=$(cat /proc/$pid/comm 2>/dev/null)
-  if [ -n "$score" ] && [ "$score" -gt 0 ] 2>/dev/null; then
-    echo "$score $pid $comm"
-  fi
+for score in /proc/[0-9]*/oom_score; do
+  pid=${score#/proc/}; pid=${pid%/oom_score}
+  value=$(cat "$score" 2>/dev/null) || continue
+  name=$(cat "/proc/$pid/comm" 2>/dev/null) || name="?"
+  printf '%s %s %s\n' "$value" "$pid" "$name"
 done | sort -rn | head -20
 ```
 
-### Phase 4: Recommendations
+Processes can exit during enumeration and permissions can hide fields. Treat
+missing rows as sampling limitations. `oom_score` is a current kernel heuristic,
+not a guaranteed kill order.
 
-Based on findings from phases 1-3, provide specific recommendations:
+## 4. Diagnose before recommending
 
-1. **Immediate actions** — processes to restart, OOM score adjustments
-2. **Kernel tunable changes** — specific sysctl values with rationale
-3. **Monitoring** — what to watch going forward
+Correlate consumers with active swap I/O, PSI, OOM journal events, cgroup limits,
+and workload timing. Separate:
 
-### Phase 5: Generate Tuning Script
+- healthy cache use from reclaim pressure;
+- allocated-but-idle swap from current thrashing;
+- one large stable process from system-wide contention; and
+- host pressure from a cgroup/container limit.
 
-Generate `scripts/tune-memory.sh` (or user-specified path) with:
-- Current values as comments for rollback reference
-- Recommended sysctl changes
-- Persistence via `/etc/sysctl.d/99-deepmetrics-memory.conf`
-- A `--dry-run` flag that only prints what would change
-- A `--rollback` flag that restores original values
+Recommend monitoring or a per-process investigation when a single snapshot is
+insufficient. Do not recommend restarting a process solely because it ranks
+high by RSS.
 
-Example structure:
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
+## Output contract
 
-# Generated by deepmetrics system-memory-audit
-# Date: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-CURRENT_SWAPPINESS=$(cat /proc/sys/vm/swappiness)
-RECOMMENDED_SWAPPINESS=10
-
-if [[ "${1:-}" == "--dry-run" ]]; then
-    echo "Would change vm.swappiness from $CURRENT_SWAPPINESS to $RECOMMENDED_SWAPPINESS"
-    exit 0
-fi
-
-sysctl -w vm.swappiness=$RECOMMENDED_SWAPPINESS
-# ... more tunables ...
-
-# Persist
-cat > /etc/sysctl.d/99-deepmetrics-memory.conf <<SYSCTL
-vm.swappiness = $RECOMMENDED_SWAPPINESS
-SYSCTL
-```
-
-Always ask the user before generating or running the script. The script requires root to apply changes.
+Return system facts, pressure evidence, top consumers, tunable context,
+limitations, and prioritized recommendations. If changes may help, provide a
+read-only proposal containing current value, proposed value, rationale,
+workload assumptions, verification, rollback, and whether persistence is
+desired. Wait for explicit approval before generating or running an apply script.

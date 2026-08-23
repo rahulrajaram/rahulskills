@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frame Product Direction"
+  short_description: "Turn ambitious vision into a living product thesis"
+  default_prompt: "Use $frame-goals-constraints to work backward from the customer outcome and long-range destination, connect them through a credible first wedge, and produce a living product thesis with aligned customer, product, and technical language."

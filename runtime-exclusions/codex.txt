@@ -1,0 +1,3 @@
+# Codex ships a system-owned skill with this name. Keep the shared source for
+# Claude, but do not install a second divergent implementation into Codex.
+skill-creator

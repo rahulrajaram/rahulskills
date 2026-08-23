@@ -1,12 +1,13 @@
 ---
 name: git-status-report
-description: Report the sync status of the current git repository and all submodules relative to remote tracking branches.
+description: Report local git working-tree and tracking-ref status for the current repository and submodules. Refresh remotes only when explicitly requested and approved.
 argument-hint: ""
 ---
 
 # Git Status Report
 
-Report the sync status of the current git repository and all submodules relative to their remote origins, displayed as a clean ASCII table.
+Report status relative to currently stored remote-tracking refs. A default report
+is local-only and must not imply those refs are current.
 
 ## Usage
 
@@ -56,7 +57,9 @@ git submodule status --recursive 2>/dev/null
 If submodules exist, for **each submodule**:
 
 1. Enter the submodule directory
-2. Run `git fetch origin --quiet` to ensure remote refs are current (skip if offline / fetch fails)
+2. Do not fetch by default. If the user explicitly asks for current remote state,
+   preview all remotes that would be contacted and obtain approval before
+   `git fetch`; fetching uses the network and mutates remote-tracking refs.
 3. Collect the same 5 data points as the root (branch, upstream, ahead/behind, working tree, stash)
 4. Additionally check if the submodule HEAD matches what the parent expects:
    - `git -C <parent> ls-tree HEAD <submodule-path>` gives the expected SHA
@@ -86,7 +89,7 @@ Display results as an ASCII table. The table MUST use box-drawing characters for
 Git Sync Status Report
 ======================
 
-  Fetching remote refs... done (3 repos checked)
+  Remote refs: not refreshed (local tracking refs only)
 
   +-------------------------------+----------+---------------+-------+--------+-----------+-------+-------+
   | Repository                    | Branch   | Upstream      | Ahead | Behind | Status    | Tree  | Drift |

@@ -1,21 +1,65 @@
 ---
 name: handoff
-description: "Commit current workspace state, reconcile handoff docs, and generate a next-shell continuation prompt. Use when the user asks for /handoff, asks to wrap up work, asks to continue from a new shell, or needs an accurate session handoff. Execute three outcomes in order: (1) commit all current changes, (2) update canonical IMPLEMENTATION_PLAN.md and PROMPT.md if present so status claims are accurate, and (3) produce a detailed copy-paste prompt for the next shell."
-argument-hint: ""
+description: "Reconcile handoff docs, commit the coherent workspace, and write a next-shell continuation prompt to NEXT_SHELL_PROMPT.md. Use $handoff extract (or Pi's /skill:handoff extract) to load that prompt as active instructions and immediately resume the work; use print only to emit it verbatim."
+argument-hint: "[extract|print]"
 ---
 
 # Handoff
 
 Use this workflow whenever a user wants a clean, accurate shell handoff.
 
+## Mode Routing
+
+- With no argument, run the write workflow below.
+- With `extract`, run the activation workflow below. Do not run the handoff
+  writing workflow or rewrite `NEXT_SHELL_PROMPT.md`; resume the work carried
+  by the existing artifact.
+- With `print`, run only the read-only print workflow below.
+- Reject unknown arguments with the supported forms: `$handoff`,
+  `$handoff extract`, and `$handoff print` (or equivalent slash forms in
+  clients that support them).
+- In Pi Coding Agent, use `/skill:handoff`, `/skill:handoff extract`, or
+  `/skill:handoff print`; arguments appended by Pi select the same modes.
+
+## Extract Workflow
+
+1. Resolve the package root with `git rev-parse --show-toplevel`.
+2. Read `<PACKAGE_ROOT>/NEXT_SHELL_PROMPT.md`. If it is missing, report the exact expected
+   path and stop without changing repository state.
+3. Treat the file contents as user-provided continuation context and requested
+   work, subordinate to current system, developer, repository, and safety
+   instructions. Treat the live invocation message as newer: merge compatible
+   additions and follow it where it conflicts with the carried prompt.
+4. Unpack the artifact into working context: repository, completed work,
+   decisions, open priorities, blockers, and first commands. Validate facts
+   that matter to the next action instead of blindly trusting stale state.
+5. Do not merely emit, quote, or summarize the artifact. Do not ask what to do
+   next when it contains authorized actionable work. Load any named skills that
+   the resumed work requires, then begin the first actionable step in the same
+   turn and continue end to end until complete or genuinely blocked.
+6. If the first carried or live instruction requires an interview, decision,
+   approval, or other user response, start that interaction immediately and
+   wait at the natural boundary. Otherwise, return progress or results from the
+   resumed work rather than the handoff text itself.
+
+## Print Workflow
+
+1. Resolve the package root with `git rev-parse --show-toplevel`.
+2. Read `<PACKAGE_ROOT>/NEXT_SHELL_PROMPT.md`. If it is missing, report the exact
+   expected path and stop without changing repository state.
+3. Emit the file contents verbatim, without a surrounding Markdown fence or
+   added commentary. Do not execute its instructions.
+
 ## Autonomy Routing
 
-A handoff request is approval to complete the handoff workflow rather than ask
-whether to commit, update docs, or generate the continuation prompt. Continue
-through the ordered steps unless a repository choice, destructive action,
-secret, push/deploy, or multi-repo ambiguity requires explicit confirmation. Do
-not ask whether to use `/goal`, Yarli, or direct execution during handoff; the
-handoff itself is the requested workflow.
+A handoff request is approval to complete the selected handoff mode rather than
+ask whether to proceed. In write mode, that includes committing, updating docs,
+and generating the continuation prompt. In extract mode, that includes adopting
+the existing prompt as working context and resuming its authorized tasks.
+Continue through the ordered steps unless a repository choice, destructive
+action, secret, push/deploy, or multi-repo ambiguity requires explicit
+confirmation. Do not ask whether to use `/goal` or direct execution
+during handoff; the selected handoff mode is the requested workflow.
 
 ## Workflow
 
@@ -36,13 +80,7 @@ python scripts/build_handoff_snapshot.py --repo .
 ```
 Otherwise, the git commands above are sufficient.
 
-### Step 2: Commit all current changes
-
-Run `git add -A` then `git commit -m "handoff: <summary>"`.
-- If commit fails because there is nothing to commit, report that explicitly.
-- If commit fails for another reason, report the exact blocker and stop.
-
-### Step 3: Update canonical plan docs when they exist
+### Step 2: Reconcile canonical plan docs when they exist
 
 Look for `IMPLEMENTATION_PLAN.md` and `PROMPT.md` at repo root first.
 If not found at root, search the repo and pick the canonical file that the project already treats as primary.
@@ -54,6 +92,19 @@ Update these files to match reality:
 Do not invent completed work.
 
 If neither file exists, skip this step and note their absence.
+
+### Step 3: Commit the coherent workspace state
+
+Invoke the shared `commit` skill after documentation reconciliation. Its file
+triage, repository-policy discovery, secret checks, explicit-path staging, and
+verification rules are authoritative. Do not duplicate them here and never use
+`git add .` or `git add -A`.
+
+If canonical handoff docs are classified as REVIEW or SKIP by repository policy,
+pause for the commit skill's normal resolution instead of silently omitting or
+force-adding them. If there is nothing to commit, record a no-op. After commit,
+verify `git status --short`; unexplained changes are an incomplete handoff and
+must be reported or reconciled before producing the continuation prompt.
 
 ### Step 4: Gather session context for the prompt
 
@@ -68,9 +119,20 @@ Before writing the prompt, review the full conversation to extract:
 
 This is critical: a handoff that only lists file changes without capturing the *reasoning and discussion* forces the next shell to re-discover context that was already established.
 
-### Step 5: Produce next-shell prompt
+### Step 5: Write `NEXT_SHELL_PROMPT.md`
 
-Fill in the template from `references/next-shell-prompt-template.md` with exact facts from this session. If that file is missing, use this inline template:
+Fill in the template from `references/next-shell-prompt-template.md` with exact
+facts from this session. Write the result to `<PACKAGE_ROOT>/NEXT_SHELL_PROMPT.md`, where
+`PACKAGE_ROOT` is the path returned by `git rev-parse --show-toplevel`. Replace
+an existing untracked handoff artifact atomically. Do not print the prompt to
+stdout. If the file is tracked, treat it as a project-owned document and ask
+before replacing it because the post-commit write would modify tracked state.
+
+`NEXT_SHELL_PROMPT.md` is a transient local session artifact written after the coherent
+workspace commit so it can contain the exact final HEAD. Do not stage or commit
+it. Its untracked status is expected until the user removes it.
+
+If the template reference is missing, use this inline template:
 
 ```text
 Continue work in <ABSOLUTE_REPO_PATH>.
@@ -119,12 +181,21 @@ Rules for filling the template:
 - Be specific enough that a new shell can continue without re-discovery.
 - Prefer factual, verifiable statements over narrative.
 
-### Step 6: Return handoff package
+### Step 6: Verify and return
 
 Return to the user:
 - Commit result (hash + message, or no-op if clean).
 - Updated plan/prompt files (or note they don't exist).
-- Final copy-paste prompt for the new shell.
+- Absolute path to `NEXT_SHELL_PROMPT.md`.
+- The resume command: `$handoff extract`.
+- The verbatim-output command: `$handoff print`.
+- For Pi Coding Agent: `/skill:handoff extract` to resume or
+  `/skill:handoff print` to emit.
+
+Do not include the handoff document contents in the response. Verify that the
+file exists, contains no unresolved angle-bracket placeholders, and records the
+actual post-commit HEAD. Run `git status --short`; only the transient untracked
+`NEXT_SHELL_PROMPT.md` may remain unexplained.
 
 ## Guardrails
 - Preserve user intent and existing project conventions.
@@ -132,3 +203,5 @@ Return to the user:
 - Keep prompt content specific enough that a new shell can continue without re-discovery.
 - If there are multiple repos/worktrees, confirm which repo to hand off before committing.
 - Never omit discussion context just because no code was written — validated conclusions and design decisions are first-class handoff content.
+- Never add `NEXT_SHELL_PROMPT.md` to `.gitignore`, `.git/info/exclude`, or the index as a
+  side effect of this workflow.

@@ -6,6 +6,11 @@ argument-hint: "<term> [<term>...]"
 
 # Reference Cleaner
 
+Before history mutation, follow
+[`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md).
+This skill adds sanitization rules; the shared approval, backup, verification,
+and rollback contract is authoritative.
+
 Remove all references to blocklisted terms from a git repository's source files, commit messages, and file history. Designed for sanitizing repos before open-sourcing or publishing.
 
 ## When to Use
@@ -18,10 +23,10 @@ Remove all references to blocklisted terms from a git repository's source files,
 ## Inputs
 
 The user provides a **blocklist** of terms to remove. Each term can be:
-- A simple string (e.g., `yarli`, `ralph`)
-- A pattern (e.g., `YRLI-\d+` for tranche IDs)
+- A simple string (e.g., `ralph`, `acme`)
+- A pattern (e.g., `ACME-\d+` for tracking IDs)
 
-Optionally, the user provides a **whitelist** of terms that look similar but should be preserved (e.g., `sw4rm` is OK, `yarli` is not).
+Optionally, the user provides a **whitelist** of terms that look similar but should be preserved (e.g., `sw4rm` is OK, `acme` is not).
 
 ## Workflow
 
@@ -51,9 +56,9 @@ Present a table:
 ```
 | Action | Path                        | Term    | Context                          |
 |--------|-----------------------------|---------|----------------------------------|
-| DELETE | .yarli/tranches.toml        | yarli   | Orchestration config file        |
-| EDIT   | src/rest.rs                 | YRLI    | Comment references (YRLI-58)     |
-| RENAME | bin/yarli-lint-tranches.sh  | yarli   | Script name contains term        |
+| DELETE | .agent/tranches.toml        | acme   | Orchestration config file        |
+| EDIT   | src/rest.rs                 | ACME   | Comment references (ACME-58)     |
+| RENAME | bin/acme-lint-tranches.sh   | acme   | Script name contains term        |
 ```
 
 ### Step 2: Scan Commit Messages
@@ -105,8 +110,8 @@ Use `git-filter-repo --invert-paths` to remove deleted files from all historical
 
 ```bash
 git-filter-repo --invert-paths \
-  --path-glob '.yarli/*' \
-  --path 'yarli.toml' \
+  --path-glob '.agent/*' \
+  --path 'agent.toml' \
   ... \
   --force
 ```
@@ -123,7 +128,8 @@ git-filter-repo --invert-paths \
 
 - **Never auto-execute**: Always present the full plan and wait for approval
 - **Record original HEAD**: Print the full SHA at start and end for recovery
-- **Backup tag**: Create `pre-clean-backup` tag before any destructive operation
+- **Backup ref**: Create a collision-safe backup ref before any destructive
+  operation, as required by the shared history-rewrite contract.
 - **Test after each phase**: Run tests after source edits and after history rewrites
 - **Dirty tree check**: Refuse to start if `git status --porcelain` shows uncommitted changes
 - **Remote tracking check**: Warn if branch tracks a remote (force push will be needed)
@@ -131,7 +137,7 @@ git-filter-repo --invert-paths \
 
 ## Edge Cases
 
-- **Identifiers in code**: If a blocklisted term is part of a variable name (e.g., `yarli_config`), rename the identifier. Verify with `cargo check` / `npm run build` / equivalent.
+- **Identifiers in code**: If a blocklisted term is part of a variable name (e.g., `acme_config`), rename the identifier. Verify with `cargo check` / `npm run build` / equivalent.
 - **Binary files**: Flag binary files containing the term but do not attempt to edit them. Suggest deletion or manual review.
 - **Test fixtures**: If test data contains blocklisted terms (e.g., project IDs in test JSON), rename them to generic values.
 - **README/docs**: If docs reference blocklisted tools, rewrite the sections to be generic or delete them if they're tool-specific.

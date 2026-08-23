@@ -6,6 +6,10 @@ argument-hint: "[N] [--all] [--batch] [--max-passes M]"
 
 # Squash Commits
 
+Before rewriting commits, follow
+[`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md).
+This skill adds grouping and message composition only.
+
 Analyze a range of git commits, identify contiguous groups that share a theme, and squash them non-interactively with clean commit messages following git conventions.
 
 ## Usage
@@ -55,17 +59,15 @@ Only commits that are **adjacent** in `git log` order are candidates. If commit 
 
 These contiguous sequences should be squashed:
 
-1. **Yarli workspace merges + reapplies**: A `yarli: merge workspace result for tranche-XXX` followed by `yarli: reapply pre-existing workspace state after merge` (and any intermediate yarli bookkeeping commits for the same run).
+1. **Handoff sequences**: Multiple `handoff:` commits updating docs in the same session.
 
-2. **Handoff sequences**: Multiple `handoff:` commits updating docs in the same session.
+2. **Fix + recovery pairs**: A commit that broke something followed immediately by its fix (e.g., `feat: add X` then `fix: correct X` where X is the same feature).
 
-3. **Fix + recovery pairs**: A commit that broke something followed immediately by its fix (e.g., `feat: add X` then `fix: correct X` where X is the same feature).
+3. **Multi-step feature work**: Implementation commit + its test commit + its doc commit, **only if contiguous** and clearly part of the same unit of work.
 
-4. **Multi-step feature work**: Implementation commit + its test commit + its doc commit, **only if contiguous** and clearly part of the same unit of work.
+4. **Identical repeated messages**: Multiple commits with the same or near-identical message (e.g., repeated `chore: sync workspace state`).
 
-5. **Identical repeated messages**: Multiple commits with the same or near-identical message (e.g., repeated `yarli: reapply pre-existing workspace state after merge`).
-
-6. **Chore batches**: Contiguous `chore:` commits doing related cleanup (e.g., lint fixes, formatting, dependency bumps in one session).
+5. **Chore batches**: Contiguous `chore:` commits doing related cleanup (e.g., lint fixes, formatting, dependency bumps in one session).
 
 ### NOT Candidates
 
@@ -82,7 +84,7 @@ All squashed commit messages MUST follow these conventions:
 ### Subject Line
 - **Imperative mood**: "Add feature" not "Added feature" or "Adds feature"
 - **Max 72 characters**
-- **Conventional prefix**: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `yarli:`, `handoff:`
+- **Conventional prefix**: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `handoff:`
 - **Capitalize** first word after prefix
 - **No trailing period**
 - **Be specific**: avoid generic "Consolidate related work" unless requested
@@ -147,7 +149,7 @@ Present a **table** to the user:
 ```
 | # | Group Label              | Commits | SHA Range          | Proposed Message                        |
 |---|--------------------------|---------|--------------------|-----------------------------------------|
-| 1 | Yarli YRLI-52 workspace  | 3       | abc1234..def5678   | yarli: Complete YRLI-52 auth middleware  |
+| 1 | Fix + recovery pair      | 2       | abc1234..def5678   | feat: Shareable AI session command |
 | 2 | Handoff docs update      | 2       | 111aaaa..222bbbb   | handoff: Update session handoff docs    |
 ```
 
@@ -157,13 +159,13 @@ Flag groups as high risk if any of these are true:
 - More than 300 files changed
 - More than 20,000 lines touched
 - Crosses a named phase or milestone boundary
-- Crosses multiple tranche waves or repeated hotspot files
+- Crosses multiple work waves or repeated hotspot files
 
 Also explicitly call out:
 - whether the group is at the tip of history
 - how many later commits would need to be replayed after the rewrite
-- whether the range contains Yarli-style `task`, `merge`, `auto-repair`, or
-  `reapply` commits, since these are often replay-sensitive
+- whether the range contains automated workspace-merge, auto-repair,
+  `reapply`, or conflict-fix commits, since these are often replay-sensitive
 
 ### Step 3: Confirm
 
@@ -273,20 +275,19 @@ Run all of the above checks. If any warnings fire:
 Squash complete.
   Original HEAD: <full 40-char SHA>
   Current HEAD:  <full 40-char SHA>
-  Backup tag:    pre-squash-backup
+  Backup ref:    <collision-safe backup ref>
   To restore:    git reset --hard <original HEAD SHA>
   Repo health:   OK (clean tree, no locks, no dangling rebase)
 ```
 
 ## Safety Guardrails
 
-- **Unpushed-only by default**: The scan range is scoped to unpushed commits (`$UPSTREAM..HEAD`) unless `--all` is passed. This prevents accidentally proposing to rewrite published history. When `--all` is used, warn prominently that a force push will be required.
-- **Dirty working tree**: If `git status --porcelain` shows uncommitted changes, refuse to proceed. Ask the user to commit or stash first.
-- **Never auto-squash**: Always present the plan and wait for approval.
-- **Never use --force**: Do not force-push. If the user needs to push after squashing, inform them they'll need `git push --force-with-lease` and let them do it.
-- **Original HEAD recorded**: The full 40-char HEAD SHA is captured in Step 0 and printed at both the start and end of the run. This is the authoritative recovery point — it survives even if the backup tag is lost.
-- **Backup ref**: Before rebasing, create a backup ref: `git tag -f pre-squash-backup` pointing at the original HEAD so the user can recover with `git reset --hard pre-squash-backup`.
-- **Per-pass backup tags in batch mode**: Create `pre-big-band-<N>-YYYYMMDD` before each pass.
+- The shared history-rewrite contract governs clean-tree checks, approval,
+  backups, verification, rollback, and shared-history boundaries.
+- Scan unpushed commits by default. `--all` only broadens the preview; it does
+  not authorize rewriting pushed history or force-pushing.
+- Create collision-safe backup refs rather than overwriting a fixed tag.
+- Create a separate backup ref before every approved batch pass.
 - **Prefer small passes**: Rewrite the smallest contiguous group that buys a
   meaningful reduction. Do not squash across multiple tranche waves at once
   unless the user explicitly accepts the replay risk.
@@ -306,62 +307,8 @@ Squash complete.
   - Allow at most one rerere-assisted retry
   - If still conflicted, abort and stop batch mode
 - **Diminishing returns stop**: In batch mode, stop when no contiguous group has 3+ commits or expected reduction is <= 1 commit/pass.
-- **Post-squash health check**: After completion, verify no rebase state dirs (`.git/rebase-merge`, `.git/rebase-apply`), no stale lock files (`.git/index.lock`, `.git/refs/heads/*.lock`), and working tree is clean. Report any anomalies.
-
-## Example Sessions
-
-### Default (unpushed only)
-
-```
-User: /squash-commits
-
-Claude:
-Original HEAD: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-To restore:    git reset --hard a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-
-Upstream: origin/master (8 commits ahead)
-Scanning 8 unpushed commits...
-
-Found 2 squash groups among 8 unpushed commits:
-
-| # | Group Label              | Commits | SHA Range          | Proposed Message                              |
-|---|--------------------------|---------|--------------------|-------------------------------------------------|
-| 1 | Ideate feature           | 3       | abc1234..def5678   | feat: Add ideate subcommand with pager          |
-| 2 | Clippy fix + recovery    | 2       | 333cccc..444dddd   | fix: Resolve clippy warnings in rest.rs          |
-
-3 commits remain untouched (standalone).
-Result: 8 commits → 5 commits. No force push needed.
-
-Approve this plan? [Approve / Conservative (3+ only) / Custom / Cancel]
-```
-
-### With --all (includes pushed history)
-
-```
-User: /squash-commits 30 --all
-
-Claude:
-Original HEAD: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-To restore:    git reset --hard a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-
-⚠ Including pushed commits — squashing will require force push.
-Scanning last 30 commits...
-
-Found 4 squash groups among 30 commits:
-...
-```
-
-### After squash completes
-
-```
-Squash complete.
-  Original HEAD: a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-  Current HEAD:  f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5
-  Backup tag:    pre-squash-backup
-  To restore:    git reset --hard a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-  Repo health:   OK (clean tree, no locks, no dangling rebase)
-  Tests:         67 passed, 0 failed
-```
+- After completion, verify no rebase state directories or stale lock files and
+  confirm the tree is clean. Report anomalies rather than deleting locks.
 
 ## Related Skills
 

@@ -12,21 +12,18 @@ Use Kokoro TTS to read text out loud.
 
 **If no arguments (default):** Read your most recent response from this conversation out loud. Look at the last message you sent to the user and read that text.
 
-Run this Python code with the appropriate text:
+Do not speak secrets, credentials, private keys, or large code/data payloads.
+Ask before speaking content that may be confidential or surprising in the
+user's physical environment. Read [references/kokoro.md](references/kokoro.md)
+for backend, audio, and voice details.
+
+Pass text through stdin so it is data, never interpolated Python code:
 
 ```bash
-python3 -c "
-from kokoro_voice.tts import tts_kokoro
-from kokoro_voice.barge import play_audio_with_barge
-
-text = '''TEXT_TO_SPEAK'''
-
-print(f'Speaking: {text[:100]}...' if len(text) > 100 else f'Speaking: {text}')
-audio = tts_kokoro(text, voice='af_heart')
-if audio is not None:
-    play_audio_with_barge(audio, 24000, enable_barge=False)
-    print('Done.')
-"
+printf '%s' "$TEXT_TO_SPEAK" | python3 "$SKILL_DIR/scripts/speak.py"
 ```
 
-Replace TEXT_TO_SPEAK with either the provided arguments or your last response text. Keep the text concise - strip any code blocks, file paths, or formatting that wouldn't sound natural when spoken.
+Set `TEXT_TO_SPEAK` from the arguments or the last response without shell
+evaluation. Keep it concise; strip code blocks, file paths, and formatting that
+would not sound natural. If Kokoro or audio playback is unavailable, report the
+missing dependency or device and do not install or reconfigure it implicitly.
