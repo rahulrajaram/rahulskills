@@ -1,9 +1,7 @@
 ---
 name: analyze-conversation
-description: Analyze completed conversations for anti-patterns, tooling gaps, and learnings
+description: "Analyze a completed conversation retrospectively for anti-patterns, tooling gaps, and durable learnings, then generate a markdown report. Use for postmortems of finished sessions or when the user explicitly says /analyze-conversation. Do not use for live, in-progress checks; use check-antipatterns instead."
 argument-hint: "[conversation-id]"
-author: system
-version: 1.0.0
 ---
 
 # Conversation Analyzer
@@ -17,7 +15,7 @@ Performs comprehensive post-mortem analysis of conversations to extract:
 ## Autonomy Routing
 
 When invoked, generate the retrospective artifact directly. Do not turn the
-analysis into a choice between `/goal`, Yarli, or direct execution. If the report
+analysis into a choice between `/goal` and direct execution. If the report
 identifies clear low-risk wording or tooling fixes and the user asked to fix the
 problem, continue into those fixes after reporting the findings; otherwise stop
 after producing the retrospective.
@@ -29,10 +27,13 @@ after producing the retrospective.
 The underlying report generator can also be run directly:
 
 ```bash
-python ~/.agents/skills/analyze-conversation/generate_report.py --current
-python ~/.agents/skills/analyze-conversation/generate_report.py --id <conversation-id>
-python ~/.agents/skills/analyze-conversation/generate_report.py <conversation-jsonl>
+python ~/.codex/skills/analyze-conversation/generate_report.py --current
+python ~/.codex/skills/analyze-conversation/generate_report.py --id <conversation-id>
+python ~/.codex/skills/analyze-conversation/generate_report.py <conversation-jsonl>
 ```
+
+(Claude Code installs scripts alongside this manifest at
+`~/.claude/skills/analyze-conversation/`; substitute that path there.)
 
 ## Arguments
 
@@ -41,7 +42,15 @@ python ~/.agents/skills/analyze-conversation/generate_report.py <conversation-js
 
 ## Output
 
-Generates a comprehensive retrospective report in markdown format at `~/.claude/retrospectives/[conversation-id].md`
+Generates a retrospective report at
+`~/.claude/retrospectives/[conversation-id]_retrospective.md`. The directory is
+created on first successful run.
+
+## Shared taxonomy
+
+Treat `check-antipatterns/rules.json` as the canonical live rule taxonomy when
+both skills are installed. This retrospective may add longitudinal and tooling
+findings, but it must not redefine the shared rule meanings.
 
 ## What It Analyzes
 
@@ -131,11 +140,13 @@ The generated report includes:
 
 ## Implementation
 
-This skill uses Python scripts located in `~/.claude/skills/analyze-conversation/`:
+This skill uses scripts beside this manifest (normally
+`~/.codex/skills/analyze-conversation/` for Codex or
+`~/.claude/skills/analyze-conversation/` for Claude Code):
 
 - **analyzer.py**: Main analysis engine that parses JSONL conversations
 - **patterns.py**: Pattern detectors for each anti-pattern type
-- **templates/**: Markdown templates for report generation
+- **generate_report.py**: CLI, Codex transcript normalization, and report writer
 
 The analyzer reuses the analysis scripts created during retrospective analysis and enhances them with:
 - Report generation in structured markdown
@@ -144,6 +155,12 @@ The analyzer reuses the analysis scripts created during retrospective analysis a
 - Success metric tracking
 - Codex JSONL normalization for `~/.codex/sessions` transcripts
 - Autonomy-break detection for user re-prompts and assistant workflow-routing questions
+
+If `--current` cannot identify a readable transcript, list the newest candidate
+JSONL files under `~/.codex/sessions` without printing their contents and ask the
+user to choose. Do not silently analyze a different session. On malformed or
+unreadable JSONL, report the path and parse/access error; do not emit a partial
+report as if it were complete.
 
 ## Benefits
 

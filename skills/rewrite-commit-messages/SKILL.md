@@ -6,6 +6,10 @@ argument-hint: "[commit-range]"
 
 # Rewrite Commit Messages
 
+Before mutation, follow
+[`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md).
+This skill adds message-specific transformations only.
+
 Safely rewrite existing git commit messages using `git filter-repo`.
 
 Use this skill when the user wants to:
@@ -63,8 +67,8 @@ Rules:
 Require explicit mappings in this format:
 
 ```text
-old: yarli: auto-repair merge conflict for tranche-014-i345
-new: yarli: Finalize tranche I345 shell runtime merge
+old: chore: auto-repair merge conflict for release-014
+new: chore: Finalize release-014 runtime merge
 ```
 
 Rules:
@@ -86,8 +90,8 @@ Example:
 
 ```text
 Rewrite plan:
-  old: yarli: auto-repair merge conflict for tranche-014-i345
-  new: yarli: Finalize tranche I345 shell runtime merge
+  old: chore: auto-repair merge conflict for release-014
+  new: chore: Finalize release-014 runtime merge
   matches: 1
 ```
 
@@ -95,16 +99,13 @@ Do not proceed without explicit approval.
 
 ### Step 4 — Create a backup ref
 
-Create a recovery tag before rewriting:
+Create a collision-safe recovery ref before rewriting (do not overwrite an
+existing backup):
 
 ```bash
-git tag -f pre-filter-repo-backup "$(git rev-parse HEAD)"
-```
-
-For repeated passes, prefer unique tags such as:
-
-```bash
-pre-filter-repo-backup-YYYYMMDD-HHMMSS
+backup="refs/tags/pre-filter-repo-backup-$(date -u +%Y%m%dT%H%M%SZ)"
+git show-ref --verify --quiet "$backup" && { echo "backup exists" >&2; exit 1; }
+git update-ref "$backup" "$(git rev-parse HEAD)"
 ```
 
 ### Step 5 — Run git filter-repo in message-only mode

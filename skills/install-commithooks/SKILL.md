@@ -17,8 +17,8 @@ If no path is provided, the source is resolved automatically (see below).
 ## Source Resolution Order
 
 1. **Explicit argument**: If a path is passed, use it.
-2. **Local default**: `~/Documents/commithooks/`
-3. **GitHub clone**: Clone `https://github.com/rahulrajaram/commithooks.git` to `~/Documents/commithooks/`.
+2. **Local default**: `${COMMITHOOKS_DIR:-$HOME/Documents/commithooks}`
+3. **GitHub clone**: Clone `https://github.com/rahulrajaram/commithooks.git` to `$COMMITHOOKS_DIR` after user approval.
 
 Validate the resolved directory contains `lib/` with at least `common.sh`. Abort with a clear error if not.
 
@@ -265,7 +265,7 @@ Next steps:
 | Dispatchers already installed | Skip individual hooks, refresh lib/ |
 | core.hooksPath is set | Unset it, switch to .git/hooks/ method |
 | Symlinked hooks in .githooks/ | Treat as existing, do not overwrite |
-| GitHub clone needed | Clone to ~/Documents/commithooks/ (persistent) |
+| GitHub clone needed | Clone to `$COMMITHOOKS_DIR` after user approval |
 | Not in a git repo | Clear error, do not git init |
 | Active rebase/merge | Abort with explanation |
 | .githooks in .gitignore | Warn that stubs won't be tracked |

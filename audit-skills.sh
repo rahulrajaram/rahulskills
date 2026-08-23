@@ -31,13 +31,12 @@ skill_root_dir() {
 build_pattern() {
     local names=()
 
-    for file in "$BLOCKLIST_FILE"; do
-        [[ -f "$file" ]] || continue
+    if [[ -f "$BLOCKLIST_FILE" ]]; then
         while IFS= read -r line; do
             [[ -z "$line" || "$line" == \#* ]] && continue
             names+=("$line")
-        done < "$file"
-    done
+        done < "$BLOCKLIST_FILE"
+    fi
 
     # Hardcoded personal-path patterns (home dir + Documents subtree)
     local path_re='/home/[^/]+/Documents/[^ ]*'
@@ -71,8 +70,12 @@ scan_files() {
     while IFS= read -r file; do
         [[ -f "$file" ]] || continue
         local matches
-        if matches="$(grep -nE "$pattern" "$file" 2>/dev/null)"; then
+        if matches="$(grep -niE "$pattern" "$file" 2>/dev/null)"; then
             while IFS= read -r match; do
+                # Ignore the canonical /home/example/ placeholder used in test fixtures.
+                case "$match" in
+                    *"/home/example/"*|*"-home-example-"*) continue ;;
+                esac
                 echo "$file:$match"
                 violations=$((violations + 1))
             done <<< "$matches"
@@ -98,7 +101,10 @@ do_check() {
     echo "Pattern: $pattern"
     echo ""
 
-    find "$root" -type f 2>/dev/null | scan_files "$pattern"
+    find "$root" \
+        -type d -name __pycache__ -prune -o \
+        -type f ! -name '*.pyc' ! -name '*.pyo' -print \
+        2>/dev/null | scan_files "$pattern"
 
     local rc=$?
     [[ $rc -eq 0 ]] && echo "All clean."

@@ -161,8 +161,8 @@ Group the DAG into phases. Include:
 - suggested parallel workstreams when they are genuinely independent,
 - the next 3 to 7 executable actions.
 
-If the active project uses Yarli and the user asks to enqueue work, translate
-the executable leaves into tranches only after the decomposition is accepted.
+If the active project uses a queueing system and the user asks to enqueue
+work, route through that mechanism only after the decomposition is accepted.
 
 ## Quality checks
 

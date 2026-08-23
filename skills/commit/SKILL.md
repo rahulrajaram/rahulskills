@@ -11,10 +11,10 @@ to determine whether it should actually be committed.
 
 ## Autonomy Routing
 
-A commit request is approval to triage, stage appropriate files, compose a
+A commit request is approval to triage, stage repository-appropriate files, compose a
 conventional commit message, and create the commit without turning the routine
 path into an approval loop. Ask only when the assessment contains REVIEW items,
-ALLOWED overrides, secrets, destructive cleanup, global ignore choices, or a
+ALLOWED overrides, secrets, destructive cleanup, ignore-policy changes, or a
 message/scope decision that materially affects user intent. Do not ask whether
 to use another workflow wrapper unless the user is really requesting history
 cleanup, PR creation, or handoff.
@@ -45,6 +45,12 @@ Collect:
 - Untracked files
 - Whether the branch has unpushed commits
 
+Read repository policy before classifying: applicable `AGENTS.md`/`CLAUDE.md`,
+`.gitignore`, contribution docs, tracked-file status, and recent history for
+ambiguous generated or planning files. Repository policy outranks the generic
+heuristics below unless it would expose a secret or violate an active safety
+instruction.
+
 Also check for a human-maintained override file:
 
 ```bash
@@ -71,21 +77,27 @@ file, assign ALLOWED before applying any SKIP rule. ALLOWED always wins over
 SKIP. Never assign ALLOWED based on your own judgement — only based on what
 is written in the allow file by the human.
 
-#### Auto-SKIP — never commit these (unless overridden in commit-allow)
+#### Default SKIP heuristics for untracked files
 
-**Planning / AI session artifacts**
-- `VISION.md`, `IMPLEMENTATION_PLAN.md`, `PROMPT.md`, `RALPH_PROMPT.md`
+Apply these defaults when repository policy and history do not establish that a
+file belongs in version control. A tracked file modified by the requested work
+is normally COMMIT; do not untrack it merely because its name matches a generic
+pattern. Contradictions between repository policy and these heuristics are
+REVIEW, not silent SKIP.
+
+**Untracked planning / AI session artifacts**
+- `VISION.md`, `IMPLEMENTATION_PLAN.md`, `PROMPT.md`, `RALPH_PROMPT.md`, `NEXT_SHELL_PROMPT.md`
 - `IDEAS.md`, `DECISIONS_LOG.txt`, `RFC_INSTRUCTIONS.md`, `ISSUES_FOUND.md`
 - `PHASE_*_SUMMARY.md`, `PHASE_*_IMPLEMENTATION.md`
 - `*VALIDATION*.md`, `*VALIDATION*.txt`, `UNDOCUMENTED_APIS*.md`
 
-**Agent runtime state**
-- `.yarli/`, `.yarl/`, `.yore/`, `.yore-test/`, `.yore-audit/`
+**Untracked agent runtime state**
+- `.yore/`, `.yore-test/`, `.yore-audit/`
 - `.cultivar/`, `.claude/` (session state only), `.codex/`, `.agent/`
 - `.ralph/`, `.haake/`, `.workmerge/`, `.worktrees/`, `.playwright-mcp/`
-- `artifacts/`, `agent_reports/`, `yarli.toml`
+- `artifacts/`, `agent_reports/`
 
-**Build / cache / generated**
+**Untracked build / cache / generated output**
 - `__pycache__/`, `*.pyc`, `*.pyo`, `.mypy_cache/`, `.ruff_cache/`, `.pytest_cache/`
 - `target/` (Rust), `node_modules/`, `dist/`, `out/`, `.next/`, `.nuxt/`
 - `*.egg-info/`, `.tox/`, `htmlcov/`, `coverage/`, `.nyc_output/`
@@ -103,7 +115,7 @@ the allow file. Flag them as SKIP and warn the user explicitly.
 `README.md`, `CHANGELOG.md`, `CHANGES.md`, `LICENSE.md`, `CONTRIBUTING.md`,
 `SECURITY.md`, `CODE_OF_CONDUCT.md`
 
-#### Auto-COMMIT — stage without asking
+#### Default COMMIT heuristics
 
 - Source files: `.py`, `.rs`, `.ts`, `.js`, `.tsx`, `.jsx`, `.go`, `.hs`,
   `.sh`, `.bash`, `.css`, `.scss`, `.html`, `.sql`
@@ -147,43 +159,17 @@ If all staged files are ordinary COMMIT verdicts and all SKIP handling is
 unambiguous, continue without a second approval; the user's commit request is
 the approval.
 
-### Step 3b — Persist ignores for SKIP'd files
+### Step 3b — Respect repository ignore policy
 
-After the user confirms, handle each SKIP'd file so it stops appearing in
-`git status` in future runs.
+SKIP means "leave unstaged" for this invocation. It does not authorize changing
+global Git configuration, writing `~/.config/git/ignore`, editing `.gitignore`,
+deleting files, or removing tracked files from the index. Never run
+`git rm --cached` as commit housekeeping.
 
-The canonical global ignore file is `~/.config/git/ignore` — git finds it
-automatically (XDG default). No `core.excludesFile` configuration is needed.
-
-```bash
-GLOBAL="${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore"
-```
-
-For each SKIP'd file:
-
-| Situation | Action |
-|-----------|--------|
-| Pattern already in `~/.config/git/ignore` | File was force-added — run `git rm --cached <file>` if tracked |
-| Matches a known category but missing from global | Add pattern to `~/.config/git/ignore` |
-| Novel file, no known category | Ask: **global** (`~/.config/git/ignore`) or **local** (`.gitignore`)? |
-| Spurious file the user wants deleted | Offer `rm -rf` — never delete without explicit confirmation |
-
-```bash
-# Add a missing pattern
-grep -qF "PATTERN" "$GLOBAL" || echo "PATTERN" >> "$GLOBAL"
-```
-
-Prefer basename patterns (`VISION.md`) over full paths, and glob patterns
-(`PHASE_*_SUMMARY.md`) over literals where the category is broad.
-
-If `~/.config/git/ignore` does not exist:
-```bash
-mkdir -p "${XDG_CONFIG_HOME:-$HOME/.config}/git"
-touch "${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore"
-```
-
-**Never write to `.githooks/commit-allow`** — that file is human-maintained.
-If you think a file deserves an override, tell the user and let them decide.
+If ignored noise is recurring, report the exact paths and recommend a
+repository-local policy change for separate approval. Only edit `.gitignore`
+when the user explicitly requests that change and it belongs to this repository.
+Never write `.githooks/commit-allow`; it is human-maintained.
 
 ### Step 4 — Stage approved files
 
