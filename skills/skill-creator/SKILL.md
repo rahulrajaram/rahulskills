@@ -35,7 +35,7 @@ python scripts/audit_catalog.py --strict
 ./stitch-skills.sh assemble
 ```
 
-The validator checks that `~/.agents/skills/<skill-name>/SKILL.md` and
+The validator checks that `~/.codex/skills/<skill-name>/SKILL.md` and
 `~/.claude/skills/<skill-name>/SKILL.md` both exist, both have frontmatter with
 `name` and `description`, and are byte-identical. Runtime-only metadata
 exceptions must be explicit before they are allowed:

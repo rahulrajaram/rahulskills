@@ -3,13 +3,16 @@
 # so Pi loads the repository copies directly (repo = single source of truth).
 #
 # Pi discovers skills from (in order): ~/.pi/agent/skills/, ~/.agents/skills/,
-# then project-local .pi/skills and .agents/skills. The first match wins, so a
-# stale copy in ~/.pi/agent/skills/ shadows the synced one. This script makes
-# every repo skill available to Pi via a symlink pointing back at the repo, so
-# Pi and the repo can never drift.
+# then project-local .pi/skills and .agents/skills. Pi scans ~/.agents/skills/
+# as a global location, so that directory must stay EMPTY for the two harnesses
+# (codex owns ~/.codex/skills/, claude owns ~/.claude/skills/) to avoid
+# duplicate-name collision warnings. This script makes every repo skill
+# available to Pi via a symlink pointing back at the repo, so Pi and the repo
+# can never drift.
 #
-# Existing real directories are moved aside to <dir>.pre-pi-sync before being
-# replaced with symlinks; nothing is deleted. Honors .exclude-skills.
+# Existing real directories are moved aside to backups under
+# ~/.pi/agent/backups/ (outside Pi's scan dirs) before being replaced with
+# symlinks; nothing is deleted. Honors .exclude-skills.
 #
 # Safety: refuses to run as root, and skill names are validated as plain
 # single directory names (no / or ..) so a crafted name cannot escape the
@@ -19,6 +22,7 @@ set -euo pipefail
 SKILLS_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_SKILLS_DIR="$SKILLS_DIR/skills"
 PI_SKILLS_DIR="${PI_SKILLS_DIR:-$HOME/.pi/agent/skills}"
+BACKUP_ROOT="${PI_SKILLS_DIR%/skills}/backups"
 EXCLUDE_FILE="$SKILLS_DIR/.exclude-skills"
 DRY_RUN=0
 
@@ -48,8 +52,11 @@ With no skill names, every repo skill is installed. With skill names, only
 those skills are processed.
 
 Honors .exclude-skills (one name per line, # comments ignored).
-Existing real directories are renamed to <name>.pre-pi-sync and replaced with
-symlinks; existing symlinks are re-pointed. Nothing is deleted.
+Existing real directories are renamed to <name>.pre-pi-sync under
+~/.pi/agent/backups/ (outside Pi's scan dirs) and replaced with symlinks;
+existing symlinks are re-pointed. Stale symlinks into deleted repo skills and
+leftover .pre-pi-sync dirs are pruned so Pi reports no collisions. Nothing is
+deleted.
 EOF
     exit 0
 }
@@ -82,6 +89,33 @@ already_linked() {
     [[ -L "$link" ]] && [[ "$(readlink "$link")" == "$target" ]]
 }
 
+prune_dst() {
+    # Remove stale/broken symlinks and relocate *.pre-pi-sync backups out of
+    # the scanned skill dir (pi scans every subdir for SKILL.md and reports
+    # name collisions across global locations).
+    [[ -d "$PI_SKILLS_DIR" ]] || return 0
+    local entry base target dest
+    for entry in "$PI_SKILLS_DIR"/*; do
+        [[ -e "$entry" || -L "$entry" ]] || continue
+        base="$(basename "$entry")"
+        if [[ -L "$entry" ]]; then
+            target="$(readlink "$entry")"
+            if [[ ! -e "$entry" || "$target" != "$REPO_SKILLS_DIR/"* ]]; then
+                echo "  PRUNE (stale symlink): $base"
+                [[ $DRY_RUN -eq 1 ]] || rm "$entry"
+            fi
+        elif [[ "$base" == *.pre-pi-sync ]]; then
+            dest="$BACKUP_ROOT/$base"
+            if [[ ! -e "$dest" ]]; then
+                echo "  MOVE (backup out of scan path): $base -> $dest"
+                [[ $DRY_RUN -eq 1 ]] || { mkdir -p "$BACKUP_ROOT"; mv "$entry" "$dest"; }
+            else
+                echo "  SKIP (backup already archived): $base"
+            fi
+        fi
+    done
+}
+
 install_one() {
     local name="$1"
     local src="$REPO_SKILLS_DIR/$name"
@@ -110,13 +144,14 @@ install_one() {
 
     mkdir -p "$PI_SKILLS_DIR"
     if [[ -e "$dst" && ! -L "$dst" ]]; then
-        local bak="$dst.pre-pi-sync"
+        local bak="$BACKUP_ROOT/$name.pre-pi-sync"
         if [[ -e "$bak" ]]; then
             local n=1
             while [[ -e "$bak.$n" ]]; do n=$((n + 1)); done
             bak="$bak.$n"
         fi
         echo "    backed up existing dir to $bak"
+        mkdir -p "$BACKUP_ROOT"
         mv "$dst" "$bak"
     fi
     ln -sfn "$src" "$dst"
@@ -129,6 +164,8 @@ main() {
         echo "Dry run - no changes will be made"
     fi
     echo "Pi skills directory: $PI_SKILLS_DIR"
+
+    prune_dst
 
     if [[ ${#SELECTED[@]} -gt 0 ]]; then
         for name in "${SELECTED[@]}"; do
@@ -151,8 +188,9 @@ main() {
 
     echo ""
     echo "Done. Restart Pi sessions to pick up the new skills."
-    echo "Pi loads ~/.pi/agent/skills/ first, then ~/.agents/skills/, so the"
-    echo "symlinked repo copies take precedence over any synced copies."
+    echo "Pi scans ~/.pi/agent/skills/ and ~/.agents/skills/. The ~/.agents/skills/"
+    echo "directory must stay empty (codex owns ~/.codex/skills/, claude owns"
+    echo "~/.claude/skills/), so the symlinked repo copies are the only ones Pi sees."
 }
 
 main "$@"

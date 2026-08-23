@@ -10,14 +10,17 @@ Shared AI agent skills and shell scripts for Claude Code and OpenAI Codex CLI. T
 
 This repo collects skills (prompt-based automation units) for two AI coding assistants:
 
-- **Codex** (`~/.agents/skills/`) -- OpenAI Codex CLI skills
+- **Codex** (`~/.codex/skills/`) -- OpenAI Codex CLI skills
 - **Claude Code** (`~/.claude/skills/`) -- Claude Code skills
 
 Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `skills/` directory in this repo is the single source of truth, synced to both locations.
 
 Pi Coding Agent resolves skills from `~/.pi/agent/skills/` first, then the
-assembled Codex location at `~/.agents/skills/`, then project-local
-`.pi/skills/` and `.agents/skills/`; the first match wins. Run
+assembled Codex location at `~/.codex/skills/` and any other location in its
+discovery chain. Pi also scans `~/.agents/skills/` as a global location, so
+that directory must stay **empty** — codex owns `~/.codex/skills/` and claude
+owns `~/.claude/skills/`, and a duplicate name in `~/.agents/skills/` would
+make Pi report a collision for every skill. Run
 [`install-pi-skills.sh`](#install-pi-skills.sh) after cloning or pulling to link
 every repo skill into `~/.pi/agent/skills/` so Pi loads the repository copies
 directly and never a stale shadowing copy. Invoke a skill explicitly in Pi as
@@ -59,7 +62,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ### Skills (39)
 
-Synced to both `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
+Synced to both `~/.codex/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
 | Skill | Description |
 |-------|-------------|
@@ -117,8 +120,11 @@ the repository copies directly (repo = single source of truth).
 ```
 
 Pi resolves `~/.pi/agent/skills/` before `~/.agents/skills/`, so existing real
-directories are moved to `<name>.pre-pi-sync` and replaced with symlinks pointing
-back at this repo; nothing is deleted. Honors `.exclude-skills`.
+directories are moved to `~/.pi/agent/backups/<name>.pre-pi-sync` (outside Pi's
+scan dirs) and replaced with symlinks pointing back at this repo; nothing is
+deleted. The installer also prunes stale symlinks into deleted repo skills and
+leftover `.pre-pi-sync` dirs, so Pi reports no skill collisions. Honors
+`.exclude-skills`.
 
 ### `stitch-skills.sh`
 
@@ -127,7 +133,7 @@ Assembles generic skills with CLI-specific overlays and installs to both CLIs.
 ```bash
 ./stitch-skills.sh repo-layout   # Validate skills/ and overlays/ directories
 ./stitch-skills.sh assemble      # Build assembled output in build/ from skills/ + overlays/
-./stitch-skills.sh install       # Assemble + install to ~/.agents/skills, ~/.claude/skills
+./stitch-skills.sh install       # Assemble + install to ~/.codex/skills, ~/.claude/skills
 ./stitch-skills.sh check         # Compare assembled output against installed locations
 ./stitch-skills.sh all           # repo-layout + install + check
 ```
@@ -189,7 +195,7 @@ cd ~/Documents/rahulskills
 `setup.sh` handles everything:
 1. Clones [commithooks](https://github.com/rahulrajaram/commithooks) to `~/Documents/commithooks/` if not already present
 2. Installs hook dispatchers into `.git/hooks/` and library modules into `.git/lib/`
-3. Optionally deploys skills to `~/.agents/skills/` and `~/.claude/skills/`
+3. Optionally deploys skills to `~/.codex/skills/` and `~/.claude/skills/`
 
 Pass `--skip-skills` to skip the interactive skill deployment prompt.
 

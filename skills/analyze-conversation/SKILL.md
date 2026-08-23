@@ -27,10 +27,13 @@ after producing the retrospective.
 The underlying report generator can also be run directly:
 
 ```bash
-python ~/.agents/skills/analyze-conversation/generate_report.py --current
-python ~/.agents/skills/analyze-conversation/generate_report.py --id <conversation-id>
-python ~/.agents/skills/analyze-conversation/generate_report.py <conversation-jsonl>
+python ~/.codex/skills/analyze-conversation/generate_report.py --current
+python ~/.codex/skills/analyze-conversation/generate_report.py --id <conversation-id>
+python ~/.codex/skills/analyze-conversation/generate_report.py <conversation-jsonl>
 ```
+
+(Claude Code installs scripts alongside this manifest at
+`~/.claude/skills/analyze-conversation/`; substitute that path there.)
 
 ## Arguments
 
@@ -138,7 +141,8 @@ The generated report includes:
 ## Implementation
 
 This skill uses scripts beside this manifest (normally
-`~/.agents/skills/analyze-conversation/`):
+`~/.codex/skills/analyze-conversation/` for Codex or
+`~/.claude/skills/analyze-conversation/` for Claude Code):
 
 - **analyzer.py**: Main analysis engine that parses JSONL conversations
 - **patterns.py**: Pattern detectors for each anti-pattern type

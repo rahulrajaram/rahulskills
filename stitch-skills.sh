@@ -6,7 +6,7 @@ SKILLS_DIR="$ROOT_DIR/skills"
 OVERLAYS_DIR="$ROOT_DIR/overlays"
 BUILD_DIR="$ROOT_DIR/build"
 
-CODEX_INSTALL="$HOME/.agents/skills"
+CODEX_INSTALL="$HOME/.codex/skills"
 CLAUDE_SKILLS_INSTALL="$HOME/.claude/skills"
 
 CLIS=(claude codex)
@@ -246,7 +246,9 @@ install_skills() {
 
     local skill_name installed=0
 
-    # Codex: ~/.agents/skills/ — overwrite managed skills, leave others untouched
+    # Codex: ~/.codex/skills/ — overwrite managed skills, leave others untouched.
+    # NOT ~/.agents/skills: pi scans that global dir and would report a
+    # duplicate-name collision for every codex copy.
     mkdir -p "$CODEX_INSTALL"
     for skill_dir in "$BUILD_DIR/codex/skills"/*/; do
         [[ -d "$skill_dir" ]] || continue
