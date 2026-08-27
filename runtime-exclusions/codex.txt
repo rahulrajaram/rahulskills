@@ -1,3 +1,8 @@
-# Codex ships a system-owned skill with this name. Keep the shared source for
-# Claude, but do not install a second divergent implementation into Codex.
+# Codex ships these system-owned skills. Keep any shared package source where
+# useful for other runtimes, but never install a second divergent Codex copy.
+imagegen
+openai-docs
+plugin-creator
+review-agent
 skill-creator
+skill-installer
