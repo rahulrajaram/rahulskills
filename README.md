@@ -60,7 +60,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (45)
+### Package-managed skills (46)
 
 Authored in this package and deployed to Pi, Codex, and Claude Code. Runtime
 exclusions prevent package copies from shadowing system-owned Codex skills.
@@ -110,6 +110,7 @@ exclusions prevent package copies from shadowing system-owned Codex skills.
 | `system-memory-audit` | Audit Linux system-wide memory health, swap, PSI, and top consumers |
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
+| `whitepaper` | Author an investor-facing enterprise whitepaper (case for building a product) with YC-flavored, un-theatrical voice, cost/revenue model, naming/branding, and a branded PDF with embedded fonts |
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
 
