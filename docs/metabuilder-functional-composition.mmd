@@ -2,55 +2,77 @@
 flowchart TB
     entry(["ENTRY · a typed ObjectiveRequest value arrives"])
 
-    subgraph Legend["Shape is kind · color is status"]
-        legend_function["Callable or pure function · rectangle"]
-        legend_artifact[("Immutable typed value · cylinder")]
+    subgraph Legend["Shape is category · color is status"]
+        legend_function["Callable skill or function · rectangle"]
+        legend_artifact[/"Immutable typed value · parallelogram"/]
         legend_runtime[["Runtime function · subroutine"]]
+        legend_gate(["Human authority gate · stadium · principal decides"])
         legend_current["BLUE · currently supported"]
         legend_proposed["GREEN · proposed or missing"]
         legend_improve["ORANGE · current but needs improvement"]
     end
 
-    subgraph Prepare["Prepare one authorized objective"]
-        request[("PROPOSED VALUE · ObjectiveRequest<br/>requester, principal, objective, delegation proof")]
-        prepare["PROPOSED COMPOSITE FUNCTION · prepareObjective"]
-        prepared[("PROPOSED VALUE · PreparedObjective<br/>thesis, decisions, DAG, authority envelope")]
-        prepare_note["INTERNAL CALLABLE PHASES<br/>authorizeRequest → frameGoalsAndConstraints → grillMaterialUnknowns<br/>→ principalRatify → decomposeObjective → deriveAttenuatedEnvelope"]
+    subgraph Prepare["PROPOSED COMPOSITION BOUNDARY · prepareObjective"]
+        request[/"PROPOSED VALUE · ObjectiveRequest<br/>requester, principal, objective, delegation proof"/]
+        authorize["PROPOSED AUTHORITY FUNCTION · authorizeRequest<br/>checks the delegation proof; a requester cannot appoint itself principal"]
+        frame["PROPOSED SKILL · frame-goals-constraints<br/>callable phase frameGoalsAndConstraints"]
+        thesis[/"PROPOSED VALUE · ProductThesis"/]
+        grill["PROPOSED SKILL · grilling<br/>callable phase grillMaterialUnknowns"]
+        decisions[/"PROPOSED VALUE · DecisionRecord"/]
+        ratify(["PROPOSED HUMAN AUTHORITY GATE · principalRatify<br/>the principal owns meaning, success, and reserved decisions"])
+        decompose["PROPOSED SKILL · objective-to-dag-decomposition<br/>callable phase decomposeObjective"]
+        dag[/"PROPOSED VALUE · ExecutionDag"/]
+        envelope["PROPOSED AUTHORITY FUNCTION · deriveAttenuatedEnvelope<br/>attenuates the ratified ceiling; never widens it"]
+        prepared[/"PROPOSED VALUE · PreparedObjective<br/>thesis, decisions, DAG, authority envelope"/]
     end
 
     subgraph Compose["Resolve a reproducible composition"]
-        catalog[("PROPOSED VALUE · ContractCatalog<br/>contracts plus execution bindings")]
-        recipe[("PROPOSED VALUE · RecipeSpec")]
+        catalog[/"PROPOSED VALUE · ContractCatalog<br/>contracts plus execution bindings"/]
+        recipe[/"PROPOSED VALUE · RecipeSpec"/]
         resolve["PROPOSED PURE FUNCTION · resolve"]
-        resolved[("PROPOSED VALUE · ResolvedGraph")]
+        resolved[/"PROPOSED VALUE · ResolvedGraph"/]
         create_lock["PROPOSED PURE FUNCTION · createResolutionLock"]
-        lock[("PROPOSED VALUE · ResolutionLock")]
+        lock[/"PROPOSED VALUE · ResolutionLock"/]
     end
 
     subgraph Build["Compile and admit using current MetaBuilder machinery"]
         compile[["CURRENT RUNTIME FUNCTION · compileHarness"]]
-        bundle[("CURRENT VALUE · content-addressed HarnessBundle")]
+        bundle[/"CURRENT VALUE · content-addressed HarnessBundle"/]
         admit[["CURRENT RUNTIME FUNCTION · admitBundle"]]
-        admitted[("CURRENT VALUE · AdmittedBundle")]
+        admitted[/"CURRENT VALUE · AdmittedBundle"/]
     end
 
     subgraph Execute["Execute, observe, verify, and qualify"]
         run[["CURRENT RUNTIME FUNCTION · runHarness"]]
-        claim[("CURRENT RULE · worker Claim")]
+        claim[/"CURRENT VALUE · worker Claim"/]
         observe[["CURRENT RUNTIME FUNCTION · controllerObserve"]]
-        observation[("CURRENT VALUE · Observation")]
+        observation[/"CURRENT VALUE · Observation"/]
         verify["PROPOSED FUNCTION · controllerVerify"]
-        record[("PROPOSED VALUE · VerificationRecord")]
+        record[/"PROPOSED VALUE · VerificationRecord"/]
         qualify[["CURRENT BUT IMPRECISE · qualifyOutcome"]]
-        outcome[("FinalOutcome<br/>accepted, rejected, unknown, or bounded stop")]
+        outcome[/"FinalOutcome<br/>accepted, rejected, unknown, or bounded stop"/]
     end
 
     exit(["EXIT · qualified result or explicit bounded stop"])
 
     entry -.-> request
-    request -.-> prepare
-    prepare -.-> prepared
-    prepare -.-> prepare_note
+    request -.-> authorize
+    authorize -.-> frame
+    frame -.-> thesis
+    thesis -.-> grill
+    grill -.-> decisions
+    decisions -.-> ratify
+    ratify -.-> decompose
+    decompose -.-> dag
+    dag -.-> envelope
+    envelope -.-> prepared
+
+    phase_note["PHASE RESULTS ARE CLAIMS<br/>Each callable skill phase returns a claim.<br/>The controller verifies it independently before the result flows on as evidence."]
+    frame -.-> phase_note
+
+    authority_note["AUTHORITY IS AN INPUT<br/>The authority envelope inside PreparedObjective is a ceiling.<br/>Resolution may attenuate it; no function or worker may widen it."]
+    prepared -.-> authority_note
+    authority_note -.-> resolve
 
     prepared -.-> resolve
     catalog -.-> resolve
@@ -58,10 +80,6 @@ flowchart TB
     resolve -.-> resolved
     resolved -.-> create_lock
     create_lock -.-> lock
-
-    authority_note["AUTHORITY IS AN INPUT<br/>The authority envelope inside PreparedObjective is a ceiling.<br/>Resolution may attenuate it; no function or worker may widen it."]
-    prepared -.-> authority_note
-    authority_note -.-> resolve
 
     lock -.-> compile
     compile --> bundle
@@ -88,10 +106,10 @@ flowchart TB
     classDef relationship fill:#fef3c7,stroke:#111827,stroke-width:1.5px,color:#000000;
 
     class compile,bundle,admit,admitted,run,claim,observe,observation,legend_current current;
-    class request,prepare,prepared,catalog,recipe,resolve,resolved,create_lock,lock,verify,record,legend_proposed proposed;
+    class request,authorize,frame,thesis,grill,decisions,ratify,decompose,dag,envelope,prepared,catalog,recipe,resolve,resolved,create_lock,lock,verify,record,legend_proposed proposed;
     class qualify,legend_improve improve;
-    class entry,exit,outcome,legend_function,legend_artifact,legend_runtime neutral;
-    class prepare_note,authority_note,claim_note,kernel_note relationship;
+    class entry,exit,outcome,legend_function,legend_artifact,legend_runtime,legend_gate neutral;
+    class phase_note,authority_note,claim_note,kernel_note relationship;
 
     style Legend fill:#ffffff,stroke:#111827,stroke-width:1.5px
     style Prepare fill:#ffffff,stroke:#16a34a,stroke-width:2px,stroke-dasharray:6 4
