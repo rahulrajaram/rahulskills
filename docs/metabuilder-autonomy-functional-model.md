@@ -34,7 +34,7 @@ status. Border weight communicates architectural importance.
 | --- | --- | --- |
 | Actor | Stadium | Person, agent, controller, operator, approver, or verifier |
 | Callable phase | Rectangle | Function-like transformation with a declared contract |
-| Artifact | Cylinder | Immutable typed value, claim, observation, lock, or record |
+| Artifact | Parallelogram in the functional view; cylinder in the authority and runtime views | Immutable typed value, claim, observation, lock, or record |
 | Runtime component | Subroutine | Compiler, broker, runner, interpreter, or durable store |
 | Decision | Diamond | Pure branch over an explicit value |
 | Rule | Yellow note | Standing invariant or evidence boundary |
@@ -155,21 +155,16 @@ prepareObjective
   -> Task (Result PreparationError PreparedObjective)
 
 prepareObjective request = do
-  authorized <- fromResult (authorizeRequest request)
+  authorized <- authorizeRequest request
 
-  thesisClaim <- frameGoalsAndConstraints authorized
-  thesis      <- controllerVerify thesisClaim
-
-  decisionsClaim <- grillMaterialUnknowns thesis
-  decisions      <- principalRatify request.principal decisionsClaim
-
-  planClaim <- decomposeObjective thesis decisions
-  plan      <- controllerVerify planClaim
-
+  thesis    <- frameGoalsAndConstraints authorized
+  decisions <- grillMaterialUnknowns thesis
+  ratified  <- principalRatify request.principal decisions
+  plan      <- decomposeObjective thesis ratified
   authority <- deriveAttenuatedEnvelope
     request.principal
     authorized
-    decisions
+    ratified
 
   pure PreparedObjective
     { thesis
@@ -178,6 +173,62 @@ prepareObjective request = do
     , authority
     }
 ~~~
+
+`prepareObjective` is a composition boundary, not a single callable phase.
+Its internal chain is exactly:
+
+ObjectiveRequest -> authorizeRequest -> frame-goals-constraints ->
+ProductThesis -> grilling -> DecisionRecord -> principalRatify ->
+objective-to-dag-decomposition -> ExecutionDag -> deriveAttenuatedEnvelope ->
+PreparedObjective.
+
+Each skill phase returns a claim; the controller verifies it independently
+before the value flows on as evidence. Ratification is a human authority gate:
+the principal, not a skill, accepts or refuses the decisions record. The
+attenuated envelope is derived from the ratified ceiling and may never widen it.
+
+The same chain can be sketched as a left-to-right pipeline over typed values:
+
+~~~haskell
+prepareObjective
+  =   authorizeRequest
+  >>> frameGoalsAndConstraints
+  >>> grillMaterialUnknowns
+  >>> principalRatify
+  >>> decomposeObjective
+  >>> deriveAttenuatedEnvelope
+
+-- equivalently, right to left:
+
+prepareObjective
+  =   deriveAttenuatedEnvelope
+  .   decomposeObjective
+  .   principalRatify
+  .   grillMaterialUnknowns
+  .   frameGoalsAndConstraints
+  .   authorizeRequest
+
+-- (conceptual phase order; see the qualifications below)
+~~~
+
+This sketch is a conceptual phase order, not a type- or dataflow-equivalent
+formulation of the `do` block above. It is idealized in five ways:
+
+1. Each skill edge is really `execute -> Claim -> controllerVerify -> verified
+   value`; claims never flow directly into the next phase's input.
+2. The dataflow has fan-out: `authorized`, `thesis`, and `ratified` are each
+   consumed more than once, so the faithful form is a small dependency graph,
+   not a unary chain. `decomposeObjective` consumes the thesis together with
+   the ratified decisions.
+3. Each arrow is really Kleisli composition `>=>` — over a composed effect such
+   as `ExceptT PreparationError Task`, since raw `Task (Result e a)` alone does
+   not provide short-circuiting `do` notation — and stage failures inject into
+   the common `PreparationError`.
+4. `principalRatify` and `deriveAttenuatedEnvelope` are not free functions of
+   the data alone: both are anchored to `request.principal`, exposed as an
+   explicit argument or reader environment rather than silent closure.
+5. The gate is an effectful authority interaction, not a pure function: refusal,
+   timeout, identity verification, and revocation are explicit outcomes.
 
 ## Composition and compilation
 
