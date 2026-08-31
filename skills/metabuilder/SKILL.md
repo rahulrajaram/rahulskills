@@ -15,6 +15,18 @@ description: "Use MetaBuilder to define, compile, inspect, run, recover, or impr
 5. State the target, exact objective, acceptance evidence, effects, bounds,
    source identity, and stop conditions.
 
+For consumer work, use the installed CLI and verify its public guidance before
+authoring artifacts:
+
+```bash
+command -v metabuilder
+metabuilder --help
+metabuilder harness qualification guide
+```
+
+Do not substitute an uncommitted development binary unless the MetaBuilder
+maintainer has explicitly admitted and identified those exact bytes.
+
 Do not infer authority from this skill or the README.
 
 ## Choose a path
@@ -23,7 +35,9 @@ Use the README's current CLI sequence.
 
 - Compile a hand-authored Harness Module when one already exists.
 - Use the full grilling, brief, diagram, package, and generation path for a
-  fresh harness.
+  fresh harness only when current repository authority has activated that
+  path. If the README says fresh generation is deferred, hand-author a Harness
+  Module for qualification or stop at the unsupported boundary.
 - Use status, preview, effects, prepare, apply, monitor, and recover for an
   active run.
 
@@ -55,6 +69,12 @@ When the target exposes a MetaBuilder gap:
 7. Re-run the target harness through the new boundary.
 
 Do not bypass MetaBuilder and describe the result as governed.
+
+The `metabuilder self-host candidate ...` and
+`metabuilder self-improvement ...` command families are maintainer-only. Do
+not use them to build or qualify a consumer harness, infer target-write
+authority, or create an unattended consumer loop. Use the repository-local
+`metabuilder-consumer-qualification` skill for consumer assessment.
 
 ## Keep the target separate
 

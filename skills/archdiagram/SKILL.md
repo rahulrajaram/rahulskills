@@ -73,6 +73,34 @@ graph TD
 ```
 ````
 
+### Review-oriented Mermaid protocol
+
+For component, dependency, ecosystem, capability, or composition diagrams intended for architectural review, make the diagram explain both structure and judgment. Apply this protocol unless the user requests another visual system. Do not force these semantics onto sequence, class, ER, or state diagrams when they would not carry useful meaning.
+
+- Use a white canvas and white component boxes. Keep group or subgraph backgrounds white or nearly white.
+- Encode importance with border weight: major or orchestration components use a thick border; minor or specialized components use a thin border.
+- Encode disposition with border color while keeping the box fill white:
+  - Blue or neutral dark border: established component with no special disposition.
+  - Green border: missing, proposed, or future component.
+  - Orange border: existing component that needs improvement.
+  - Red border: redundant, deprecated, or consolidation/removal candidate.
+- Do not rely on color alone. Label proposed components and consolidation candidates explicitly, and include a legend whenever any disposition or importance styling is used.
+- Use solid arrows for established, currently supported relationships. Use dashed arrows for proposed, weakly defined, indirect, or untyped relationships, and explain that convention in the legend.
+- For non-obvious relationships, especially where the task asks about composition gaps, interpose a concise explanatory note between the connected boxes instead of relying on a terse edge label. Give note boxes a pale-yellow fill, black border, and black text. Each note should state what currently flows or composes across the relationship and what contract, artifact, authority, adapter, or verification is missing.
+- Keep factual and evaluative claims distinct. Never render a proposed or inferred component as existing; mark it as missing or future. Treat redundancy and improvement classifications as review judgments, not repository facts.
+- When detailed relationship notes make one canvas unreadable, preserve the overview and split dense areas into focused companion diagrams rather than shrinking text below practical reading size.
+
+For example, a Mermaid component diagram may use class definitions equivalent to:
+
+```
+classDef major fill:#ffffff,stroke:#1d4ed8,stroke-width:4px,color:#000000,font-weight:bold;
+classDef minor fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#000000;
+classDef missing fill:#ffffff,stroke:#16a34a,stroke-width:3px,color:#14532d,font-weight:bold;
+classDef improve fill:#ffffff,stroke:#f97316,stroke-width:3px,color:#7c2d12;
+classDef redundant fill:#ffffff,stroke:#dc2626,stroke-width:3px,color:#7f1d1d,font-weight:bold;
+classDef relationship fill:#fef3c7,stroke:#111827,stroke-width:1.5px,color:#000000;
+```
+
 **PlantUML (`--format plantuml`):**
 
 ````
@@ -151,5 +179,6 @@ The `--type` is free-form. Use best judgment:
 - Use meaningful labels, not file paths (e.g., "gRPC API" not "src/api/grpc.rs").
 - For deep review, the written summary should be concise (10-20 bullet points max).
 - Distinguish data flow from control flow when both are present (solid vs dashed lines).
+- For review-oriented Mermaid component diagrams, follow the visual and relationship-annotation protocol above.
 - If the system is too large for one diagram, state that and offer to break it into focused sub-diagrams.
 - Do not fabricate components that do not exist in the codebase or discussion.

@@ -1,0 +1,124 @@
+%%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
+flowchart TB
+    entry(["ENTRY · admitted bundle plus AuthorizedObjective"])
+
+    subgraph Legend["Shape is kind · color is status"]
+        legend_state[("Immutable state or record · cylinder")]
+        legend_pure["Pure reducer function · rectangle"]
+        legend_runtime[["Effectful runtime · subroutine"]]
+        legend_decision{"Decision · diamond"}
+        legend_note["Standing rule · yellow note"]
+        legend_current["BLUE · currently supported"]
+        legend_proposed["GREEN · proposed or missing"]
+        legend_improve["ORANGE · current but needs improvement"]
+    end
+
+    subgraph Durable["Controller-owned durable records"]
+        state_store[("CURRENT · RunState and exact bundle pins")]
+        journal[("CURRENT · intent, attempt, observation and event journal")]
+        checkpoints[("CURRENT · artifacts, receipts and checkpoints")]
+    end
+
+    subgraph Controller["MetaBuilder controller · owns the state transition"]
+        load[["CURRENT · load exact state and pins"]]
+        next["PURE FUNCTION · nextIntent state"]
+        next_choice{"Stop or execute?"}
+        persist[["CURRENT · persist prepared intent before dispatch"]]
+        broker[["CURRENT · capability and resource admission"]]
+        classify["FUNCTION · classify observation"]
+        outcome_choice{"Succeeded, failed,<br/>outcome unknown, or denied?"}
+        transition["PURE FUNCTION · transition state event"]
+        checkpoint[["CURRENT · persist next state and evidence"]]
+        stop_choice{"Acceptance reached,<br/>breaker tripped, or budget exhausted?"}
+    end
+
+    subgraph Effects["Effect interpretation"]
+        direct[["CURRENT · sandboxed direct-command interpreter"]]
+        agent[["MISSING · governed agent interpreter"]]
+        external[["MISSING · authenticated provider or external-effect adapter"]]
+        raw[("Raw adapter outcome")]
+    end
+
+    subgraph Evidence["Observation and verification"]
+        observe[["CURRENT · controller records Observation"]]
+        observation[("CURRENT · Observation")]
+        claim[("Worker output · Claim")]
+        verify[["PROPOSED · controller verification function"]]
+        record[("PROPOSED · VerificationRecord")]
+    end
+
+    subgraph Recovery["Ambiguous-outcome recovery"]
+        unknown[("CURRENT · EffectOutcomeUnknown")]
+        reconcile[["CURRENT · reconcile persisted intent and external state"]]
+        redispatch_rule["NO BLIND REDISPATCH<br/>An effect that may have happened is reconciled first.<br/>Replay reuses the persisted observation."]
+    end
+
+    exit_success(["EXIT · accepted qualified outcome"])
+    exit_stop(["EXIT · explicit bounded stop with evidence"])
+
+    entry --> load
+    state_store --> load
+    load --> next
+    next --> next_choice
+    next_choice -->|stop| exit_stop
+    next_choice -->|execute| persist
+    persist --> journal
+    persist --> broker
+    broker -->|admit current command| direct
+    broker -.->|future agent profile| agent
+    broker -.->|future external profile| external
+    broker -->|deny| outcome_choice
+
+    direct --> raw
+    agent -.-> claim
+    claim -.-> raw
+    external -.-> raw
+    raw --> observe
+    observe --> journal
+    observe --> observation
+    observation --> classify
+    classify --> outcome_choice
+
+    outcome_choice -->|succeeded| verify
+    outcome_choice -->|conclusive failure or denial| transition
+    outcome_choice -->|effect outcome unknown| unknown
+    unknown --> reconcile
+    reconcile --> journal
+    reconcile --> observation
+    unknown -.-> redispatch_rule
+
+    verify -.-> record
+    record -.-> transition
+    transition --> checkpoint
+    checkpoint --> checkpoints
+    checkpoint --> state_store
+    checkpoint --> stop_choice
+    stop_choice -->|continue within bounds| load
+    stop_choice -->|accepted| exit_success
+    stop_choice -->|breaker or budget| exit_stop
+
+    reducer_rule["FUNCTIONAL CORE<br/>nextIntent and transition are pure over immutable state.<br/>Only interpreters perform effects; observations return as explicit events."]
+    next -.-> reducer_rule
+    transition -.-> reducer_rule
+
+    assurance_rule["ASSURANCE DIMENSIONS<br/>Structural integrity, execution provenance, semantic adequacy and production readiness<br/>must be reported separately rather than collapsed into one qualified label."]
+    record -.-> assurance_rule
+
+    classDef current fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#000000,font-weight:bold;
+    classDef proposed fill:#ffffff,stroke:#16a34a,stroke-width:3px,color:#14532d,font-weight:bold;
+    classDef improve fill:#ffffff,stroke:#f97316,stroke-width:3px,color:#7c2d12,font-weight:bold;
+    classDef neutral fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#000000;
+    classDef relationship fill:#fef3c7,stroke:#111827,stroke-width:1.5px,color:#000000;
+
+    class state_store,journal,checkpoints,load,next,next_choice,persist,broker,classify,outcome_choice,transition,checkpoint,stop_choice,direct,raw,observe,observation,unknown,reconcile,entry,exit_success,exit_stop,legend_current current;
+    class agent,external,verify,record,legend_proposed proposed;
+    class claim,legend_improve improve;
+    class legend_state,legend_pure,legend_runtime,legend_decision neutral;
+    class redispatch_rule,reducer_rule,assurance_rule,legend_note relationship;
+
+    style Legend fill:#ffffff,stroke:#111827,stroke-width:1.5px
+    style Durable fill:#ffffff,stroke:#64748b,stroke-width:1.5px,stroke-dasharray:6 4
+    style Controller fill:#ffffff,stroke:#1d4ed8,stroke-width:2.5px
+    style Effects fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Evidence fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Recovery fill:#ffffff,stroke:#1d4ed8,stroke-width:2px
