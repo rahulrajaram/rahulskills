@@ -34,16 +34,27 @@ Use adaptive reasoning:
 Default loop:
 
 1. Orient on project state, project doctrine, recent work, proof artifacts, and
-   resource health.
-2. Reconstruct the active epic and acceptance criteria.
-3. Generate or refresh the next 10 candidate tasks.
-4. Rank candidates by strategic value, verification clarity, risk, locality,
-   dependency order, and resource cost.
-5. Select one bounded task.
-6. Execute that task with `autonomous-execution-contract`.
-7. Verify, checkpoint, and commit locally when permitted.
-8. Re-rank and either stop at a clean checkpoint or continue if the prompt
-   explicitly grants multi-slice/reactor execution.
+   resource health. On resume, verify stored authority/source digests and read
+   only changed authority unless a digest changed or evidence is missing.
+2. Reconstruct the active epic, stable acceptance IDs, proof schedule, budgets,
+   and stop rules as one compiled epic contract.
+3. At epic start, a major pivot, or an architecture-changing blocker, create or
+   refresh the typed execution DAG. Otherwise preserve it.
+4. Maintain a ranked ready frontier of at most 5 tasks. After a slice, rescore
+   only nodes whose dependencies, evidence, risk, or authority changed. A full
+   frontier refresh is due only at a pivot, compaction recovery, or detected
+   drift.
+5. Select one bounded task and express only its per-slice delta: task ID,
+   objective, selection reason, changed risk/authority, focused verification,
+   expected evidence, and budget delta.
+6. Execute that delta with `autonomous-execution-contract`, which inherits the
+   compiled epic invariants by reference and digest.
+7. Run focused verification, append the required checkpoint/receipt events,
+   and add the result to the current tranche.
+8. Commit when the tranche is coherent and the compiled proof schedule says
+   the commit or milestone gate is satisfied. A slice need not equal a commit.
+9. Rescore the affected frontier and either stop at a clean checkpoint or
+   continue if the prompt explicitly grants multi-slice/reactor execution.
 
 For ordinary "continue" prompts, complete one coherent loop iteration. For
 explicit multi-hour, multi-slice, epic-completion, "chain", or "reactor" prompts,
@@ -60,10 +71,12 @@ In reactor mode:
 
 1. Complete one bounded slice through `autonomous-execution-contract`.
 2. Verify the slice with focused checks.
-3. Commit locally when the slice is coherent and commits are permitted.
-4. Update the checkpoint source when progress is material.
-5. Re-read current git/resource/proof state.
-6. Re-rank the next 10 candidate tasks against the active epic.
+3. Append its result and proof receipt to the current tranche.
+4. Commit locally only when the tranche is coherent, commits are permitted,
+   and the compiled proof schedule is satisfied.
+5. Record mandatory checkpoint events and re-read only changed
+   git/resource/proof/authority state.
+6. Rescore the affected ready frontier; preserve unaffected DAG rankings.
 7. Start the next bounded slice only if all reactor continuation gates pass.
 
 ### Reactor Continuation Gates
@@ -86,14 +99,72 @@ Continue only when all are true:
 If the user grants reactor-style autonomy but does not specify a budget, use
 these defaults:
 
-- Stop after 5 local commits or 3 submodule commits plus parent checkpoints,
-  whichever comes first.
+- Stop after 4 hours of active controller work, 5 local commits, or 3 submodule
+  commits plus parent checkpoints, whichever comes first. Tool wait and user
+  wait are reported separately when the runtime exposes them.
+- Permit at most 2 expensive global-proof groups per activation unless the
+  compiled repository authority requires more or the user explicitly grants a
+  larger proof budget. A twice-green gate is one proof group with two runs.
 - Stop after 3 consecutive failures of the same verification target.
 - Stop before an expensive global proof unless the proof budget says it is due.
 - Stop at the first clean milestone where the next task would be a new epic.
+- External spend defaults to zero. Track any explicitly authorized cost against
+  a separate ceiling; never infer spend authority from a time or commit budget.
 
 If the user gives a smaller budget, obey it. If the user gives a larger budget,
 still enforce all guardrails and stop conditions.
+
+### Budget Precedence
+
+Before every expensive proof and before starting another slice, evaluate
+budgets in this order:
+
+1. authority and non-negotiable stop rules,
+2. safety/resource breakers,
+3. explicit user ceilings,
+4. proof-run and repeated-failure ceilings,
+5. active-time and external-cost ceilings,
+6. commit/tranche ceilings.
+
+A lower item never overrides a higher one. Reaching a budget produces a clean
+checkpoint/stop reason; it does not establish that the epic is complete.
+
+## Compiled Epic Contract
+
+Compile the following once at epic start and revise it only when authority or
+the epic changes:
+
+- stable epic ID, objective digest, and acceptance-criterion IDs;
+- authority/source digests and precedence;
+- stop rules and delegated/reserved decisions;
+- proof schedule: focused checks, milestone/global checks, repeat count, and
+  exact receipt-reuse conditions;
+- Git, checkpoint, resource, delegation, and external-cost policy;
+- execution DAG, ranked ready frontier, and budget ledger.
+
+The goal runtime may still expose only a flat objective. In that case, keep the
+compiled contract in the project's canonical checkpoint source and put a
+concise objective plus its digest in goal mode. Do not treat the flat goal as
+the whole campaign state.
+
+## Proof Schedule And Receipts
+
+Compile repository authority into one proof schedule before implementation.
+Project authority wins over this skill. If project rules and the requested
+budget conflict, surface the conflict once and stop only when authority cannot
+be satisfied.
+
+- Run focused checks after each coherent patch or slice.
+- Run expensive/global proof only when the compiled schedule says it is due.
+- A controller-owned receipt should record command/manifest, exit status,
+  duration, source commit/tree, lock/dependency identity, toolchain, features,
+  environment contract, and relevant artifact digests.
+- Reuse a receipt only when every identity field required by its proof policy is
+  unchanged. Agent testimony, matching prose, or a commit-message-only claim is
+  not a receipt.
+- Delegated deterministic proof need not be rerun merely because it was
+  delegated when the controller owns and validates such a receipt. Without a
+  valid receipt, rerun the acceptance check.
 
 ## Non-Negotiable Guardrails
 
@@ -139,15 +210,16 @@ Use precise slices of other skills. Do not load or follow their full workflows
 when a narrow contract is enough.
 
 - **`autonomous-execution-contract`**: use for each selected bounded task. Pass
-  objective, task source, selection rule, stop rules, verification, proof
-  budget, git policy, checkpoint policy, and parallelism boundaries.
+  the compiled epic-contract reference/digest plus the per-slice delta. Do not
+  retransmit unchanged stop, Git, proof, checkpoint, or delegation policy.
 - **`objective-to-dag-decomposition`**: use when the epic is vague, strategic,
   or spans multiple subsystems. Produce or refresh the DAG only at epic start,
   major pivots, or after a blocker changes the architecture.
-- **`next-todos`**: use its output discipline for the next 10 tasks: imperative,
-  specific, testable, one sentence each. Invoke the full skill only when the
-  user wants durable todo/tranche side effects; otherwise draft the list
-  directly to avoid accidental queue mutation.
+- **`next-todos`**: use its output discipline: imperative, specific, testable,
+  one sentence each. Use at most 5 ready-frontier tasks during execution; a
+  longer list is an epic-orientation artifact. Invoke the full skill only when
+  the user wants durable todo/tranche side effects; otherwise draft the
+  frontier directly to avoid accidental queue mutation.
 - **`git-status-report`**: use for sync/ahead/behind reporting or before a
   handoff. For quick local orientation, raw `git status --short --branch` and
   `git submodule status` are enough.
@@ -190,7 +262,8 @@ At the start of an epic or resumed loop:
 2. Read current git/submodule state.
 3. Read canonical project docs when present: project agent instructions,
    implementation plans, prompt/handoff docs, roadmap docs, benchmark reports,
-   and local handoff files.
+   and local handoff files. Record their digests. On later iterations, re-read
+   only changed authority or the narrow evidence needed by the selected task.
 4. Query memory for prior decisions and current house style when available.
 5. Check whether a local code index can safely improve impact analysis. Use it
    only if available and relevant.
@@ -198,6 +271,9 @@ At the start of an epic or resumed loop:
    blockers, and open risks.
 7. If the epic is still blurry, run a compact `objective-to-dag-decomposition`
    pass before task selection.
+8. Set an orientation budget appropriate to the repository. If orientation
+   keeps expanding without changing the ready frontier, stop reading and select
+   the smallest evidence-gathering task instead.
 
 ## Project Trajectory Compass
 
@@ -236,16 +312,13 @@ For each selected task, instantiate `autonomous-execution-contract` like this:
 Use autonomous-execution-contract.
 
 Objective: <one bounded task from the ranked epic backlog>
+Epic contract: <canonical path or goal checkpoint + objective/authority digest>
+Task ID: <stable DAG node ID>
 Task source: autonomy-loop ranked backlog for <epic>.
 Selection: selected because <strategic value>, <verification clarity>, and <dependency order>.
 Reasoning: low by default; escalate for architecture, safety, product/API, or repeated failure.
-Stop only for: push/deploy/publish, secrets, destructive cleanup, deletion outside project root,
-external shared state, unavailable required infra, or repeated same failure after the circuit breaker.
-Verification: <focused commands>; global proof only when proof budget says due.
-Proof budget: focused checks after each patch; expensive proof at milestone/final unless explicitly requested earlier.
-Git: local commits allowed when coherent; do not push.
-Checkpoint: update canonical plan/handoff docs after material progress.
-Parallelism: serial implementation unless file ownership and verification boundaries are independent.
+Slice delta: <changed authority/risk, focused commands, expected evidence, and budget delta only>.
+Inherited policy: <stop/Git/proof/checkpoint/delegation policy is loaded from the epic contract>.
 ```
 
 For reactor mode, add:
@@ -260,15 +333,26 @@ Reactor gates: clean checkpoint after each slice; re-rank before each next slice
 
 For an entire epic, maintain resumability:
 
+- When structured checkpoint state is warranted, emit append-only events that
+  conform to `references/checkpoint-event.schema.json`. This compatibility
+  format does not make a sidecar authoritative when the project already has a
+  canonical state mechanism.
+
 - Prefer project-native state: implementation plans, prompt/handoff docs, issue
   files, benchmark manifests, durable tranche files, or other canonical
   project state.
 - If no project-native state exists, create a concise local loop-state file
   only for substantial multi-step work.
-- Record completed tasks, current task, verification results, resource issues,
-  commits, submodule pointers, blockers, and the next recommended action.
+- Record stable acceptance and DAG IDs, completed/current tasks, verification
+  receipts, resource issues, budgets consumed, commits/tree identities,
+  blockers, rank changes with reasons, and the next ready frontier.
 - Commit checkpoints only when the workspace is internally consistent and
   verification appropriate to that checkpoint has passed.
+
+Append a checkpoint event after every commit, expensive proof run, budget or
+stop event, authority revision, and context compaction. Also checkpoint before
+a long command that risks losing recoverable state. A checkpoint is not a
+claim of completion.
 
 ## Stop Conditions
 
@@ -294,5 +378,9 @@ Report:
 - Commits created and whether anything was pushed.
 - Current branch, submodule pointers, and workspace cleanliness.
 - Resource state and cleanup performed when heavy resources were used.
+- Active/tool/wait/user-idle time and fresh/cached/output/reasoning tokens when
+  the runtime exposes them; otherwise label the available aggregate precisely.
+- Proof receipts produced or reused, their bound identities, and why reuse was
+  admissible.
 - The next bounded task that should be fed to `autonomous-execution-contract`,
   or the next reactor-ready slice when reactor mode remains appropriate.
