@@ -11,7 +11,7 @@ usage() {
 Usage: audit-skills.sh <command>
 
 Commands:
-  check          Scan all skill files in skills/ for private references
+  check          Scan skill files for private references and validate the capability catalog
   pre-commit     Scan only staged skill files (called by git hook)
   install-hook   Write the pre-commit hook into .git/hooks/
 EOF
@@ -91,6 +91,22 @@ scan_files() {
     return 0
 }
 
+validate_capability_catalog() {
+    local catalog="$SKILLS_DIR/capabilities/skills.toml"
+    [[ -f "$catalog" ]] || return 0
+
+    python3 - "$catalog" <<'PY'
+import sys
+import tomllib
+from pathlib import Path
+
+catalog = Path(sys.argv[1])
+with catalog.open("rb") as handle:
+    tomllib.load(handle)
+print(f"Capability catalog is valid TOML: {catalog}")
+PY
+}
+
 do_check() {
     local pattern
     local root
@@ -107,6 +123,9 @@ do_check() {
         2>/dev/null | scan_files "$pattern"
 
     local rc=$?
+    if [[ $rc -eq 0 ]] && ! validate_capability_catalog; then
+        rc=1
+    fi
     [[ $rc -eq 0 ]] && echo "All clean."
     return $rc
 }

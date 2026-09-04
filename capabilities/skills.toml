@@ -58,6 +58,10 @@ layer = "workflow"
 effect = "local-write"
 layer = "workflow"
 
+[skills.review-agent]
+effect = "readonly"
+layer = "workflow"
+
 [skills.skill-installer]
 commands = ["git"]
 effect = "external-call"
@@ -75,6 +79,11 @@ commands = ["gptengage"]
 effect = "external-call"
 layer = "workflow"
 overlaps = ["invokellm"]
+
+[skills.define-operating-charter]
+effect = "local-write"
+layer = "workflow"
+overlaps = ["autonomous-execution-contract", "frame-goals-constraints"]
 
 [skills.ideate]
 commands = ["gptengage"]
@@ -141,7 +150,10 @@ commands = ["git"]
 effect = "local-write"
 effects = ["local-write"]
 approval_boundaries = ["review-file", "allowed-override", "secret", "ignore-policy-change"]
-layer = "workflow"
+
+[skills.clear-writing]
+effect = "readonly"
+layer = "primitive"
 
 [skills.ecosystem-borrow-audit]
 commands = ["git", "gptengage"]
@@ -265,4 +277,17 @@ commands = ["gptengage"]
 effect = "external-call"
 effects = ["external-call", "local-write", "home-write"]
 approval_boundaries = ["external-data-send", "proposal-write", "merge-local", "merge-global"]
+layer = "workflow"
+
+[skills.pi-defects-harvester]
+effect = "readonly"
+effects = ["readonly", "home-write"]
+approval_boundaries = ["report-write"]
+layer = "workflow"
+
+[skills.whitepaper]
+commands = ["pandoc", "weasyprint", "curl", "dot", "pdfinfo", "pdftoppm", "pdffonts"]
+effect = "local-write"
+effects = ["local-write", "network-read"]
+approval_boundaries = ["overwrite-output", "dependency-install", "trademark-check", "domain-check"]
 layer = "workflow"
