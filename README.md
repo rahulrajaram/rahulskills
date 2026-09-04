@@ -29,7 +29,7 @@ directly and never a stale shadowing copy. Invoke a skill explicitly in Pi as
 
 Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yore vocabulary curation).
 
-Four shell scripts handle discovery, syncing, Pi linking, and audit across all local projects.
+Five shell scripts handle discovery, assembly, syncing, Pi linking, and audit across all local projects.
 
 ## Repository Structure
 
@@ -60,9 +60,10 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Skills (39)
+### Package-managed skills (45)
 
-Synced to both `~/.codex/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
+Authored in this package and deployed to Pi, Codex, and Claude Code. Runtime
+exclusions prevent package copies from shadowing system-owned Codex skills.
 
 | Skill | Description |
 |-------|-------------|
@@ -71,9 +72,13 @@ Synced to both `~/.codex/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 | `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |
 | `autonomy-loop` | Drive an epic as a principal-architect loop with bounded execution and controlled reactor chaining |
 | `check-antipatterns` | Real-time anti-pattern detection during active work |
+| `clear-writing` | Edit dense, awkward, repetitive, or AI-generated prose into clear, direct, readable writing as an editor, not a ghostwriter; default and grill modes |
 | `commit` | Smart commit with file triage, artifact filtering, and secret detection |
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
+| `define-operating-charter` | Define and ratify authority, lifecycle, evidence, and stop rules for long-running agentic systems |
 | `ecosystem-borrow-audit` | Cross-repo borrowing analysis and multi-sigma ideation sweeps |
+| `figma` | Use Figma MCP for design context, screenshots, variables, assets, setup, and design-to-code work |
+| `figma-implement-design` | Translate Figma nodes into production code with 1:1 visual fidelity |
 | `fp-refine` | Transform imperative code into functional-programming-first structures |
 | `frame-goals-constraints` | Turn complex product and system direction into a living, customer-legible product thesis |
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
@@ -90,6 +95,7 @@ Synced to both `~/.codex/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 | `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |
 | `objective-to-dag-decomposition` | Decompose vague objectives into typed reasoning trees, an execution DAG, and phased plans |
 | `postmortem` | Generate Amazon COE-style 5-whys postmortem reports |
+| `pi-defects-harvester` | Harvest local Pi and shell artifacts into a compact defect digest |
 | `pr-lifecycle` | Create and manage a PR from local prep through green CI |
 | `privateify` | Lock down a repo to stay private via CI guards, hooks, manifest flags, and agent directives |
 | `pythonpackagesevere` | Decompose a Python package into independent projects |
@@ -97,14 +103,23 @@ Synced to both `~/.codex/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 | `reference-cleaner` | Remove blocklisted references from git history and source files |
 | `repo-topics` | Analyze a GitHub repo and apply relevant topic labels |
 | `rewrite-commit-messages` | Bulk rewrite git commit messages with filter-repo |
-| `skill-creator` | Guide for creating effective skills for Claude and Codex |
+| `skill-creator` | Create or update scoped skills and their supporting resources across the package runtimes |
 | `speak` | Read text out loud using Kokoro TTS |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
 | `system-memory-audit` | Audit Linux system-wide memory health, swap, PSI, and top consumers |
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
+| `whitepaper` | Author an investor-facing enterprise whitepaper (case for building a product) with YC-flavored, un-theatrical voice, cost/revenue model, naming/branding, and a branded PDF with embedded fonts |
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
+
+### Codex runtime-owned skills (6)
+
+These are represented in the capability catalog and runtime exclusion list,
+but are not vendored or reinstalled because Codex owns and updates them:
+`imagegen`, `openai-docs`, `plugin-creator`, `review-agent`, `skill-creator`, and
+`skill-installer`. The package still carries its shared `skill-creator` source
+for Pi and Claude while excluding that copy from the Codex assembly.
 
 ## Shell Scripts
 
@@ -146,8 +161,9 @@ Bidirectional sync between this repo and installed locations. Push delegates to 
 ./sync-skills.sh pull      # Copy installed skills into this repo (strips CLI-specific keys)
 ./sync-skills.sh push      # Assemble and install skills to all CLI locations
 ./sync-skills.sh diff      # Show differences between assembled output and installed
-./sync-skills.sh status    # List which skills exist where
-./sync-skills.sh compare-implementations  # Validate Codex/Claude skill parity
+./sync-skills.sh status    # List which skills exist in repo, Codex, Pi, and Claude
+./sync-skills.sh source-coverage  # Verify all installed Pi/Codex skills are represented
+./sync-skills.sh compare-implementations  # Validate repo/Codex/Pi/Claude skill parity
 ./sync-skills.sh audit-catalog --strict   # Fail on divergent loaded skill names
 ./sync-skills.sh capability-health --mcp figma  # Check commands/MCPs/platforms
 ```
@@ -167,7 +183,7 @@ Discover skills, scripts, agents, and build targets across all local projects li
 Tags each discovered item as `[COLLECTED]`, `[EXCLUDED]`, or `[NEW]` relative to this repo.
 ### `audit-skills.sh`
 
-Pre-commit guard that scans skill files for private references (project names in blocklists, personal filesystem paths).
+Pre-commit guard that scans skill files for private references (project names in blocklists, personal filesystem paths). The full check also parses `capabilities/skills.toml` so malformed or duplicate TOML keys fail in CI.
 
 ```bash
 ./audit-skills.sh check          # Scan all skill files
@@ -205,7 +221,7 @@ The `audit-skills.sh check` scan runs on every push to `master` and on pull requ
 
 ## Adding a New Skill
 
-1. Create `skills/<name>/SKILL.md` with frontmatter (`name`, `description`, `argument-hint`). Add optional `agents/`, `references/`, or `scripts/` subdirectories.
+1. Create `skills/<name>/SKILL.md` with required `name` and `description` frontmatter. Preserve supported optional fields such as `argument-hint`, and add `agents/`, `references/`, or `scripts/` only when needed.
 2. If the skill needs Claude-specific metadata (e.g. `allowed-tools`), create `overlays/claude/<name>.yml`.
 3. Run `./audit-skills.sh check` to verify no private references leaked.
 4. Commit and `./sync-skills.sh push` to assemble and deploy to all CLI locations.
