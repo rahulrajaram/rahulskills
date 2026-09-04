@@ -24,8 +24,9 @@ make Pi report a collision for every skill. Run
 [`install-pi-skills.sh`](#install-pi-skills.sh) after cloning or pulling to link
 every repo skill into `~/.pi/agent/skills/` so Pi loads the repository copies
 directly and never a stale shadowing copy. Invoke a skill explicitly in Pi as
-`/skill:<name>`; for example, `/skill:handoff extract` resumes work from
-`NEXT_SHELL_PROMPT.md`.
+`/skill:<name>`; for example, `/skill:handoff extract` reviews
+`NEXT_SHELL_PROMPT.md`, adopts it as the current request, and immediately
+executes its authorized work.
 
 Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yore vocabulary curation).
 
@@ -60,7 +61,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (45)
+### Package-managed skills (47)
 
 Authored in this package and deployed to Pi, Codex, and Claude Code. Runtime
 exclusions prevent package copies from shadowing system-owned Codex skills.
@@ -73,9 +74,11 @@ exclusions prevent package copies from shadowing system-owned Codex skills.
 | `autonomy-loop` | Drive an epic as a principal-architect loop with bounded execution and controlled reactor chaining |
 | `check-antipatterns` | Real-time anti-pattern detection during active work |
 | `clear-writing` | Edit dense, awkward, repetitive, or AI-generated prose into clear, direct, readable writing as an editor, not a ghostwriter; default and grill modes |
+| `clean-code-refine` | Review or refactor code across behavior, idiom, size, complexity, dataflow, testability, and simplicity |
 | `commit` | Smart commit with file triage, artifact filtering, and secret detection |
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
 | `define-operating-charter` | Define and ratify authority, lifecycle, evidence, and stop rules for long-running agentic systems |
+| `diagram-review-viewer` | Create Mermaid diagrams with an interactive browser review viewer |
 | `ecosystem-borrow-audit` | Cross-repo borrowing analysis and multi-sigma ideation sweeps |
 | `figma` | Use Figma MCP for design context, screenshots, variables, assets, setup, and design-to-code work |
 | `figma-implement-design` | Translate Figma nodes into production code with 1:1 visual fidelity |
@@ -84,7 +87,7 @@ exclusions prevent package copies from shadowing system-owned Codex skills.
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
 | `grilling` | Hard, dependency-aware questions with human-first rendering; speculative factory research, internal debate, and a plain-language orchestrator close |
 | `grill-me` | Alias trigger that invokes the grilling skill |
-| `handoff` | Commit and write `NEXT_SHELL_PROMPT.md`, or load it to resume work |
+| `handoff` | Commit and write `NEXT_SHELL_PROMPT.md`, or review and execute it as resumed work |
 | `humanize` | Rewrite rigorous narratives for human readers without weakening their truth |
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
 | `install-commithooks` | Install shared commithooks framework into a project |
