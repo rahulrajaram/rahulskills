@@ -211,6 +211,30 @@ effects = ["readonly", "privileged-observe"]
 approval_boundaries = ["sudo", "attach", "trace", "signal", "restart"]
 layer = "workflow"
 
+[skills.metabuilder]
+commands = ["metabuilder"]
+effect = "local-write"
+effects = ["readonly", "local-process", "local-write"]
+approval_boundaries = ["target-write", "network", "credential-use", "dependency-install", "external-state", "provider-dispatch"]
+layer = "composer"
+overlaps = ["metabuilder-harness-design", "metabuilder-consumer-qualification"]
+
+[skills.metabuilder-consumer-qualification]
+commands = ["metabuilder"]
+effect = "local-write"
+effects = ["readonly", "local-process", "local-write"]
+approval_boundaries = ["target-write", "network", "credential-use", "dependency-install", "external-state"]
+layer = "workflow"
+overlaps = ["metabuilder"]
+
+[skills.metabuilder-harness-design]
+commands = ["metabuilder"]
+effect = "local-write"
+effects = ["readonly", "local-process", "local-write"]
+approval_boundaries = ["artifact-write", "network", "credential-use", "dependency-install", "external-state", "provider-dispatch"]
+layer = "composer"
+overlaps = ["metabuilder", "grilling", "frame-goals-constraints"]
+
 [skills.next-todos]
 effect = "readonly"
 layer = "primitive"
