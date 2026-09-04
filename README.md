@@ -60,7 +60,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (46)
+### Package-managed skills (48)
 
 Authored in this package and deployed to Pi, Codex, and Claude Code. Runtime
 exclusions prevent package copies from shadowing system-owned Codex skills.
@@ -93,6 +93,8 @@ exclusions prevent package copies from shadowing system-owned Codex skills.
 | `max-columns` | Keep output within a user-specified column width |
 | `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
 | `metabuilder` | Define, compile, inspect, run, recover, and improve governed MetaBuilder harnesses |
+| `metabuilder-consumer-qualification` | Run and assess an already designed consumer harness without conflating controller evidence with product judgment |
+| `metabuilder-harness-design` | Turn a target objective into an agreed brief and typed MetaBuilder harness design |
 | `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |
 | `objective-to-dag-decomposition` | Decompose vague objectives into typed reasoning trees, an execution DAG, and phased plans |
 | `postmortem` | Generate Amazon COE-style 5-whys postmortem reports |

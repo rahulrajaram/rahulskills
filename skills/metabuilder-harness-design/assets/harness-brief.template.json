@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "brief_id": "local-target-check",
+  "request": "Design a governed harness for one exact local target repository.",
+  "objective": "Execute the target's approved checks and preserve exact controller observations without modifying target source.",
+  "risk_tier": "consequential",
+  "risk_factors": [
+    "authority"
+  ],
+  "ambiguity": "material",
+  "grilling": {
+    "depth": "thorough",
+    "rationale": "Fresh harness construction selects executable commitments and therefore requires complete task understanding before implementation.",
+    "resolved_questions": [
+      {
+        "question": "Who owns the objective, product decisions, and final semantic judgment?",
+        "answer": "The named principal owns product decisions and final semantic judgment; the controller owns structural admission and execution observations.",
+        "covers": [
+          "goals",
+          "actors",
+          "success_criteria"
+        ],
+        "basis": "user_answer",
+        "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "question": "Which effects, constraints, risks, and material unknowns bound this harness?",
+        "answer": "Use only approved local read-only source access and declared sandboxed commands; stop before any undeclared write, network, credential, installation, release, or deployment effect.",
+        "covers": [
+          "constraints",
+          "risks",
+          "material_unknowns"
+        ],
+        "basis": "user_answer",
+        "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
+  },
+  "goals": [
+    "Represent the approved target checks as typed obligations and executable actions."
+  ],
+  "non_goals": [
+    "Claim production readiness or mutate target source."
+  ],
+  "constraints": [
+    "Operate within the controller's explicit effect ceiling and preserve the exact target source identity."
+  ],
+  "risks": [
+    {
+      "risk": "An incomplete check could be mistaken for proof of the target's meaning.",
+      "mitigation": "Keep controller observations separate from the consumer's semantic assessment and record untested conditions.",
+      "material": true
+    }
+  ],
+  "success_criteria": [
+    {
+      "criterion": "The intended workflow is represented by an admitted Harness Module whose compiled bundle re-admits exactly.",
+      "evidence": "metabuilder harness compile and metabuilder harness check both exit zero for the exact module and bundle."
+    }
+  ],
+  "actors": [
+    {
+      "id": "controller",
+      "role": "structural gate evaluator and execution observer",
+      "agreement_required": false
+    },
+    {
+      "id": "principal",
+      "role": "requester, product decision owner, and semantic approver",
+      "agreement_required": true
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Which target outcome and effect boundary define completion?",
+      "resolution": "Use the exact approved local checks, refuse undeclared effects, and reserve final semantic judgment for the principal.",
+      "decision_kind": "product",
+      "basis": {
+        "kind": "user_approval",
+        "actor_id": "principal",
+        "evidence_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ],
+  "material_unknowns": [
+    {
+      "unknown": "Which repository-specific commands and toolchains constitute adequate checks?",
+      "material": true,
+      "disposition": {
+        "status": "assumption",
+        "assumption": "The target's authoritative instructions and inspected build configuration will supply the exact commands before the brief is approved.",
+        "owner": "controller",
+        "impact": "technical",
+        "review_trigger": "Before preparing the final brief or translating it into executable actions."
+      }
+    }
+  ]
+}
