@@ -3,7 +3,9 @@
 Date: 2026-08-30
 
 Status: proposed semantic model for review. It does not describe a currently
-implemented callable-skill ABI.
+implemented callable-skill ABI or grant execution authority. The companion
+[`metabuilder-bounded-autonomy-charter.md`](metabuilder-bounded-autonomy-charter.md)
+records the complete proposed operating envelope and evidence boundary.
 
 ## Purpose
 
@@ -16,14 +18,24 @@ places in similar boxes:
 4. **Runtime components** interpret effects and persist controller observations.
 5. **Rules** constrain composition, execution, evidence, recovery, and stopping.
 
-The three focused Mermaid projections are views of this model:
+The five focused Mermaid projections are views of this model:
 
+- `metabuilder-autonomy-components.mmd` is the primary four-process map.
 - `metabuilder-functional-composition.mmd` shows functions and typed values.
 - `metabuilder-authority-model.mmd` shows actors and authority-bearing artifacts.
 - `metabuilder-runtime-loop.mmd` shows pure transitions and effect interpretation.
+- `metabuilder-discovery-execution-boundary.mmd` shows how open-ended discovery
+  crosses into finite execution.
 
-`metabuilder-autonomy-components.mmd` remains a mixed architectural inventory.
-It is not the primary explanation of function composition.
+No projection is the model of record. Each answers one operator question and
+omits details that remain explicit in this document and the proposed charter.
+
+Implementation status is also a projection, not a construct kind. In this
+review, "installed" refers to the inspected consumer CLI with SHA-256
+`6407442f50bac6e1a2f5c7727d01eaa57d9174e23862c98eeab1ac4febe230b9`;
+"committed source" refers to MetaBuilder commit
+`ec1b9d079da8afc09b112a0e4f731a1b66412285`; and "target" means proposed.
+Uncommitted MetaBuilder work is excluded from implementation claims.
 
 ## Visual type system
 
@@ -34,7 +46,8 @@ status. Border weight communicates architectural importance.
 | --- | --- | --- |
 | Actor | Stadium | Person, agent, controller, operator, approver, or verifier |
 | Callable phase | Rectangle | Function-like transformation with a declared contract |
-| Artifact | Parallelogram in the functional view; cylinder in the authority and runtime views | Immutable typed value, claim, observation, lock, or record |
+| Artifact | Parallelogram | Immutable typed value, claim, observation, lock, or record |
+| Durable store | Cylinder | Actual controller-owned persisted storage, never an ordinary value |
 | Runtime component | Subroutine | Compiler, broker, runner, interpreter, or durable store |
 | Decision | Diamond | Pure branch over an explicit value |
 | Rule | Yellow note | Standing invariant or evidence boundary |
@@ -52,13 +65,18 @@ Status colors:
 type ActorId = OpaqueId
 type PrincipalId = ActorId
 type RequesterId = ActorId
+type OrchestratorId = ActorId
+type ControllerId = ActorId
 type OperatorId = ActorId
 type WorkerId = ActorId
 type VerifierId = ActorId
 ~~~
 
 The requester sends an objective. The principal owns the authority ceiling and
-the meaning of success. They are often the same human, but need not be.
+the meaning of success. They are often the same human, but need not be. The
+orchestrator exercises only delegated strategic discretion. The MetaBuilder
+controller enforces mechanics and records observations; it does not inherit the
+orchestrator's discretion.
 
 ~~~haskell
 type ObjectiveRequest =
@@ -66,6 +84,20 @@ type ObjectiveRequest =
   , principal       : PrincipalId
   , objective       : BoundedObjective
   , delegationProof : Optional DelegationProof
+  }
+
+type Ratifier =
+  | PrincipalRatifier PrincipalId
+  | DelegatedRatifier
+      { actor              : OrchestratorId
+      , standingDelegation : DelegationProof
+      , decisionClasses    : Set DecisionClass
+      }
+
+type AuthorizedRequest =
+  { request        : ObjectiveRequest
+  , ratifier       : Ratifier
+  , authorityProof : DelegationProof
   }
 ~~~
 
@@ -102,6 +134,12 @@ type AuthorityEnvelopeRef =
 
 The authority envelope is an input to composition. A contract, recipe, worker,
 or runtime component may attenuate it, but may never widen it.
+
+A proposed standing delegation names the orchestrator as a bounded ratifier for
+enumerated decision classes. It must also name reserved decisions, effect and
+resource ceilings, expiry, revocation, acceptance policy, integration modes,
+and the exact policy/classifier identity. The orchestrator remains a delegate,
+not the principal, and cannot amend the proof it is using.
 
 ## Callable skill phases
 
@@ -159,7 +197,7 @@ prepareObjective request = do
 
   thesis    <- frameGoalsAndConstraints authorized
   decisions <- grillMaterialUnknowns thesis
-  ratified  <- principalRatify request.principal decisions
+  ratified  <- ratifyDecisionRecord request.principal authorized decisions
   plan      <- decomposeObjective thesis ratified
   authority <- deriveAttenuatedEnvelope
     request.principal
@@ -178,14 +216,17 @@ prepareObjective request = do
 Its internal chain is exactly:
 
 ObjectiveRequest -> authorizeRequest -> frame-goals-constraints ->
-ProductThesis -> grilling -> DecisionRecord -> principalRatify ->
+ProductThesis -> grilling -> DecisionRecord -> ratifyDecisionRecord ->
 objective-to-dag-decomposition -> ExecutionDag -> deriveAttenuatedEnvelope ->
 PreparedObjective.
 
 Each skill phase returns a claim; the controller verifies it independently
-before the value flows on as evidence. Ratification is a human authority gate:
-the principal, not a skill, accepts or refuses the decisions record. The
-attenuated envelope is derived from the ratified ceiling and may never widen it.
+before the value flows on as evidence. Ratification is an authority gate, not a
+skill: the principal decides today, while the target design also permits an
+orchestrator to ratify an enumerated routine decision under an authenticated
+standing delegation. Reserved, ambiguous, expired, or revoked decisions return
+to the principal. The attenuated envelope is derived from that ratified ceiling
+and may never widen it.
 
 The same chain can be sketched as a left-to-right pipeline over typed values:
 
@@ -194,7 +235,7 @@ prepareObjective
   =   authorizeRequest
   >>> frameGoalsAndConstraints
   >>> grillMaterialUnknowns
-  >>> principalRatify
+  >>> ratifyDecisionRecord
   >>> decomposeObjective
   >>> deriveAttenuatedEnvelope
 
@@ -203,7 +244,7 @@ prepareObjective
 prepareObjective
   =   deriveAttenuatedEnvelope
   .   decomposeObjective
-  .   principalRatify
+  .   ratifyDecisionRecord
   .   grillMaterialUnknowns
   .   frameGoalsAndConstraints
   .   authorizeRequest
@@ -224,9 +265,10 @@ formulation of the `do` block above. It is idealized in five ways:
    as `ExceptT PreparationError Task`, since raw `Task (Result e a)` alone does
    not provide short-circuiting `do` notation — and stage failures inject into
    the common `PreparationError`.
-4. `principalRatify` and `deriveAttenuatedEnvelope` are not free functions of
-   the data alone: both are anchored to `request.principal`, exposed as an
-   explicit argument or reader environment rather than silent closure.
+4. `ratifyDecisionRecord` and `deriveAttenuatedEnvelope` are not free functions
+   of the data alone: both are anchored to `request.principal` and the admitted
+   ratifier authority, exposed as explicit arguments or a reader environment
+   rather than silent closure.
 5. The gate is an effectful authority interaction, not a pure function: refusal,
    timeout, identity verification, and revocation are explicit outcomes.
 
@@ -413,6 +455,19 @@ durable checkpoints, interruption recovery, and explicit stop conditions.
 It does not require push, deploy, unrestricted network, credentials, or
 unbounded self-improvement.
 
+## Open-ended discovery, bounded execution
+
+The discovery domain may remain open across campaigns, but each discovery
+episode has finite resource bounds. Discovered text is untrusted data, never
+implicit instruction or authority. Discovery may produce only observations,
+hypotheses, counterevidence, and a proposed `ObjectiveRequest`.
+
+Execution begins only after that request is authorized, decomposed into a
+finite DAG, compiled, admitted, and bound to exact resources and effects. An
+epoch never revises itself. Leftover work becomes a checkpoint and a new
+request; continuation is a separate orchestrator decision under current
+delegation, not a result manufactured by convergence or the harness.
+
 ## Non-negotiable invariants
 
 1. The requester and principal are separate fields even when their values match.
@@ -425,3 +480,23 @@ unbounded self-improvement.
 8. Build-time module updates never silently revise an active run.
 9. Historical locks and evidence remain pinned and reproducible.
 10. Continuation is finite and bounded by explicit acceptance and breaker rules.
+11. The orchestrator owns strategy; MetaBuilder owns enforcement; the harness
+    owns execution; the target source is a value and owns no authority.
+12. Discovered content may propose work but may never become instruction,
+    capability, evidence, or execution authority without typed admission.
+13. Every discovery episode and every execution epoch has finite resource
+    bounds even when the long-term opportunity space remains open.
+14. Ratification identifies the actual ratifier and authority proof; a delegate
+    cannot amend, authenticate, or widen its own delegation.
+15. Convergence evaluates frozen evidence. Only the orchestrator may authorize
+    continuation, and only within the remaining standing envelope.
+16. Active objectives, criteria, source pins, runtimes, adapters, and authority
+    envelopes never change silently in place.
+17. Structural integrity, provenance, semantic adequacy, security posture, and
+    production readiness remain separate assurance dimensions.
+18. MetaBuilder self-improvement uses an isolated admitted candidate; an
+    uncommitted binary is never selected merely because it builds.
+19. A durable store is visually and semantically distinct from an immutable
+    value passed between processes.
+20. Diagram bytes and review receipts provide integrity and provenance, not
+    truth, implementation, human authentication, or ratification.

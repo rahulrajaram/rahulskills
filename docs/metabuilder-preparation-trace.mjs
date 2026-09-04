@@ -12,11 +12,15 @@
 //   2. CLAIM FLOW   — skill phases emit claims; the controller verifies them
 //                     asynchronously; durable journal appends lag behind the
 //                     chain in wall-clock time (potentially out of sync).
-//   3. THE GATE     — principalRatify reads the human decision from the
-//                     environment (a Reader dependency), not from the data.
-//                     Identical request data + different principal decisions
-//                     => different outcomes. No pure function of the data
-//                     could produce both.
+//   3. THE GATE     — ratifyDecisionRecord reads a principal or delegated
+//                     ratifier decision from the environment (a Reader
+//                     dependency), not from the data. Identical request data +
+//                     different authority decisions => different outcomes. No
+//                     pure function of the data could produce both.
+//
+// This illustrates the target gate shape. It does not authenticate the
+// ratifier or validate a real StandingDelegation; those remain controller
+// responsibilities in the proposed operating model.
 //
 // Run: node docs/metabuilder-preparation-trace.mjs
 
@@ -41,12 +45,14 @@ const rand = (min, max) => min + Math.random() * (max - min);
 const t0 = performance.now();
 const stamp = () => `[t=${String(Math.round(performance.now() - t0)).padStart(4, '0')}ms]`;
 
-const makeEnv = (runTag, principal, decision) => {
+const makeEnv = (runTag, principal, ratifier, ratificationAuthority, decision) => {
   let claimSeq = 0;
   const log = (plane, msg) =>
     console.log(`${stamp()} ${runTag} ${plane.padEnd(10)} ${msg}`);
   return {
     principal,
+    ratifier,
+    ratificationAuthority,
     log,
     nextClaimId: () => `c${String(++claimSeq).padStart(2, '0')}`,
     // Controller verification: asynchronous, variable latency. The chain
@@ -72,8 +78,8 @@ const makeEnv = (runTag, principal, decision) => {
       },
     },
     // THE GATE'S INPUT IS NOT IN THE DATA. The decision arrives from the
-    // environment, asynchronously, per principal. Same request, different
-    // principal decision => different pipeline outcome.
+    // environment, asynchronously, per admitted ratifier. Same request,
+    // different authority decision => different pipeline outcome.
     decisionService: async () => {
       await new Promise((r) => setTimeout(r, rand(150, 400))); // human latency
       return decision;
@@ -100,7 +106,14 @@ const authorizeRequest = (request) => async (env) => {
     return Err({ type: 'DelegationRequired' });
   }
   env.log('chain', 'authorizeRequest: delegation proof checked (authority function)');
-  return Ok({ request, authorized: { principal: request.principal } });
+  return Ok({
+    request,
+    authorized: {
+      principal: request.principal,
+      ratifier: env.ratifier,
+      ratificationAuthority: env.ratificationAuthority,
+    },
+  });
 };
 
 const frame = skillPhase('frameGoalsAndConstraints', (acc) => ({
@@ -110,21 +123,36 @@ const grill = skillPhase('grillMaterialUnknowns', (acc) => ({
   decisions: `decisions-from(${acc.frameGoalsAndConstraints.thesis})`,
 }));
 
-const principalRatify = (acc) => async (env) => {
-  env.log('chain', `HUMAN GATE principalRatify: pausing; reading decision for ` +
-    `principal=${env.principal} FROM THE ENVIRONMENT (not from the data)`);
+const ratifyDecisionRecord = (acc) => async (env) => {
+  env.log('chain', `AUTHORITY GATE ratifyDecisionRecord: reading decision for ` +
+    `principal=${env.principal} from ratifier=${env.ratifier} under ` +
+    `${env.ratificationAuthority} FROM THE ENVIRONMENT (not from the data)`);
   const decision = await env.decisionService();
   if (decision !== 'approve') {
     env.log('chain', `gate returned '${decision}' -> pipeline refuses`);
-    return Err({ type: 'RatificationRefused', principal: env.principal });
+    return Err({
+      type: 'RatificationRefused',
+      principal: env.principal,
+      ratifier: env.ratifier,
+      authority: env.ratificationAuthority,
+    });
   }
-  env.log('chain', `gate returned 'approve' for principal=${env.principal}`);
-  return Ok({ ...acc, ratified: `ratified(${acc.grillMaterialUnknowns.decisions})` });
+  env.log('chain', `gate returned 'approve' for principal=${env.principal} ` +
+    `by ratifier=${env.ratifier}`);
+  return Ok({
+    ...acc,
+    ratified: {
+      decision: acc.grillMaterialUnknowns.decisions,
+      principal: env.principal,
+      ratifier: env.ratifier,
+      authority: env.ratificationAuthority,
+    },
+  });
 };
 
 const decompose = skillPhase('decomposeObjective', (acc) => ({
   plan: `dag(thesis=${acc.frameGoalsAndConstraints.thesis}, ` +
-        `ratified=${acc.ratified})`, // <- FAN-OUT: two earlier values reused
+        `ratified=${JSON.stringify(acc.ratified)})`, // <- FAN-OUT: two earlier values reused
 }));
 
 const deriveEnvelope = (acc) => async (env) => {
@@ -132,7 +160,7 @@ const deriveEnvelope = (acc) => async (env) => {
   return Ok({
     ...acc,
     authority: `envelope(principal=${env.principal}, ` +
-      `ceiling<=${acc.authorized.principal})`, // <- FAN-OUT again
+      `ratifier=${env.ratifier}, ceiling<=${acc.authorized.principal})`, // <- FAN-OUT again
   });
 };
 
@@ -148,7 +176,7 @@ const assemble = (acc) => async (env) => {
 };
 
 const prepareObjective = kleisli(
-  authorizeRequest, frame, grill, principalRatify, decompose, deriveEnvelope, assemble
+  authorizeRequest, frame, grill, ratifyDecisionRecord, decompose, deriveEnvelope, assemble
 );
 
 /* ---------- dataflow ledger (the fan-out, stated explicitly) ------------- */
@@ -172,7 +200,13 @@ const outcomes = [];
 
 for (const [tag, decision] of [['run-1', 'approve'], ['run-2', 'refuse']]) {
   console.log(`\n=== ${tag} · environment decision '${decision}' · request data byte-identical ===`);
-  const env = makeEnv(`[${tag}]`, REQUEST.principal, decision);
+  const env = makeEnv(
+    `[${tag}]`,
+    REQUEST.principal,
+    'orchestrator-1',
+    'standing-delegation-1',
+    decision,
+  );
   const result = await prepareObjective(REQUEST)(env);
   outcomes.push({ decision, digest: JSON.stringify(REQUEST), result });
 }
@@ -188,4 +222,4 @@ console.log(`  input digests identical : ${a.digest === b.digest} (byte-identica
 console.log(`  run-1 (env: approve)    : ${a.result.tag}`);
 console.log(`  run-2 (env: refuse)     : ${b.result.tag} (${JSON.stringify(b.result.error)})`);
 console.log('  same data, different outcomes => the deciding input lives in the');
-console.log("  environment (the principal's live decision), not in ObjectiveRequest.");
+console.log("  environment (the admitted ratifier's live decision), not in ObjectiveRequest.");

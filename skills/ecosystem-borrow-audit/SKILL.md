@@ -24,8 +24,10 @@ Extract from user request:
 
 1. Normalize paths and scope.
 - Verify listings path exists; correct typo if user wrote `Documetns`.
-- Enumerate all depth-1 git repos under `$WORKSPACE_ROOT`.
-- Build unified catalog: listings entries + git repos.
+- Enumerate all depth-1 git repos under `$WORKSPACE_ROOT` (a directory
+  qualifies ONLY if it contains `.git`).
+- Build unified catalog: listings entries + git repos. Listings entries that
+  are not git repos are contextual only: never scanned, scored, or ranked.
 
 2. Run tier-1 scan across the unified catalog.
 - For each repo/path, capture lightweight signals:
@@ -93,7 +95,11 @@ Return:
 ## Guardrails
 
 - Keep analysis evidence-backed with file paths and commands.
-- Do not treat non-git listings entries as repos; include them as contextual entries.
+- Git-only rule: any directory without `.git` is EXCLUDED from tier-1/tier-2
+  scanning, scoring, and ranking, even if it appears in listings.txt. Include
+  such entries as contextual only (never score them).
+- Verify at the end: every catalog entry must pass `[ -d "$d/.git" ]`; report
+  the assertion result (e.g. `133 git repos, 0 missing-git entries`).
 - If `gptengage` fails, report error and suggest:
 ```bash
 ~/.local/bin/gptengage status
