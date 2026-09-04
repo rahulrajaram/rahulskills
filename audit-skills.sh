@@ -11,7 +11,7 @@ usage() {
 Usage: audit-skills.sh <command>
 
 Commands:
-  check          Scan all skill files in skills/ for private references
+  check          Audit private references, manifests, inventory, catalog, and local links
   pre-commit     Scan only staged skill files (called by git hook)
   install-hook   Write the pre-commit hook into .git/hooks/
 EOF
@@ -91,6 +91,227 @@ scan_files() {
     return 0
 }
 
+validate_capability_catalog() {
+    local catalog="$SKILLS_DIR/capabilities/skills.toml"
+    [[ -f "$catalog" ]] || return 0
+
+    python3 - "$catalog" "$SKILLS_DIR/overlays/claude" <<'PY'
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+catalog = Path(sys.argv[1])
+overlay_dir = Path(sys.argv[2])
+with catalog.open("rb") as handle:
+    document = tomllib.load(handle)
+
+skills = document.get("skills")
+if not isinstance(skills, dict):
+    raise SystemExit("Capability catalog must define a [skills] table")
+
+allowed_layers = {"primitive", "workflow", "composer"}
+problems = []
+for name, entry in sorted(skills.items()):
+    effect = entry.get("effect")
+    layer = entry.get("layer")
+    commands = entry.get("commands", [])
+    if not isinstance(effect, str) or not effect.strip():
+        problems.append(f"skills.{name}: missing non-empty effect")
+    if layer not in allowed_layers:
+        allowed = ", ".join(sorted(allowed_layers))
+        problems.append(f"skills.{name}: layer must be one of {allowed}")
+    if not isinstance(commands, list) or not all(
+        isinstance(command, str) and command for command in commands
+    ):
+        problems.append(f"skills.{name}: commands must be a list of non-empty strings")
+
+scoped_bash = re.compile(r"Bash\(([^:(),]+):\*\)")
+prohibited_preapprovals = {"curl", "rm"}
+for overlay in sorted(overlay_dir.glob("*.yml")):
+    skill_name = overlay.stem
+    entry = skills.get(skill_name)
+    if entry is None:
+        problems.append(f"{overlay}: no matching skills.{skill_name} catalog entry")
+        continue
+    granted = set(scoped_bash.findall(overlay.read_text(encoding="utf-8")))
+    prohibited = sorted(granted & prohibited_preapprovals)
+    if prohibited:
+        problems.append(
+            f"{overlay}: unsafe preapproved command(s): {', '.join(prohibited)}"
+        )
+    undeclared = sorted(granted - set(entry.get("commands", [])))
+    if undeclared:
+        problems.append(
+            f"{overlay}: scoped Bash command(s) absent from catalog: "
+            + ", ".join(undeclared)
+        )
+
+if problems:
+    raise SystemExit("Capability catalog validation failed:\n" + "\n".join(problems))
+
+print(
+    f"Capability catalog and scoped Claude grants are valid: "
+    f"{len(skills)} skills checked."
+)
+PY
+}
+
+validate_skill_manifests() {
+    local validator="$REPO_SKILLS_DIR/skill-creator/scripts/quick_validate.py"
+    local skill_dir
+    local failures=0
+    local count=0
+
+    [[ -f "$validator" ]] || {
+        echo "ERROR: skill validator not found: $validator" >&2
+        return 1
+    }
+
+    for skill_dir in "$REPO_SKILLS_DIR"/*/; do
+        [[ -f "$skill_dir/SKILL.md" ]] || continue
+        count=$((count + 1))
+        if ! python3 "$validator" "$skill_dir" >/dev/null; then
+            echo "INVALID MANIFEST: $skill_dir"
+            python3 "$validator" "$skill_dir" || true
+            failures=$((failures + 1))
+        fi
+    done
+
+    if [[ "$failures" -gt 0 ]]; then
+        echo "Manifest validation failed: $failures of $count skill(s)."
+        return 1
+    fi
+    echo "Skill manifests are valid: $count checked."
+}
+
+validate_package_inventory() {
+    python3 - "$SKILLS_DIR" <<'PY'
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+root = Path(sys.argv[1])
+package_skills = {
+    path.parent.name for path in (root / "skills").glob("*/SKILL.md")
+}
+
+with (root / "capabilities" / "skills.toml").open("rb") as handle:
+    catalog_skills = set(tomllib.load(handle).get("skills", {}))
+
+readme = (root / "README.md").read_text(encoding="utf-8")
+section_match = re.search(
+    r"### Package-managed skills \((\d+)\)\n(?P<body>.*?)"
+    r"\n### Codex runtime-owned skills",
+    readme,
+    re.DOTALL,
+)
+if not section_match:
+    raise SystemExit("README package-managed skill inventory section was not found")
+
+declared_count = int(section_match.group(1))
+readme_skills = set(
+    re.findall(r"^\|\s*`([^`]+)`\s*\|", section_match.group("body"), re.MULTILINE)
+)
+
+problems = []
+if declared_count != len(package_skills):
+    problems.append(
+        f"README declares {declared_count} package skills; source contains {len(package_skills)}"
+    )
+if missing := sorted(package_skills - readme_skills):
+    problems.append("README is missing: " + ", ".join(missing))
+if extra := sorted(readme_skills - package_skills):
+    problems.append("README contains non-package skills: " + ", ".join(extra))
+if uncataloged := sorted(package_skills - catalog_skills):
+    problems.append("Capability catalog is missing: " + ", ".join(uncataloged))
+
+if problems:
+    raise SystemExit("\n".join(problems))
+
+print(
+    f"Package inventory is congruent: {len(package_skills)} source, README, and catalog entries."
+)
+PY
+}
+
+validate_markdown_links() {
+    python3 - "$SKILLS_DIR" <<'PY'
+import re
+import subprocess
+import sys
+from pathlib import Path
+from urllib.parse import unquote
+
+root = Path(sys.argv[1])
+tracked = set(subprocess.run(
+    ["git", "-C", str(root), "ls-files", "*.md"],
+    check=True,
+    capture_output=True,
+    text=True,
+).stdout.splitlines())
+
+# Include new, not-yet-tracked package documentation so a broken link cannot
+# evade the pre-commit audit on its first commit. Deliberately exclude arbitrary
+# root-level scratch/handoff files from this package-maintenance check.
+maintained = set(tracked)
+maintained.update(
+    path.relative_to(root).as_posix()
+    for top_level in ("skills", "references", "docs")
+    for path in (root / top_level).rglob("*.md")
+    if path.is_file()
+)
+if (root / "README.md").is_file():
+    maintained.add("README.md")
+
+link_pattern = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+scheme_pattern = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:")
+broken = []
+checked = 0
+
+for relative in sorted(maintained):
+    source = root / relative
+    if not source.is_file():
+        continue
+    checked += 1
+    in_fence = False
+    fence_marker = ""
+    for line_number, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
+        fence = re.match(r"^[ \t]*(`{3,}|~{3,})", line)
+        if fence:
+            marker = fence.group(1)[0]
+            if not in_fence:
+                in_fence = True
+                fence_marker = marker
+            elif marker == fence_marker:
+                in_fence = False
+                fence_marker = ""
+            continue
+        if in_fence:
+            continue
+
+        searchable = re.sub(r"`[^`]*`", "", line)
+        for match in link_pattern.finditer(searchable):
+            raw_target = match.group(1).strip()
+            if raw_target.startswith("<") and raw_target.endswith(">"):
+                raw_target = raw_target[1:-1]
+            else:
+                raw_target = raw_target.split(maxsplit=1)[0]
+            if not raw_target or raw_target.startswith("#") or scheme_pattern.match(raw_target):
+                continue
+            target = unquote(raw_target.split("#", 1)[0])
+            resolved = source.parent / target
+            if target.startswith("/") or not resolved.exists():
+                broken.append(f"{relative}:{line_number}: {raw_target}")
+
+if broken:
+    raise SystemExit("Broken local Markdown link(s):\n" + "\n".join(broken))
+
+print(f"Maintained Markdown links resolve: {checked} files checked.")
+PY
+}
+
 do_check() {
     local pattern
     local root
@@ -102,11 +323,28 @@ do_check() {
     echo ""
 
     find "$root" \
-        -type d -name __pycache__ -prune -o \
+        -type d \( \
+            -name __pycache__ -o \
+            -name .ruff_cache -o \
+            -name .mypy_cache -o \
+            -name .pytest_cache \
+        \) -prune -o \
         -type f ! -name '*.pyc' ! -name '*.pyo' -print \
         2>/dev/null | scan_files "$pattern"
 
     local rc=$?
+    if [[ $rc -eq 0 ]] && ! validate_capability_catalog; then
+        rc=1
+    fi
+    if [[ $rc -eq 0 ]] && ! validate_skill_manifests; then
+        rc=1
+    fi
+    if [[ $rc -eq 0 ]] && ! validate_package_inventory; then
+        rc=1
+    fi
+    if [[ $rc -eq 0 ]] && ! validate_markdown_links; then
+        rc=1
+    fi
     [[ $rc -eq 0 ]] && echo "All clean."
     return $rc
 }

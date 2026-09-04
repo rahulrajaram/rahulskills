@@ -67,17 +67,16 @@ read_projects() {
 # Count items in a glob pattern (returns 0 if none match)
 count_glob() {
     local pattern="$1"
-    # shellcheck disable=SC2086
-    local files
-    files=( $pattern ) 2>/dev/null || true
+    local -a files=()
+    mapfile -t files < <(compgen -G "$pattern" || true)
     [[ -e "${files[0]:-}" ]] && echo "${#files[@]}" || echo 0
 }
 
 # List items from a glob pattern
 list_glob() {
     local pattern="$1"
-    local files
-    files=( $pattern ) 2>/dev/null || true
+    local -a files=()
+    mapfile -t files < <(compgen -G "$pattern" || true)
     [[ -e "${files[0]:-}" ]] || return 0
     for f in "${files[@]}"; do
         basename "$f"

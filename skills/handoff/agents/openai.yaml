@@ -1,4 +1,4 @@
 interface:
   display_name: "Handoff"
   short_description: "Write a handoff or resume one as active work."
-  default_prompt: "Use $handoff to write NEXT_SHELL_PROMPT.md, or $handoff extract to load it as active instructions and immediately continue the work."
+  default_prompt: "Use $handoff to write NEXT_SHELL_PROMPT.md, or $handoff extract to review it, adopt it as the current request, and immediately execute its authorized work."

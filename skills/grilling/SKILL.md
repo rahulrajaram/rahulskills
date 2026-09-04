@@ -1,7 +1,7 @@
 ---
 name: grilling
-description: "Interrogate a plan, decision, product thesis, or idea through hard, dependency-aware questions only. Use when the user asks to be grilled, stress-test assumptions, expose blind spots, explore a decision tree, run a speculative interview, or invokes /grilling, $grilling, /grill-me, or $grill-me. Support an ordinary user interview and a multi-agent speculative mode (spec, factory, debate, or -s) in which a strictly question-only griller interrogates an honest, exhaustive respondent that can initiate research, web searches, and specialist-agent delegation; open positions are then sharpened by a bounded internal debate, and the orchestrator closes with a plain-language recommendation covering implications, trajectory, time and effort, and an autonomous-execution handoff. Human-facing output is conversational prose with zero internal identifiers; machine state travels in private control deltas."
-argument-hint: "[spec|factory|debate] [topic or artifact] [--depth <n>]"
+description: "Interrogate a plan, decision, product thesis, or idea through hard, dependency-aware questions only. Use when the user asks to be grilled, stress-test assumptions, expose blind spots, explore a decision tree, run a speculative interview, or invokes /grilling, $grilling, /grill-me, or $grill-me. Support an ordinary user interview and multi-agent speculative modes: a linear family (spec, factory, debate, or -s) and the wave-parallel lattice (gradient). The speculative modes pit a strictly question-only griller against an honest, exhaustive respondent that can initiate research, web searches, and specialist-agent delegation; open positions are sharpened by a bounded internal debate, and the orchestrator closes with a plain-language recommendation covering implications, trajectory, time and effort, and an autonomous-execution handoff. Human-facing output is conversational prose with zero internal identifiers; machine input travels in private control deltas."
+argument-hint: "[spec|factory|debate|gradient] [topic or artifact] [--depth <n>] [--n <stems>] [--branch <b>] [--keep <k>] [--zones <z>] [--cap <nodes>]"
 ---
 
 # Grilling
@@ -10,6 +10,31 @@ Expose what a plan has not yet earned by asking the questions on which its
 conclusions depend. Keep the griller interrogative: it may investigate,
 challenge, and follow implications, but it must not become a critic that argues
 for its own position.
+
+## Choosing a strategy
+
+The modes fall on two orthogonal axes, and picking the right one starts by
+identifying which axis you are changing:
+
+- `spec`, `factory`, and `debate` change **who answers and how the evidence wave
+  runs** inside a still-linear interview.
+- `gradient` changes **topology and resource discipline** — it is a bounded
+  branching lattice with wave-parallel execution and explicit cost caps, not a
+  different "who answers".
+
+| Strategy | Answers / evidence | Topology | Resource policy |
+|---|---|---|---|
+| *(default)* | user answers directly, no agents | linear | none defined |
+| `spec` (`-s`,`sx`) | griller + respondent + orchestrator; projected answer chain | linear / user-guided | none defined |
+| `factory` | spec + respondent spawns a parallel bounded specialist wave | linear | research wave with deadline, synthesis-only after |
+| `debate` | spec close + bounded internal debate over the sharpest open split | linear | debate, evidence-gated, minority preserved |
+| `gradient` *(see its section)* | spec roles, respondent waves run **wave-parallel** | bounded branching lattice: `n` at L2, branch `b`, depth `d` | lazy expansion, beam+VOI prune, DAG fan-in dedup, **barrier checkpoints**, executed-node/token caps, BM25/embedding recall + MMR selection, deterministic-key-only merge |
+
+One sentence demarcation: **`factory` is one parallel evidence wave inside a
+linear interview; `gradient` makes the whole inquiry a bounded branching
+lattice with wave-parallel respondent execution and cost caps.** If you want
+wider/denser coverage of a decision space with disciplined spend, choose
+`gradient`; otherwise the linear family.
 
 ## Human-first rendering rules
 
@@ -53,9 +78,9 @@ In `transport` mode, emit only the smallest versioned machine envelope needed
 by the receiving agent. Do not mix transport metadata into human prose.
 
 Speculative execution does not grant permission to expose internals. The words
-`spec`, `speculative`, `factory`, `debate`, `-s`, or `sx` select an execution
-mode; they do not mean “show the graph.” Show raw internals only when the user
-explicitly asks to see the raw graph, ledger, protocol, or debug
+`spec`, `speculative`, `factory`, `debate`, `gradient`, `-s`, or `sx` select
+an execution mode; they do not mean “show the graph.” Show raw internals only
+when the user explicitly asks to see the raw graph, ledger, protocol, or debug
 representation.
 
 When raw internals are explicitly requested, present the complete human-readable
@@ -211,9 +236,16 @@ resulting plan until the user separately authorizes that work.
 ## Run speculative multi-agent execution
 
 Use speculative mode only when the user asks for `spec`, `speculative`,
-`factory`, `debate`, `-s`, `sx`, a projected answer chain, or a back-and-forth
-between agents. Honor any named agent, provider, or model after verifying that
-it is available.
+`factory`, `debate`, `gradient`, `-s`, `sx`, a projected answer chain, or a
+back-and-forth between agents. Honor any named agent, provider, or model after
+verifying that it is available.
+
+`gradient` is a different shape from the others: `spec`/`factory`/`debate` keep
+a linear interview and change who answers or how evidence runs; `gradient`
+changes topology and resource discipline (it is the bounded wave-parallel
+lattice defined in its own section below, “Run gradient”, which extends the
+speculative roles). Select `gradient` when the goal is wide, smooth coverage of
+a decision space with explicit cost caps, not a linear interrogation.
 
 Keep four roles and their output channels distinct:
 
@@ -334,15 +366,186 @@ falsified, explicitly unresolved with a resolution path, or no longer capable
 of changing the active decision. Preserve the raw research and unanswered
 questions for branches that may reopen.
 
+## Run gradient: a bounded, wave-parallel decision lattice
+
+`gradient` is a distinct strategy for cases where the decision space should be
+covered **widely and densely** — a smooth continuum of possibilities rather than
+a few binary forks — with disciplined, bounded spend. It reuses the speculative
+roles (griller, respondent, orchestrator, user) but changes the **topology** and
+adds a **resource budget**. It is not a linear interview with a research wave; it
+is a bounded branching lattice executed in parallel waves.
+
+### Shape
+
+The lattice is parameterized intentionally:
+
+- **Level 1 is the root**: the single central question (for example "is this
+the right base, and how firmly?"). It is not itself a position; it anchors
+the axis.
+- **The axis** is the one continuous dimension the lattice spans (for example
+  confidence/discovery). It must be chosen and documented up front because it
+defines what "adjacent" means.
+- `n` stems at level 2 (one per major position). Each stem is a discrete,
+  non-overlapping position along the axis; adjacent stems should differ by a
+  small margin so the lattice is smooth. Enumerating the stems is a scoping
+  decision the user sets (or the respondent wave proposes) before expansion;
+  `n` is then fixed for the run.
+- `b`-way branching per node thereafter.
+- `d` maximum depth.
+- Theoretical root→leaf paths = `n · b^(d-2)`. This number is a **frontier
+  spec, never a build order** — the lattice is grown lazily and pruned, so the
+executed cost is far below the theoretical count.
+- `keep` (`k`) candidate paths carried as live; `zones` (`z`) divides the
+  gradient into regions used to guarantee spread.
+
+A “smooth gradient” is the organizing intent: the `n` stems deliberately span
+one axis of the decision space (for example a confidence/discovery axis), so the
+kept paths form a continuum of adjacent positions rather than clumping near the
+current stance. Enforce this with explicit zone allocation, not by hoping the
+top-value paths happen to spread.
+
+### Execution rules
+
+1. **Lazy expansion.** Never materialize a child you will not execute. A node's
+   children are forked only when the parent's value-of-information gate passes.
+2. **Value function.** Score each candidate node by its decision leverage, its
+   shared fan-in (how many paths touch it), its gradient-diversity bonus, over
+   an estimated cost:
+   `V(n) = (decision_leverage(n) · fan_in(n) · diversity(n)) / cost(n)`.
+3. **Beam + VOI prune.** Keep the top-`k` by accumulated value; stop a path the
+   moment continuing it can no longer change the recommendation (supported,
+   falsified, unresolved-with-a-path, or decision-fixed). Effective depth thus
+   varies per path; `d` is a ceiling, not a target.
+4. **DAG fan-in dedup.** When paths converge on a shared sub-node, execute it
+   once and credit its result to every touching path. This is the single largest
+   cost collapse: a huge theoretical lattice can cost a few hundred real nodes.
+5. **Wave-parallel execution with barrier checkpoints (bulk synchronous).**
+   Respondents run in parallel **per wave**; a serial orchestrator barrier sits
+   between waves. **A wave worker is a complete respondent instance, not a
+   specialist** — each independently answers its slot and may itself spawn
+   bounded specialists (which report only to that worker, never to the
+   orchestrator, per the respondent-specialist rules). The barrier does
+exact-key clustering, near-duplicate recall, structured-field-confirmed
+merges, re-scoring, pruning, and the next zone allocation **before any deeper
+wave launches**. Parallelism (produce) and comparison (reconcile) never
+overlap.
+
+   **Barrier failure semantics.** The barrier advances only when every worker's
+turn in the wave has finished and been validated. A worker that fails or
+times out is isolated: its partial output is discarded, its slot is marked
+failed (recorded in the ledger, not silently dropped), and the wave is
+re-arranged — either retry that slot or, if the runtime is degraded, continue
+with the valid workers and record the gap as an incomplete turn. A failed
+slot is never merged half-valid into a shared node. If parallel workers finish
+unevenly, the barrier waits for the slowest within the budget cap; if a worker
+exceeds the wave deadline, that is a bounded failure handled here, not an
+excuse to manufacture the missing answer.
+6. **Similarity is recall, never merge authority.** BM25/embeddings recall
+   candidate near-duplicates and drive MMR (maximal marginal relevance) cross-
+   path selection so the kept set spans all zones. **Collapsing a node is gated
+   on exact deterministic keys (canonicalized evidence tuples, structured
+   fields), never on fuzzy similarity alone.** A fuzzy suggestion is only a
+   candidate, always confirmed or reviewed before application. This guards the
+   “looked equivalent, wasn't” failure.
+7. **Budget caps.** Set an executed-node hard cap and a token/time envelope up
+   front. If the beam would exceed the cap, tighten `keep`/`zones` rather than
+   run more nodes. Insert a **stop-checkpoint** periodically (for example every
+   ~40 executed nodes) so the user can steer before cost accumulates.
+8. **Synthesis-only phase.** After the research/expansion waves close, stop
+   launching new nodes and enter synthesis (reconcile, run the internal debate
+   over the sharpest open split, then close).
+
+### Close
+
+Close `gradient` like any speculative run: user review boundary, the internal
+debate over the sharpest open split **when materially different candidate
+answers or mutually exclusive positions remain** (consistent with the mandatory
+debate rule — it is only skipped when no materially different positions are
+left), then the orchestrator's plain-language closing report (recommendation,
+implications, trajectory, time and effort, autonomous-execution handoff).
+Ratification stays with the user.
+
+### Resumable state and graph mapping
+
+Gradient's lattice is schedule state the orchestrator owns, and it must be
+recorded in the same private control envelope as every other node so replay
+reconstructs the same frontier (definition-of-done). Persist, per checkpoint:
+
+- the **lattice shape** (`n`, `branch`, `depth`, `keep`, `zones`);
+- the **beam**: every live path as a branch, with its accumulated value, its
+  zone, and its scheduled/pruned/reopened status;
+- the **wave/barrier state**: current wave number, per-slot worker status,
+  and the last committed frontier;
+- the **budget counters**: executed-node total against the hard cap, token and
+  time consumed, and remaining envelope;
+- the **deterministic merge keys** already assigned (so dedup is stable across
+  replay, preventing a re-run from re-merging differently);
+- the **scoring parameters and tie-break rule**, so two replays break ties
+  identically.
+
+Map the beam onto the canonical graph faithfully: each kept stem is a real
+branch in the ledger; a pruned path has a parked branch with its reopening
+condition; a fan-in convergence is recorded as shared-node edges so that
+dependency invalidation still walks the same subgraph. The control delta may
+carry a nested `lattice` block for this state; it is private and never shown
+in human output.
+
+### Typical parameters
+
+A disciplined default is `--n 10 --branch 3 --depth 7 --keep 20 --zones 5`.
+The theoretical lattice has 2,430 root-to-leaf paths, but that is a frontier
+spec, never a build order. **Expected executed cost is a capped estimate, not
+a guarantee:** under lazy expansion + DAG fan-in dedup + VOI pruning with
+these parameters, the realistic range is roughly **120–200 executed
+refinements** (not 2,430 materialized paths), always subject to the hard
+executed-node cap (`--cap`), a token envelope, and a wall-clock envelope.
+Set the hard `--cap` before launching (for example 200) and report actual vs
+caps in the closing summary rather than asserting a fixed node count. Costs
+are reported as executed refinements, token range, and wall-clock under the
+stated parallel/serial assumptions and the explicit budget caps.
+
+## Type each unresolved uncertainty
+
+Every unresolved `U-*` node carries one type that says why it is open and what
+would close it. Use the same taxonomy as the `clear-writing` skill's grill mode,
+so a single vocabulary covers both editing and interrogation: the reason an
+editor flags a sentence is the reason a plan's claim is unproven. Assign the
+most specific. If several types apply, record the primary one and note the
+others.
+
+- **CITATION** — a factual claim should be supported by a source. Closed by finding the source.
+- **VERIFY** — a number, fact, or external claim must be checked. Closed by confirming against a primary or otherwise documented source.
+- **JUSTIFY** — a conclusion does not clearly follow from the preceding reasoning. Closed by stating the missing inference.
+- **EVIDENCE** — a claim needs data, an example, an experiment, or other empirical support. Closed by producing it.
+- **DEFINE** — an important term is ambiguous or overloaded. Closed by fixing its operational meaning.
+- **ASSUMPTION** — the argument rests on an unstated premise. Closed by surfacing and testing the premise.
+- **COUNTERARGUMENT** — a strong obvious objection goes unanswered. Closed by addressing it.
+- **INVESTIGATE** — the claim requires deeper technical or external investigation. Closed by scoping and running that investigation.
+- **HUMAN** — the text presents a choice only the user can decide. Closed by the user; never close it on their behalf.
+
+Typing is not a license to over-flag. Mark only gaps whose resolution could
+materially change truth, credibility, logical validity, decision quality, or
+reader understanding. Do not type an ordinary statement merely because it
+could theoretically cite a source.
+
+The type maps to what the griller asks next and what the respondent resolves.
+Filter the respondent's resolution precisely: it must close the stated type,
+not restyle the claim to sound more confident or less exposed. Do not let a
+clean restatement hide the evidence gap.
+
+The type is internal machine vocabulary, the same as a `U-*` identifier. It
+may appear in the private control envelope and the explicit diagnostic view,
+never in a numbered question or in ordinary human-facing prose.
+
 ## Repeat this cycle
 
 This cycle has two halves. Steps 1–4 form the **default human loop** for both
 modes: the griller asks plain-language questions, they are validated, and the
 orchestrator records them. Steps 5–8 (respondent answers, control deltas, and
 branch routing) apply **only to speculative execution** (`spec`, `factory`,
-`debate`, `-s`, `sx`). In the default interview, the user answers the questions
-directly; the orchestrator maps the answers and selects the next frontier
-without a respondent.
+`debate`, `gradient`, `-s`, `sx`). In the default interview, the user answers
+the questions directly; the orchestrator maps the answers and selects the next
+frontier without a respondent.
 
 1. The orchestrator selects the active frontier from the canonical graph and
    prepares only the relevant ancestry. It does not send the complete graph
@@ -371,6 +574,26 @@ without a respondent.
    in plain language rather than exposing the graph representation.
 8. Let the orchestrator select the next branch and repeat until a stop
    condition is met.
+
+In the `gradient` strategy the loop is the same atomic contract at **per-wave**
+granularity, not per-question: within one wave, each respondent runs steps 5-7
+on its own slot in parallel; the orchestrator then runs one barrier checkpoint
+that (a) validates each returned answer against the two rendering contracts,
+(b) applies each control delta atomically, and (c) only after all valid turns
+are applied, recomputes the frontier and selects the next wave. No parallel
+worker's output is accepted until it has passed the same validation as a
+serial turn; a failed worker turn is discarded and requests a fresh
+re-render rather than merged half-valid. This keeps the definition-of-done
+replay property (same frontier reconstructed) true under parallelism.
+
+**Wave transaction.** All workers in one wave share the same `base_rev`. To
+avoid revision conflicts and partial-wave commits, the orchestrator applies
+one **composite wave delta**: it accumulates each validated worker's node
+mutations onto a single envelope, applies them in a deterministic commit order
+(materialized by `lattice.beam` order, then `path_ref`), and commits that one
+delta as the next `rev`. No worker's delta is committed alone mid-wave; this
+keeps the atomic "all-or-nothing" contract that the serial loop guarantees, and
+a replay replays the whole composite wave as one step.
 
 Never ask a lean flash model to serialize the graph; give it only the current
 frontier and the minimum relevant ancestry, and let the orchestrator construct
@@ -520,6 +743,16 @@ requirement to manufacture 100 shallow exchanges. Do not impose an arbitrary
 depth cap. Continue while new questions can change the result and the user's
 time, cost, and stop constraints permit it.
 
+The single-trunk and no-hard-depth-cap rules apply to the **linear** family
+(`spec`/`factory`/`debate`) and the default interview. The `gradient` strategy
+is an explicit exception: it deliberately keeps `keep` live paths (a bounded
+beam, not one trunk) and imposes `depth` as a hard ceiling with a strict
+executed-node cap. Both are budget-capped by user constraint and value-of-
+information pruning, not driven by an open-ended demand that every path reach
+full depth. Gradient's kept/pruned paths map onto this ledger as the branches
+the beam is carrying; the ledger and the beam must be reconciled at each
+barrier checkpoint so replay reconstructs the same frontier.
+
 Discussions of organizations, economics, physics, or first principles are
 in-scope only while a dependency path connects them to the product decision.
 Record the connection; park the branch if it becomes merely interesting.
@@ -595,6 +828,11 @@ if it contains any internal identifier or machine field, including:
 - any control-envelope field: `v`, `base_rev`, `rev`, `mode`, `add`,
   `update`, `remove`, `frontier`, `ancestry`, `recompute`, `deps`,
   `content_ref`, `from_nr`, `nr`, `id`, `targets`, or `depends-on`; and
+- any `lattice` (gradient) envelope field: `lattice`, `shape`, `axis`, `n`,
+  `branch`, `depth`, `keep`, `zones`, `beam`, `path_ref`, `value`, `zone`,
+  `status`, `wave`, `worker_status`, `last_frontier_rev`, `budget`, `executed`,
+  `cap`, `tokens_cap`, `tokens_used`, `time_cap_secs`, `time_used_secs`,
+  `merge_keys`, `scoring`, `params`, or `tie_break`; and
 - any machine-structure marker: a JSON/YAML object or array literal, a
   key-value mapping outside a numbered question list, a code fence,
   `BEGIN`/`END` transport delimiters, or an HTML `<details>`/`<summary>`
@@ -603,6 +841,13 @@ if it contains any internal identifier or machine field, including:
 The denylist above is the visible subset of a complete machine-token
 classification: every field name, identifier family, and delimiter shown
 anywhere in this skill's transport examples is machine content by default.
+These matches are **schema-key matches** — they flag the fields only where
+they appear as control-envelope keys (a quoted field in an envelope or a key
+in a JSON/YAML object), not as bare words. Short generic tokens such as `n`,
+`zone`, `value`, `status`, `shape`, or `budget` are ordinary English and must
+not be banned when they appear in human prose. A validator should match a
+quoted identifier or a mapping key at envelope depth, never every occurrence
+of the word.
 If any such content appears, do not show any part of the turn. Re-render it
 from the question prose and validate the complete replacement.
 
@@ -639,6 +884,40 @@ Use this delta shape:
   "remove": [],
   "frontier": [],
   "ancestry": [],
+  "lattice": {
+    "shape": {
+      "axis": "confidence-or-discovery",
+      "n": 10,
+      "branch": 3,
+      "depth": 7,
+      "keep": 20,
+      "zones": 5
+    },
+    "beam": [
+      {
+        "path_ref": "B-012",
+        "value": 0.0,
+        "zone": 2,
+        "status": "scheduled"
+      }
+    ],
+    "wave": 0,
+    "worker_status": {},
+    "last_frontier_rev": 17,
+    "budget": {
+      "executed": 0,
+      "cap": 200,
+      "tokens_cap": 0,
+      "tokens_used": 0,
+      "time_cap_secs": 0,
+      "time_used_secs": 0
+    },
+    "merge_keys": {},
+    "scoring": {
+      "params": {},
+      "tie_break": "path_ref"
+    }
+  },
   "recompute": {
     "invalidate": {
       "roots": [],
@@ -673,6 +952,11 @@ Interpret the fields as follows:
   repeat question or answer text in the control envelope. When one human item
   states multiple alternatives, an optional `part` ordinal may distinguish
   them without copying their prose.
+- `lattice` (gradient only) carries scheduler state: the shape
+  (`n`/`branch`/`depth`/`keep`/`zones`), the live beam, the current wave and
+  per-slot worker status, and budget counters (executed vs cap, tokens, time).
+  It is private and never shown in human output; replay accepts only
+  monotonic, self-consistent lattice deltas (see the gradient section).
 
 Apply a delta atomically:
 

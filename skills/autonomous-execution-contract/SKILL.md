@@ -13,15 +13,46 @@ Use this skill when the user asks for long-running uninterrupted work, says to k
 Treat the user's prompt as an execution contract. Extract or infer:
 
 - Objective: the concrete finish line.
+- Epic contract: the canonical path/checkpoint plus objective and authority
+  digests whose unchanged policy this bounded task inherits.
+- Task ID and slice delta: the stable DAG node plus only the risk, authority,
+  focused-proof, expected-evidence, and budget fields changed for this task.
 - Timebox: how long to keep working before summarizing or reassessing.
 - Reasoning posture: low by default for routine inspect/patch/test loops; escalate only for architecture, safety, product behavior, or unclear tradeoffs.
 - Stop rules: the few conditions that require user intervention.
 - Verification target: the proof command, benchmark, test, CI state, or artifact that defines done.
+- Proof schedule: focused checks, milestone/global checks, repeat count,
+  proof-run/time ceiling, and receipt-reuse rules inherited from project
+  authority through the epic contract.
 - Git policy: whether commits, squashes, pushes, PRs, or merges are allowed.
 - Resource policy: what heavy resources (Docker, emulators, K8s, GPU, benchmarks) the contract may use, and the finite fault-containment breakers that must stop it.
-- Via: whether the executing agent does the work itself (`self`) or delegates mechanical inspect/patch/test/benchmark work to lower-reasoning sub-agents (`sub-agents`), keeping proof and authorization judgment for the executor. If unspecified and sub-agent tooling is available, prefer `sub-agents`; keep faithful to the host's governor-orchestrator convention when one is documented.
+- Via: whether the executing agent does the work itself (`self`) or delegates
+  bounded mechanical inspect/patch/test/benchmark work to lower-reasoning
+  sub-agents, keeping proof and authorization judgment for the executor.
 
-If any field is missing, make the safest reasonable assumption and continue. A missing `Via` defaults to following the host's documented orchestrator convention when present, else `self`. A missing `Resource policy` defaults to a preflight + the finite-breaker defaults below. Ask only when the missing field changes risk, public behavior, external shared state, or destructive action.
+If any field is missing, make the safest reasonable assumption and continue. A
+missing `Via` follows an explicit host/project governor convention when one
+positively authorizes delegation; otherwise it defaults to `self`. Tool
+availability alone never grants delegation authority. Evidence-bearing
+delegation must have a named scope and acceptance boundary. A missing Resource
+policy defaults to a preflight plus the finite-breaker defaults below. Ask only
+when the missing field changes risk, public behavior, external shared state, or
+destructive action.
+
+## Budget Precedence
+
+Before starting the task and before every expensive proof, apply budgets in
+this order:
+
+1. authority and non-negotiable stop rules,
+2. safety/resource breakers,
+3. explicit user ceilings,
+4. proof-run and repeated-failure ceilings,
+5. active-time and external-cost ceilings,
+6. commit/tranche ceilings.
+
+A lower-priority budget never overrides a higher-priority boundary. Reaching a
+budget creates a checkpointed stop; it never proves the objective complete.
 
 ## Default Stop Rules
 
@@ -39,18 +70,52 @@ Routine implementation details, test failures, benchmark artifacts, noisy local 
 
 ## Execution Loop
 
-1. Restate the active objective and stop rules briefly.
-2. Orient: if resuming a long-running campaign, recall the canonical checkpoint state (project docs, submodule/HEAD state, prior decisions, proof status, open blockers) before acting. Never assume continuity you have not verified.
+1. State the active task ID and objective, then verify the inherited epic
+   contract's objective/authority digests. Restate only changed policy.
+2. Orient: if resuming, load the canonical checkpoint and re-read only authority
+   or evidence whose digest changed. Never assume continuity you have not
+   verified, but do not retransmit unchanged invariants as fresh prose.
 3. Gather the narrowest context needed for the next concrete step.
 4. Patch the next failure or missing capability directly (or delegate the mechanical patch to a sub-agent per the `Via` field; review its diff before accepting).
-5. Run focused verification after each coherent patch. If `Via: sub-agents`, delegate the run and re-run the acceptance check yourself (trust but verify).
-6. Run the contract's proof target when focused checks pass.
+5. Run focused verification after each coherent patch. If delegated, validate a
+   controller-owned receipt binding the command/manifest, exit, duration,
+   source tree, dependencies, toolchain, features, environment, and artifacts.
+   Re-run the acceptance check only when no valid receipt exists or a bound
+   identity changed.
+6. Run milestone/global proof only when the inherited proof schedule says it is
+   due and its pre-proof budget check passes. Do not promote every focused check
+   into the contract's expensive proof target.
 7. If proof fails, inspect artifacts, classify the next failure, patch it, and continue — but stop if the 3-strike circuit breaker triggers.
-8. Commit coherent checkpoints when permitted and the touched work is internally consistent.
-9. Update the checkpoint state when progress is material (completed tasks, current task, verification outcomes, submodule pointers, next action) so the work is resumable across shells.
+8. Add the completed task to its tranche. Commit only when the tranche is
+   coherent, permitted, and has satisfied the proof schedule; a patch, slice,
+   checkpoint, commit, and milestone are distinct events.
+9. Append a checkpoint event after every commit, expensive proof run, budget or
+   stop event, authority revision, and context compaction. Include stable task
+   and acceptance IDs, receipts, budget consumption, source identities,
+   failure evidence, and the next ready action.
 10. Keep concise progress updates flowing during long commands.
 
 Prefer the next concrete fix over a broad plan once the objective and stop rules are clear.
+
+## Checkpoint And Receipt Minimum
+
+When the goal runtime supports only a flat objective and aggregate usage, store
+the richer append-only checkpoint in the project's canonical state. Each event
+must identify:
+
+- epic, task, and acceptance IDs;
+- objective and authority digests;
+- event kind and terminal/non-terminal status;
+- source commit/tree and dependency/toolchain/environment identity;
+- focused or global proof receipt and whether it was produced or reused;
+- active, tool, wait, and user-wait time when exposed, otherwise a precisely
+  labelled aggregate;
+- fresh/cached input, output, and reasoning tokens when exposed;
+- budget remaining, failure evidence, and next ready action.
+
+Receipt reuse is valid only when every identity required by the compiled proof
+policy matches. Agent testimony and matching commit messages never substitute
+for controller-owned evidence.
 
 ## Reasoning Posture
 
@@ -105,6 +170,9 @@ Verification: <exact proof target>
 Git: <commit/push/PR/merge policy>
 Via: <self | sub-agents>
 Resource: <heavy-resource scope + breaker floors, or 'none'>
+Epic contract: <canonical checkpoint path + objective/authority digest>
+Task ID: <stable DAG node ID>
+Proof budget: <focused schedule + global schedule + run/time ceiling + receipt reuse>
 ```
 
 For a multi-slice campaign rather than a single bounded task, wrap this contract inside the loop authority (`autonomy-loop` skill) and pass the campaign goal + task-selection and checkpoint rules there; keep this skill as the per-target executor. Use a `Via: sub-agents` line when the host's governor-orchestrator convention expects the bulk work to be delegated.
@@ -115,10 +183,13 @@ Example:
 Use autonomous-execution-contract.
 
 Objective: Make 13_managed_queue_worker pass a two-repeat --require-churn-free sweep.
+Epic contract: PROMPT.md plus its recorded objective/authority digest.
+Task ID: benchmark.managed_queue.churn_free.
 Timebox: 3 hours.
 Reasoning: low by default; escalate only for architecture/safety decisions.
 Stop only for product/API decisions, secrets, destructive actions, or external infra; also after 3 straight same-target proof failures.
 Verification: focused tests after patches, then the two-repeat benchmark proof.
+Proof budget: focused tests per patch; one two-run global group; no receipt reuse if source or benchmark identity changes.
 Git: commit coherent passing checkpoints; do not push.
 Via: sub-agents for inspect/patch/test/benchmark; keep proof and authorization judgment here.
 Resource: Docker benchmarks; preflight df-h + docker system df; stop if disk<10% or Docker unhealthy.
@@ -134,5 +205,9 @@ When the contract ends, report:
 - The next concrete blocker or recommended continuation.
 - Whether any resource breakers tripped and what state was left behind.
 - Whether the work is checkpointed and resumable, and the exact next command to resume.
+- Proof receipts produced or reused, their bound identities, and any failure
+  evidence captured before stopping.
+- Budget usage separated into active/tool/wait/user-wait time and
+  fresh/cached/output/reasoning tokens when the runtime exposes those fields.
 
 Do not bury tool-friction records in the user-facing report. If workarounds or missing tool capabilities slowed the loop, record them in the appropriate system-level friction log and then continue.

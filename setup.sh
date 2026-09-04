@@ -2,7 +2,43 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
-GIT_DIR="$(git -C "$REPO_ROOT" rev-parse --git-dir)"
+GIT_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-dir)"
+
+replace_hook_library() {
+  local source_dir="$1"
+  local git_dir_real target stage backup_root backup=""
+
+  git_dir_real="$(realpath -e -- "$GIT_DIR")"
+  [[ "$git_dir_real" != "/" && ! -L "$GIT_DIR" ]] || {
+    echo "ERROR: refusing library install into unsafe git directory: $GIT_DIR" >&2
+    return 1
+  }
+
+  target="$git_dir_real/lib"
+  [[ "$(realpath -m -- "$(dirname -- "$target")")" == "$git_dir_real" ]] || {
+    echo "ERROR: refusing library install outside git directory: $target" >&2
+    return 1
+  }
+
+  stage="$(mktemp -d "$git_dir_real/.lib-stage.XXXXXX")"
+  cp -a "$source_dir/." "$stage/"
+  if [[ -e "$target" || -L "$target" ]]; then
+    backup_root="$git_dir_real/rahulskills-backups/setup-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    backup="$backup_root/lib"
+    mkdir -p "$backup_root"
+    mv -- "$target" "$backup"
+    echo "  [backup] prior lib retained at $backup"
+  fi
+
+  if ! mv -- "$stage" "$target"; then
+    echo "ERROR: library install failed; staged tree retained at $stage" >&2
+    if [[ -n "$backup" && ! -e "$target" && ! -L "$target" ]]; then
+      mv -- "$backup" "$target"
+      echo "  [restore] prior lib restored" >&2
+    fi
+    return 1
+  fi
+}
 
 # --- Commithooks bootstrap ---------------------------------------------------
 
@@ -31,10 +67,10 @@ for hook in pre-commit commit-msg pre-push post-checkout post-merge; do
   echo "  [ok]   $hook"
 done
 
-# Copy library modules
-rm -rf "$GIT_DIR/lib"
-cp -r "$COMMITHOOKS_DIR/lib" "$GIT_DIR/lib"
-echo "  [ok]   lib/ ($(ls "$GIT_DIR/lib" | wc -l) modules)"
+# Copy library modules as a staged, recoverable replacement.
+replace_hook_library "$COMMITHOOKS_DIR/lib"
+module_count="$(find "$GIT_DIR/lib" -mindepth 1 -maxdepth 1 -printf '.' | wc -c)"
+echo "  [ok]   lib/ ($module_count modules)"
 
 # Ensure .githooks/ are executable
 if [ -d "$REPO_ROOT/.githooks" ]; then

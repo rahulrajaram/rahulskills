@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clean Code Refine"
+  short_description: "Review or refactor code across clean-code aspects without over-weighting one style."
+  default_prompt: "Run /clean-code-refine: review the target code across behavior, idiom, size, complexity, dataflow, testability, and simplicity; refactor only when requested or approved."

@@ -5,13 +5,18 @@ Comprehensive conversation analysis for extracting anti-patterns, tooling gaps, 
 
 import json
 import sys
-from collections import defaultdict, Counter
+import re
+from collections import Counter
 from typing import List, Dict, Any
 from dataclasses import dataclass, field
+
+from redaction import redact_sensitive_excerpt, redact_sensitive_text
+
 
 @dataclass
 class ConversationStats:
     """Statistics extracted from conversation."""
+
     total_turns: int = 0
     user_messages: List[str] = field(default_factory=list)
     assistant_messages: List[str] = field(default_factory=list)
@@ -24,6 +29,10 @@ class ConversationStats:
     retries: List[Dict[str, Any]] = field(default_factory=list)
     scope_expansions: List[str] = field(default_factory=list)
     hardcoded_values: List[Dict[str, Any]] = field(default_factory=list)
+    first_timestamp: str = ""
+    last_timestamp: str = ""
+    command_duration_seconds: float = 0.0
+    tool_calls: Counter = field(default_factory=Counter)
 
     # Command patterns
     repeated_commands: Counter = field(default_factory=Counter)
@@ -37,7 +46,7 @@ class ConversationStats:
 def load_conversation(filepath: str) -> List[Dict]:
     """Load JSONL conversation file."""
     messages = []
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         for line in f:
             if line.strip():
                 messages.append(json.loads(line))
@@ -52,19 +61,19 @@ def extract_text_from_content(content: Any) -> str:
         texts = []
         for item in content:
             if isinstance(item, dict):
-                if item.get('type') == 'text':
-                    texts.append(item.get('text', ''))
-                elif item.get('type') == 'thinking':
-                    texts.append(f"[THINKING: {item.get('thinking', '')[:200]}...]")
+                if item.get("type") == "text":
+                    texts.append(item.get("text", ""))
+                elif item.get("type") == "thinking":
+                    texts.append(f"[THINKING: {item.get('thinking', '')}]")
             elif isinstance(item, str):
                 texts.append(item)
-        return '\n'.join(texts)
+        return "\n".join(texts)
     return str(content)
 
 
 def analyze_tool_use(message: Dict, stats: ConversationStats):
     """Extract tool usage patterns."""
-    content = message.get('message', {}).get('content', [])
+    content = message.get("message", {}).get("content", [])
     if not isinstance(content, list):
         return
 
@@ -72,39 +81,56 @@ def analyze_tool_use(message: Dict, stats: ConversationStats):
         if not isinstance(item, dict):
             continue
 
-        tool_name = item.get('name')
-        tool_input = item.get('input', {})
+        tool_name = item.get("name")
+        tool_input = item.get("input", {})
+        if tool_name:
+            stats.tool_calls[tool_name] += 1
 
-        if tool_name == 'Bash':
-            cmd = tool_input.get('command', '')
-            desc = tool_input.get('description', '')
-            stats.bash_commands.append({
-                'command': cmd,
-                'description': desc,
-                'timestamp': message.get('timestamp', '')
-            })
+        if tool_name == "Bash":
+            cmd = tool_input.get("command", "")
+            desc = tool_input.get("description", "")
+            command = {
+                "command": cmd,
+                "description": desc,
+                "timestamp": message.get("timestamp", ""),
+                "duration_seconds": float(
+                    tool_input.get("duration_seconds", 0.0) or 0.0
+                ),
+                "exit_code": tool_input.get("exit_code"),
+                "status": tool_input.get("status", ""),
+            }
+            stats.bash_commands.append(command)
+            stats.command_duration_seconds += command["duration_seconds"]
             stats.repeated_commands[cmd] += 1
+            if command["exit_code"] not in (None, 0):
+                stats.failed_commands.append(command)
 
-        elif tool_name == 'Read':
-            stats.file_reads.append(tool_input.get('file_path', ''))
+        elif tool_name == "Read":
+            stats.file_reads.append(tool_input.get("file_path", ""))
 
-        elif tool_name == 'Write':
-            stats.file_writes.append(tool_input.get('file_path', ''))
+        elif tool_name == "Write":
+            stats.file_writes.append(tool_input.get("file_path", ""))
 
-        elif tool_name == 'Edit':
-            stats.file_edits.append({
-                'file': tool_input.get('file_path', ''),
-                'old': tool_input.get('old_string', '')[:100],
-                'new': tool_input.get('new_string', '')[:100]
-            })
+        elif tool_name == "Edit":
+            stats.file_edits.append(
+                {
+                    "file": tool_input.get("file_path", ""),
+                    "old": redact_sensitive_text(tool_input.get("old_string", ""))[
+                        :100
+                    ],
+                    "new": redact_sensitive_text(tool_input.get("new_string", ""))[
+                        :100
+                    ],
+                }
+            )
 
-        elif tool_name == 'Grep':
-            stats.grep_searches.append(tool_input.get('pattern', ''))
+        elif tool_name == "Grep":
+            stats.grep_searches.append(tool_input.get("pattern", ""))
 
 
 def analyze_tool_results(message: Dict, stats: ConversationStats):
     """Analyze tool results for errors and failures."""
-    content = message.get('message', {}).get('content', [])
+    content = message.get("message", {}).get("content", [])
     if not isinstance(content, list):
         return
 
@@ -112,17 +138,19 @@ def analyze_tool_results(message: Dict, stats: ConversationStats):
         if not isinstance(item, dict):
             continue
 
-        if item.get('type') == 'tool_result':
-            result_content = item.get('content', '')
+        if item.get("type") == "tool_result":
+            result_content = item.get("content", "")
             result_str = str(result_content)
 
             # Check for errors
-            if 'error' in result_str.lower() or 'failed' in result_str.lower():
-                stats.errors.append({
-                    'tool_use_id': item.get('tool_use_id', ''),
-                    'content': result_str[:500],
-                    'timestamp': message.get('timestamp', '')
-                })
+            if "error" in result_str.lower() or "failed" in result_str.lower():
+                stats.errors.append(
+                    {
+                        "tool_use_id": item.get("tool_use_id", ""),
+                        "content": redact_sensitive_text(result_str)[:500],
+                        "timestamp": message.get("timestamp", ""),
+                    }
+                )
 
 
 def detect_hardcoded_values(text: str) -> List[Dict[str, str]]:
@@ -130,25 +158,33 @@ def detect_hardcoded_values(text: str) -> List[Dict[str, str]]:
     patterns = []
 
     # Look for password assignments
-    if 'password' in text.lower() and '=' in text:
-        for line in text.split('\n'):
-            if 'password' in line.lower() and '=' in line:
-                patterns.append({
-                    'type': 'password',
-                    'line': line.strip()[:200]
-                })
+    if "password" in text.lower() and "=" in text:
+        for match in re.finditer(r"[^\n]+", text):
+            line = match.group()
+            if "password" in line.lower() and "=" in line:
+                patterns.append(
+                    {
+                        "type": "password",
+                        "line": redact_sensitive_excerpt(text, *match.span()).strip()[
+                            :200
+                        ],
+                    }
+                )
 
     # Look for IP addresses being set
-    import re
-    ip_pattern = r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'
+    ip_pattern = r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"
     if re.search(ip_pattern, text):
         for match in re.finditer(ip_pattern, text):
-            context = text[max(0, match.start()-50):min(len(text), match.end()+50)]
-            patterns.append({
-                'type': 'ip_address',
-                'value': match.group(),
-                'context': context
-            })
+            context = redact_sensitive_excerpt(
+                text, max(0, match.start() - 50), match.end() + 50
+            )
+            patterns.append(
+                {
+                    "type": "ip_address",
+                    "value": redact_sensitive_excerpt(text, *match.span()),
+                    "context": context,
+                }
+            )
 
     return patterns
 
@@ -158,20 +194,27 @@ def detect_scope_expansion(user_msg: str, assistant_msgs: List[str]) -> List[str
     expansions = []
 
     # Simple heuristic: if assistant mentions creating/building things not in user request
-    original_words = set(user_msg.lower().split())
-
-    expansion_keywords = ['also', 'additionally', 'furthermore', 'we should also',
-                          'let me also', 'i will also', 'we need to']
+    expansion_keywords = [
+        "also",
+        "additionally",
+        "furthermore",
+        "we should also",
+        "let me also",
+        "i will also",
+        "we need to",
+    ]
 
     for msg in assistant_msgs:
         msg_lower = msg.lower()
         for keyword in expansion_keywords:
             if keyword in msg_lower:
                 # Extract sentence containing keyword
-                sentences = msg.split('.')
-                for sent in sentences:
+                for match in re.finditer(r"[^.]+", msg):
+                    sent = match.group()
                     if keyword in sent.lower():
-                        expansions.append(sent.strip())
+                        expansions.append(
+                            redact_sensitive_excerpt(msg, *match.span()).strip()
+                        )
 
     return expansions
 
@@ -185,34 +228,44 @@ def analyze_conversation(filepath: str) -> ConversationStats:
     current_assistant_msgs = []
 
     for msg in messages:
-        msg_type = msg.get('type')
+        msg_type = msg.get("type")
+        timestamp = msg.get("timestamp", "")
+        if timestamp:
+            if not stats.first_timestamp or timestamp < stats.first_timestamp:
+                stats.first_timestamp = timestamp
+            if not stats.last_timestamp or timestamp > stats.last_timestamp:
+                stats.last_timestamp = timestamp
 
-        if msg_type == 'user':
+        if msg_type == "user":
             # Analyze previous turn if exists
             if current_user_msg and current_assistant_msgs:
-                expansions = detect_scope_expansion(current_user_msg, current_assistant_msgs)
+                expansions = detect_scope_expansion(
+                    current_user_msg, current_assistant_msgs
+                )
                 stats.scope_expansions.extend(expansions)
 
             # Start new turn
-            content = msg.get('message', {}).get('content', '')
+            content = msg.get("message", {}).get("content", "")
             current_user_msg = extract_text_from_content(content)
             stats.user_messages.append(current_user_msg)
             current_assistant_msgs = []
             stats.total_turns += 1
 
-        elif msg_type == 'assistant':
-            content = msg.get('message', {}).get('content', '')
+        elif msg_type == "assistant":
+            content = msg.get("message", {}).get("content", "")
             text = extract_text_from_content(content)
-            current_assistant_msgs.append(text)
-            stats.assistant_messages.append(text)
+            if text:
+                current_assistant_msgs.append(text)
+                stats.assistant_messages.append(text)
 
             # Analyze tool use
             analyze_tool_use(msg, stats)
             analyze_tool_results(msg, stats)
 
             # Check for hardcoded values
-            hardcoded = detect_hardcoded_values(text)
-            stats.hardcoded_values.extend(hardcoded)
+            if text:
+                hardcoded = detect_hardcoded_values(text)
+                stats.hardcoded_values.extend(hardcoded)
 
     return stats
 
@@ -227,25 +280,26 @@ def print_anti_patterns(stats: ConversationStats):
     print("-" * 80)
     for cmd, count in stats.repeated_commands.most_common(20):
         if count >= 3:
-            print(f"  [{count}x] {cmd[:100]}")
+            print(f"  [{count}x] {redact_sensitive_text(cmd)[:100]}")
 
     print("\n2. HARDCODED VALUES DETECTED")
     print("-" * 80)
     for item in stats.hardcoded_values[:20]:
         print(f"  Type: {item['type']}")
-        print(f"  Context: {item.get('line', item.get('context', ''))[:150]}")
+        context = item.get("line", item.get("context", ""))
+        print(f"  Context: {redact_sensitive_text(context)[:150]}")
         print()
 
     print("\n3. SCOPE EXPANSIONS")
     print("-" * 80)
     for expansion in stats.scope_expansions[:15]:
-        print(f"  • {expansion[:200]}")
+        print(f"  • {redact_sensitive_text(expansion)[:200]}")
 
     print("\n4. ERRORS ENCOUNTERED")
     print("-" * 80)
     for error in stats.errors[:20]:
         print(f"  Timestamp: {error.get('timestamp', 'N/A')}")
-        print(f"  Content: {error['content'][:300]}")
+        print(f"  Content: {redact_sensitive_text(error['content'])[:300]}")
         print()
 
 
@@ -265,9 +319,9 @@ def print_tooling_analysis(stats: ConversationStats):
     print("-" * 80)
 
     # Group similar commands
-    kubectl_cmds = [c for c in stats.bash_commands if 'kubectl' in c['command']]
-    docker_cmds = [c for c in stats.bash_commands if 'docker' in c['command']]
-    pytest_cmds = [c for c in stats.bash_commands if 'pytest' in c['command']]
+    kubectl_cmds = [c for c in stats.bash_commands if "kubectl" in c["command"]]
+    docker_cmds = [c for c in stats.bash_commands if "docker" in c["command"]]
+    pytest_cmds = [c for c in stats.bash_commands if "pytest" in c["command"]]
 
     print(f"  kubectl commands: {len(kubectl_cmds)}")
     print(f"  docker commands: {len(docker_cmds)}")
@@ -276,7 +330,7 @@ def print_tooling_analysis(stats: ConversationStats):
     print("\n3. GREP SEARCHES (exploration patterns)")
     print("-" * 80)
     for pattern in stats.grep_searches[:15]:
-        print(f"  • {pattern}")
+        print(f"  • {redact_sensitive_text(pattern)}")
 
 
 def print_summary(stats: ConversationStats):
@@ -288,12 +342,14 @@ def print_summary(stats: ConversationStats):
     print(f"  User messages: {len(stats.user_messages)}")
     print(f"  Assistant messages: {len(stats.assistant_messages)}")
     print(f"  Bash commands: {len(stats.bash_commands)}")
+    print(f"  Failed commands: {len(stats.failed_commands)}")
+    print(f"  Command runtime: {stats.command_duration_seconds:.1f}s")
     print(f"  Errors encountered: {len(stats.errors)}")
     print(f"  Scope expansions detected: {len(stats.scope_expansions)}")
     print(f"  Hardcoded values found: {len(stats.hardcoded_values)}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python analyze_conversation.py <conversation.jsonl>")
         sys.exit(1)
