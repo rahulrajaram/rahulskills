@@ -1,0 +1,14 @@
+# Historical synthetic Figma file-key examples. Source now uses FILE_KEY;
+# retain exact fingerprints so only the reviewed historical fixtures are ignored.
+c05ec0bece8fcd872c1f62d48c0165dfebbedf4c:skills/figma-implement-design/SKILL.md:generic-api-key:57
+c05ec0bece8fcd872c1f62d48c0165dfebbedf4c:skills/figma-implement-design/SKILL.md:generic-api-key:177
+c05ec0bece8fcd872c1f62d48c0165dfebbedf4c:skills/figma-implement-design/SKILL.md:generic-api-key:178
+c05ec0bece8fcd872c1f62d48c0165dfebbedf4c:skills/figma-implement-design/SKILL.md:generic-api-key:179
+c05ec0bece8fcd872c1f62d48c0165dfebbedf4c:skills/figma-implement-design/SKILL.md:generic-api-key:194
+c05ec0bece8fcd872c1f62d48c0165dfebbedf4c:skills/figma-implement-design/SKILL.md:generic-api-key:195
+c05ec0bece8fcd872c1f62d48c0165dfebbedf4c:skills/figma-implement-design/SKILL.md:generic-api-key:197
+c05ec0bece8fcd872c1f62d48c0165dfebbedf4c:skills/figma-implement-design/SKILL.md:generic-api-key:198
+
+# Historical detector test fixture; the value is intentionally fake and the
+# exact commit/path/rule/line fingerprint prevents broad suppression.
+770eb5a765279f8dda557f57a99eac966be6419d:codex/check-antipatterns/test_cases.md:generic-api-key:104

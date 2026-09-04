@@ -97,7 +97,7 @@ effect = "local-process"
 layer = "workflow"
 
 [skills.markdown-to-pdf]
-commands = ["pandoc", "weasyprint"]
+commands = ["pandoc", "weasyprint", "pdfinfo"]
 effect = "local-write"
 effects = ["local-write"]
 approval_boundaries = ["overwrite-output", "dependency-install"]
@@ -123,11 +123,13 @@ effects = ["local-process", "audio-output"]
 layer = "workflow"
 
 [skills.check-antipatterns]
+commands = ["python3"]
 effect = "readonly"
 layer = "primitive"
 overlaps = ["analyze-conversation"]
 
 [skills.analyze-conversation]
+commands = ["python3"]
 effect = "local-write"
 layer = "workflow"
 overlaps = ["check-antipatterns"]
@@ -150,6 +152,7 @@ commands = ["git"]
 effect = "local-write"
 effects = ["local-write"]
 approval_boundaries = ["review-file", "allowed-override", "secret", "ignore-policy-change"]
+layer = "workflow"
 
 [skills.clear-writing]
 effect = "readonly"
@@ -286,9 +289,9 @@ approval_boundaries = ["external-data-send", "proposal-write", "merge-local", "m
 layer = "workflow"
 
 [skills.pi-defects-harvester]
-effect = "readonly"
-effects = ["readonly", "home-write"]
-approval_boundaries = ["report-write"]
+effect = "local-write"
+effects = ["sensitive-read", "local-write", "home-write"]
+approval_boundaries = ["sensitive-source-read", "report-write"]
 layer = "workflow"
 
 [skills.whitepaper]

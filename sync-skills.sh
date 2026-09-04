@@ -101,7 +101,7 @@ has_frontmatter_key() {
 strip_cli_keys() {
     local file="$1"
     local tmpfile
-    tmpfile="$(mktemp)"
+    tmpfile="$(mktemp "${file}.tmp.XXXXXX")"
     awk -v keys="$CLI_SPECIFIC_KEYS" '
         BEGIN { split(keys, ka, ","); for (i in ka) { gsub(/^ +| +$/, "", ka[i]); strip[ka[i]]=1 } }
         NR==1 && $0=="---" { in_fm=1; print; next }
@@ -112,13 +112,80 @@ strip_cli_keys() {
         }
         { print }
     ' "$file" > "$tmpfile"
-    mv "$tmpfile" "$file"
+    chmod --reference="$file" "$tmpfile"
+    mv -- "$tmpfile" "$file"
+}
+
+run_id() {
+    printf '%s-%s' "$(date -u +%Y%m%dT%H%M%SZ)" "$$"
+}
+
+git_common_dir() {
+    git -C "$SKILLS_DIR" rev-parse --path-format=absolute --git-common-dir
+}
+
+assert_repo_skills_root() {
+    local expected actual
+    expected="$(realpath -e -- "$SKILLS_DIR")/skills"
+    actual="$(realpath -m -- "$REPO_SKILLS_DIR")"
+    if [[ "$actual" != "$expected" || "$actual" == "/" || -L "$REPO_SKILLS_DIR" ]]; then
+        echo "ERROR: refusing pull into unexpected or linked skills root: $actual" >&2
+        return 1
+    fi
+}
+
+assert_skill_name() {
+    local skill_name="$1"
+    [[ "$skill_name" =~ ^[a-z0-9][a-z0-9-]*$ ]] || {
+        echo "ERROR: refusing unsafe skill name: $skill_name" >&2
+        return 1
+    }
+}
+
+replace_repo_skill() {
+    local source_dir="$1" skill_name="$2" backup_root="$3"
+    local target stage backup=""
+
+    assert_skill_name "$skill_name"
+    target="$REPO_SKILLS_DIR/$skill_name"
+    [[ "$(realpath -m -- "$(dirname -- "$target")")" == "$(realpath -e -- "$REPO_SKILLS_DIR")" ]] || {
+        echo "ERROR: refusing replacement outside skills root: $target" >&2
+        return 1
+    }
+
+    mkdir -p "$backup_root"
+    stage="$(mktemp -d "$backup_root/.${skill_name}.stage.XXXXXX")"
+    cp -aL "$source_dir/." "$stage/"
+
+    if [[ -e "$target" || -L "$target" ]]; then
+        backup="$backup_root/$skill_name"
+        if [[ -e "$backup" || -L "$backup" ]]; then
+            echo "ERROR: refusing to overwrite pull backup: $backup" >&2
+            return 1
+        fi
+        mv -- "$target" "$backup"
+        echo "  BACKUP: $skill_name -> $backup"
+    fi
+
+    if ! mv -- "$stage" "$target"; then
+        echo "ERROR: pull replacement failed; staged tree retained at $stage" >&2
+        if [[ -n "$backup" && ! -e "$target" && ! -L "$target" ]]; then
+            mv -- "$backup" "$target"
+            echo "  RESTORED: $skill_name" >&2
+        fi
+        return 1
+    fi
 }
 
 pull() {
     local skipped=0
     local skill_name
     local warnings=0
+    local backup_root
+    local -A pulled_skills=()
+
+    assert_repo_skills_root
+    backup_root="$(git_common_dir)/rahulskills-backups/pull-$(run_id)"
 
     echo "Pulling Codex skills from $CODEX_SRC ..."
     mkdir -p "$REPO_SKILLS_DIR"
@@ -126,11 +193,10 @@ pull() {
         if is_excluded "$skill_name"; then
             echo "  SKIP (excluded): $skill_name"
             skipped=$((skipped + 1))
-            rm -rf "$REPO_SKILLS_DIR/$skill_name"
             continue
         fi
-        rm -rf "$REPO_SKILLS_DIR/$skill_name"
-        cp -aL "$CODEX_SRC/$skill_name" "$REPO_SKILLS_DIR/$skill_name"
+        replace_repo_skill "$CODEX_SRC/$skill_name" "$skill_name" "$backup_root"
+        pulled_skills["$skill_name"]=1
     done < <(list_skill_names "$CODEX_SRC")
 
     echo "Pulling Pi-only skills from $PI_SRC ..."
@@ -143,7 +209,8 @@ pull() {
         if [[ -d "$REPO_SKILLS_DIR/$skill_name" ]]; then
             continue
         fi
-        cp -aL "$PI_SRC/$skill_name" "$REPO_SKILLS_DIR/$skill_name"
+        replace_repo_skill "$PI_SRC/$skill_name" "$skill_name" "$backup_root"
+        pulled_skills["$skill_name"]=1
         echo "  NEW (from pi/agent/skills): $skill_name"
     done < <(list_skill_names "$PI_SRC")
 
@@ -158,7 +225,8 @@ pull() {
             # Already pulled from Codex source, skip
             continue
         fi
-        cp -aL "$CLAUDE_SRC/$skill_name" "$REPO_SKILLS_DIR/$skill_name"
+        replace_repo_skill "$CLAUDE_SRC/$skill_name" "$skill_name" "$backup_root"
+        pulled_skills["$skill_name"]=1
         echo "  NEW (from claude/skills): $skill_name"
     done < <(list_skill_names "$CLAUDE_SRC")
 
@@ -175,6 +243,7 @@ pull() {
 
         local sname
         sname="$(basename "$skill_dir")"
+        [[ -n "${pulled_skills[$sname]+x}" ]] || continue
         IFS=',' read -ra _keys <<< "$CLI_SPECIFIC_KEYS"
         for key in "${_keys[@]}"; do
             key="${key## }"; key="${key%% }"
@@ -190,6 +259,7 @@ pull() {
     echo "Skills: $(count_skill_names "$REPO_SKILLS_DIR")"
     [ "$skipped" -gt 0 ] && echo "Excluded: $skipped"
     [ "$warnings" -gt 0 ] && echo "Warnings: $warnings (CLI-specific keys stripped)"
+    [[ -d "$backup_root" ]] && echo "Pull backups retained under: $backup_root"
     echo "Done. Review with: cd $SKILLS_DIR && git diff"
 }
 
@@ -202,11 +272,9 @@ do_diff() {
     local has_diff=0
     local skill_name
 
-    # Ensure assembled output exists
-    if [[ ! -d "$BUILD_DIR/claude/skills" || ! -d "$BUILD_DIR/codex/skills" ]]; then
-        echo "No assembled output found. Running assemble first ..."
-        "$STITCH_SCRIPT" assemble
-    fi
+    # Always compare against output assembled from the current source tree.
+    # Reusing a prior build can reverse the apparent direction of runtime drift.
+    "$STITCH_SCRIPT" assemble
 
     echo "=== Codex skills (~/.codex/skills/) ==="
     for skill_dir in "$BUILD_DIR/codex/skills"/*/; do
@@ -356,6 +424,9 @@ source_coverage() {
             label="pi"
         fi
         while IFS= read -r skill; do
+            if is_excluded "$skill"; then
+                continue
+            fi
             if [[ ! -d "$REPO_SKILLS_DIR/$skill" ]]; then
                 echo "MISSING SOURCE [$label]: $skill"
                 has_issue=1
