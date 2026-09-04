@@ -188,9 +188,10 @@ main() {
 
     echo ""
     echo "Done. Restart Pi sessions to pick up the new skills."
-    echo "Pi scans ~/.pi/agent/skills/ and ~/.agents/skills/. The ~/.agents/skills/"
-    echo "directory must stay empty (codex owns ~/.codex/skills/, claude owns"
-    echo "~/.claude/skills/), so the symlinked repo copies are the only ones Pi sees."
+    echo "Pi scans $HOME/.pi/agent/skills/ and $HOME/.agents/skills/."
+    echo "$HOME/.agents/skills/ must stay empty (Codex owns"
+    echo "$HOME/.codex/skills/ and Claude owns $HOME/.claude/skills/), so the"
+    echo "symlinked repo copies are the only ones Pi sees."
 }
 
 main "$@"

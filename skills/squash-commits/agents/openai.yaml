@@ -1,4 +1,4 @@
 interface:
   display_name: "Squash Commits"
-  short_description: "Analyze git history, identify contiguous thematic groups, and squash with clean messages."
-  default_prompt: "Run /squash-commits: scan the last 20 commits, identify contiguous thematic groups that should be squashed, present a table of proposed groups with commit messages, and after approval execute a non-interactive rebase."
+  short_description: "Safely consolidate contiguous Git commits"
+  default_prompt: "Use $squash-commits to inspect recent history and propose a safe, recoverable squash plan."

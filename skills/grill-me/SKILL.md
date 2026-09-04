@@ -1,7 +1,7 @@
 ---
 name: grill-me
 description: "A shortcut to run the grilling skill on a plan, decision, or idea. Use when the user says /grill-me or $grill-me."
-argument-hint: "[spec|factory|debate] [topic or artifact]"
+argument-hint: "[spec|factory|debate|gradient] [topic or artifact] [--n <stems>] [--branch <b>] [--depth <n>] [--keep <k>] [--zones <z>] [--cap <nodes>]"
 disable-model-invocation: true
 ---
 

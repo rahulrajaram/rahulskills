@@ -58,6 +58,10 @@ layer = "workflow"
 effect = "local-write"
 layer = "workflow"
 
+[skills.review-agent]
+effect = "readonly"
+layer = "workflow"
+
 [skills.skill-installer]
 commands = ["git"]
 effect = "external-call"
@@ -76,6 +80,11 @@ effect = "external-call"
 layer = "workflow"
 overlaps = ["invokellm"]
 
+[skills.define-operating-charter]
+effect = "local-write"
+layer = "workflow"
+overlaps = ["autonomous-execution-contract", "frame-goals-constraints"]
+
 [skills.ideate]
 commands = ["gptengage"]
 effect = "external-call"
@@ -88,7 +97,7 @@ effect = "local-process"
 layer = "workflow"
 
 [skills.markdown-to-pdf]
-commands = ["pandoc", "weasyprint"]
+commands = ["pandoc", "weasyprint", "pdfinfo"]
 effect = "local-write"
 effects = ["local-write"]
 approval_boundaries = ["overwrite-output", "dependency-install"]
@@ -114,11 +123,13 @@ effects = ["local-process", "audio-output"]
 layer = "workflow"
 
 [skills.check-antipatterns]
+commands = ["python3"]
 effect = "readonly"
 layer = "primitive"
 overlaps = ["analyze-conversation"]
 
 [skills.analyze-conversation]
+commands = ["python3"]
 effect = "local-write"
 layer = "workflow"
 overlaps = ["check-antipatterns"]
@@ -143,6 +154,15 @@ effects = ["local-write"]
 approval_boundaries = ["review-file", "allowed-override", "secret", "ignore-policy-change"]
 layer = "workflow"
 
+[skills.clear-writing]
+effect = "readonly"
+layer = "primitive"
+
+[skills.clean-code-refine]
+effect = "local-write"
+layer = "composer"
+overlaps = ["fp-refine"]
+
 [skills.ecosystem-borrow-audit]
 commands = ["git", "gptengage"]
 effect = "external-call"
@@ -151,6 +171,7 @@ layer = "composer"
 [skills.fp-refine]
 effect = "local-write"
 layer = "workflow"
+overlaps = ["clean-code-refine"]
 
 [skills.frame-goals-constraints]
 effect = "readonly"
@@ -266,3 +287,20 @@ effect = "external-call"
 effects = ["external-call", "local-write", "home-write"]
 approval_boundaries = ["external-data-send", "proposal-write", "merge-local", "merge-global"]
 layer = "workflow"
+
+[skills.pi-defects-harvester]
+effect = "local-write"
+effects = ["sensitive-read", "local-write", "home-write"]
+approval_boundaries = ["sensitive-source-read", "report-write"]
+layer = "workflow"
+
+[skills.whitepaper]
+commands = ["pandoc", "weasyprint", "curl", "dot", "pdfinfo", "pdftoppm", "pdffonts"]
+effect = "local-write"
+effects = ["local-write", "network-read"]
+approval_boundaries = ["overwrite-output", "dependency-install", "trademark-check", "domain-check"]
+layer = "workflow"
+
+[skills.diagram-review-viewer]
+effect = "local-write"
+layer = "composer"

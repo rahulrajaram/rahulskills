@@ -1,0 +1,4 @@
+interface:
+  display_name: "Define Operating Charter"
+  short_description: "Ratify authority and execution boundaries"
+  default_prompt: "Use $define-operating-charter to turn this autonomous objective into a ratifiable operating charter with explicit actors, authority, constraints, evidence, lifecycle, recovery, and stop rules."

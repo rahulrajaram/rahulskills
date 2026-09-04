@@ -104,6 +104,13 @@
       "keywords": ["integration", "e2e", "pytest"],
       "detection": "Running integration tests without environment validation",
       "severity": "HIGH"
+    },
+    {
+      "id": 16,
+      "rule": "Destructive targets require exact identity and containment checks",
+      "keywords": ["rm -rf", "find -delete", "git clean", "reset --hard", "rmtree"],
+      "detection": "A destructive command appears without independently verified target identity, containment, and recovery",
+      "severity": "HIGH"
     }
   ]
 }

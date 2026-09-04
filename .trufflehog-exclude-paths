@@ -1,0 +1,6 @@
+(^|/)\.git/
+(^|/)build(?:\.stale[^/]*)?/
+(^|/)__pycache__/
+(^|/)\.mypy_cache/
+(^|/)\.pytest_cache/
+(^|/)\.ruff_cache/
