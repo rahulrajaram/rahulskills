@@ -59,8 +59,8 @@ for hook in pre-commit commit-msg pre-push post-checkout post-merge; do
     echo "[skip] $hook (existing custom hook)"
     continue
   fi
-  cp "$src" "$dst"
-  chmod +x "$dst"
+  cp "$src" "$dst" || { echo "Failed to copy $hook" >&2; exit 1; }
+  chmod +x "$dst" || { echo "Failed to make $hook executable" >&2; exit 1; }
   echo "[ok]   $hook"
 done
 ```
@@ -68,36 +68,46 @@ done
 ### Step 3: Copy Library into `.git/lib/`
 
 ```bash
-git_dir_real="$(realpath -e -- "$GIT_DIR")"
+(
+git_dir_real="$(realpath -e -- "$GIT_DIR")" || exit 1
 target="$git_dir_real/lib"
 
-[[ "$git_dir_real" != "/" && ! -L "$GIT_DIR" ]]
-[[ "$(realpath -m -- "$(dirname -- "$target")")" == "$git_dir_real" ]]
+[[ -d "$git_dir_real" && "$git_dir_real" != "/" && ! -L "$GIT_DIR" ]] || exit 1
+[[ "$(realpath -e -- "$(dirname -- "$target")")" == "$git_dir_real" ]] || exit 1
+[[ -f "$SOURCE/lib/common.sh" ]] || { echo "Missing source lib/common.sh" >&2; exit 1; }
 
-stage="$(mktemp -d "$git_dir_real/.lib-stage.XXXXXX")"
-cp -a "$SOURCE/lib/." "$stage/"
+stage="$(mktemp -d "$git_dir_real/.lib-stage.XXXXXX")" || exit 1
+cp -a "$SOURCE/lib/." "$stage/" || {
+  echo "Copy failed; staged tree retained at $stage" >&2
+  exit 1
+}
 
 backup=""
 if [[ -e "$target" || -L "$target" ]]; then
-  backup_root="$git_dir_real/commithooks-backups/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  mkdir -p "$git_dir_real/commithooks-backups" || exit 1
+  backup_root="$(mktemp -d "$git_dir_real/commithooks-backups/lib.XXXXXX")" || exit 1
   backup="$backup_root/lib"
-  mkdir -p "$backup_root"
-  mv -- "$target" "$backup"
+  mv -T -- "$target" "$backup" || { echo "Backup failed; live library preserved" >&2; exit 1; }
 fi
 
-if ! mv -- "$stage" "$target"; then
+if ! mv -T -- "$stage" "$target"; then
   if [[ -n "$backup" && ! -e "$target" && ! -L "$target" ]]; then
-    mv -- "$backup" "$target"
+    mv -T -- "$backup" "$target" || echo "Restore failed; prior library retained at $backup" >&2
   fi
   echo "Install failed; staged tree retained at $stage" >&2
   exit 1
 fi
+)
 ```
 
 The exact target must be proven even though `.git/lib/` is an untracked
 namespace. Never use a nonempty-variable check as the only guard for recursive
 deletion. Stage the replacement, move the prior tree to a recoverable backup,
 and restore it if publication fails.
+
+The example uses GNU `realpath` and `mv -T` so publication cannot nest the
+stage inside an existing target directory. Every failure exits the transaction
+explicitly; do not rely on the calling shell's `set -e` setting.
 
 ### Step 4: Unset `core.hooksPath`
 

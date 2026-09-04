@@ -1,12 +1,158 @@
 import json
+import contextlib
+import io
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 import generate_report
-from analyzer import analyze_conversation
+from analyzer import analyze_conversation, print_anti_patterns, detect_hardcoded_values
 from patterns import find_retry_without_diagnosis, is_normal_retry_command
+
+
+def message(role, text):
+    return {"type": role, "message": {"content": [{"type": "text", "text": text}]}}
+
+
+def command(text):
+    return {
+        "type": "assistant",
+        "message": {"content": [{"name": "Bash", "input": {"command": text}}]},
+    }
+
+
+def boundary(prefix, limit):
+    return (
+        prefix
+        + "x" * (limit - len(prefix) - 26)
+        + " https://u:SYNTHETIC_TAIL"
+        + "z" * 40
+        + "@host.invalid"
+    )
+
+
+def synthetic_url(userinfo, scheme="https"):
+    return f"{scheme}://{userinfo}@host.invalid"
+
+
+class ReportEvidenceTests(unittest.TestCase):
+    def test_saved_reports_redact_before_each_lossy_transformation(self):
+        cases = (
+            ([message("user", boundary("do it ", 220))], "User Signals"),
+            (
+                [message("assistant", boundary("Should I do it? ", 220))],
+                "Assistant Routing Questions",
+            ),
+            ([command(boundary("deploy ", 100))] * 2, "1. Command:"),
+            ([command(boundary("deploy ", 80))] * 3, "Repeated 3x"),
+            (
+                [
+                    message("user", "Inspect only"),
+                    message(
+                        "assistant",
+                        "I will also create " + synthetic_url("u:SYNTHETIC_TAIL.more"),
+                    ),
+                ],
+                "Expansion:",
+            ),
+            (
+                [
+                    message(
+                        "assistant",
+                        "export URL=" + synthetic_url("u:SYNTHETIC_TAIL:1234", "http"),
+                    )
+                ],
+                "Value:",
+            ),
+            (
+                [message("assistant", r'PASSWORD="prefix\"SYNTHETIC_TAIL"')],
+                "Credential assignment detected",
+            ),
+            (
+                [command("env 'PASSWORD=prefix SYNTHETIC_TAIL' deploy")] * 3,
+                "Repeated 3x",
+            ),
+        )
+        for messages, expected in cases:
+            with self.subTest(
+                expected=expected
+            ), tempfile.TemporaryDirectory() as raw_dir:
+                root = Path(raw_dir)
+                transcript = root / "synthetic.jsonl"
+                write_jsonl(transcript, messages)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    report = Path(
+                        generate_report.generate_markdown_report(str(transcript), root)
+                    )
+                text = report.read_text()
+                self.assertIn(expected, text)
+                self.assertIn("[REDACTED]", text)
+                self.assertNotIn("SYNTHETIC_TAIL", text)
+
+    def test_console_evidence_and_ip_context_keep_full_source_boundaries(self):
+        source = (
+            'PASSWORD="' + "x" * 100 + "SYNTHETIC_TAIL 192.0.2.1 " + "x" * 100 + '"'
+        )
+        findings = detect_hardcoded_values(source)
+        self.assertEqual(2, len(findings))
+        self.assertNotIn("192.0.2.1", json.dumps(findings))
+        self.assertNotIn("SYNTHETIC_TAIL", json.dumps(findings))
+        with tempfile.TemporaryDirectory() as raw_dir:
+            transcript = Path(raw_dir) / "synthetic.jsonl"
+            error = (
+                "error "
+                + "x" * 230
+                + " https://u:SYNTHETIC_TAIL"
+                + "z" * 300
+                + "@host.invalid"
+            )
+            write_jsonl(
+                transcript,
+                [
+                    message("assistant", source),
+                    {
+                        "type": "assistant",
+                        "message": {
+                            "content": [{"type": "tool_result", "content": error}]
+                        },
+                    },
+                ],
+            )
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                print_anti_patterns(analyze_conversation(str(transcript)))
+            self.assertIn("ERRORS ENCOUNTERED", output.getvalue())
+            self.assertIn("[REDACTED]", output.getvalue())
+            self.assertNotIn("SYNTHETIC_TAIL", output.getvalue())
+
+    def test_redaction_does_not_merge_distinct_raw_commands(self):
+        commands = [
+            command("deploy --token first-value"),
+            command("deploy --token second-value"),
+        ]
+        self.assertEqual([], find_retry_without_diagnosis(commands))
+        with tempfile.TemporaryDirectory() as raw_dir:
+            transcript = Path(raw_dir) / "synthetic.jsonl"
+            write_jsonl(transcript, commands)
+            stats = analyze_conversation(str(transcript))
+            self.assertEqual(2, len(stats.repeated_commands))
+            self.assertEqual([1, 1], list(stats.repeated_commands.values()))
+
+    def test_completed_stderr_is_redacted_before_normalization_truncates_it(self):
+        result = generate_report._normalize_completed_item(
+            {
+                "payload": {
+                    "item": {
+                        "type": "CommandExecution",
+                        "command": "deploy",
+                        "stderr": boundary("error ", 2000),
+                    }
+                }
+            }
+        )
+        self.assertNotIn("SYNTHETIC_TAIL", json.dumps(result))
+        self.assertIn("[REDACTED]", json.dumps(result))
 
 
 def write_jsonl(path: Path, events: list[dict]) -> None:

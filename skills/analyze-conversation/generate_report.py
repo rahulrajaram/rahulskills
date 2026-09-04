@@ -168,7 +168,9 @@ def _normalize_completed_item(event: dict) -> dict | None:
                     {
                         "status": item.get("status"),
                         "exit_code": item.get("exit_code"),
-                        "stderr": str(item.get("stderr") or "")[:2000],
+                        "stderr": redact_sensitive_text(item.get("stderr") or "")[
+                            :2000
+                        ],
                     },
                     sort_keys=True,
                 ),
@@ -589,9 +591,12 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     for cmd, count in stats.repeated_commands.most_common(10):
         if count >= 3 and not is_normal_dev_command(cmd):
             tool_opp_count += 1
-            tool_name = f"myproject-{cmd.split()[0] if cmd.split() else 'cmd'}"
+            safe_cmd = redact_sensitive_text(cmd)
+            tool_name = (
+                f"myproject-{safe_cmd.split()[0] if safe_cmd.split() else 'cmd'}"
+            )
             report_lines.append(
-                f"{tool_opp_count}. **Repeated {count}x**: `{cmd[:80]}...` → Tool: `{tool_name}`"
+                f"{tool_opp_count}. **Repeated {count}x**: `{safe_cmd[:80]}...` → Tool: `{tool_name}`"
             )
             if tool_opp_count >= 5:
                 break
@@ -645,13 +650,17 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         report_lines.append("### User Signals")
         report_lines.append("")
         for signal in autonomy_user_signals[:10]:
-            report_lines.append(f"- {signal.replace(chr(10), ' ')[:220]}")
+            report_lines.append(
+                f"- {redact_sensitive_text(signal).replace(chr(10), ' ')[:220]}"
+            )
         report_lines.append("")
     if autonomy_assistant_signals:
         report_lines.append("### Assistant Routing Questions")
         report_lines.append("")
         for signal in autonomy_assistant_signals[:10]:
-            report_lines.append(f"- {signal.replace(chr(10), ' ')[:220]}")
+            report_lines.append(
+                f"- {redact_sensitive_text(signal).replace(chr(10), ' ')[:220]}"
+            )
         report_lines.append("")
     if autonomy_user_signals or autonomy_assistant_signals:
         report_lines.append("### Recommended Operating Rule")
@@ -819,10 +828,15 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     actionable_tool_opps = []
     for cmd, count in stats.repeated_commands.most_common(10):
         if count >= 3 and not is_normal_dev_command(cmd):
+            safe_cmd = redact_sensitive_text(cmd)
             tool_name = (
-                f"myproject-{cmd.split()[0]}" if cmd.split() else "myproject-cmd"
+                f"myproject-{safe_cmd.split()[0]}"
+                if safe_cmd.split()
+                else "myproject-cmd"
             )
-            report_lines.append(f"- **{count}x**: `{cmd[:80]}` → Tool: `{tool_name}`")
+            report_lines.append(
+                f"- **{count}x**: `{safe_cmd[:80]}` → Tool: `{tool_name}`"
+            )
             actionable_tool_opps.append((cmd, count))
 
     if not actionable_tool_opps:
@@ -842,7 +856,7 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     if tool_opps["repeated_sequences"]:
         for seq_info in tool_opps["repeated_sequences"]:
             report_lines.append(
-                f"- **{seq_info['count']}x**: `{seq_info['sequence'][:100]}`"
+                f"- **{seq_info['count']}x**: `{redact_sensitive_text(seq_info['sequence'])[:100]}`"
             )
             report_lines.append(f"  → Potential tool: `{seq_info['tool_name']}`")
     else:

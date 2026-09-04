@@ -7,7 +7,7 @@ import json
 import re
 from typing import List, Dict, Tuple
 
-from redaction import redact_sensitive_text
+from redaction import redact_sensitive_excerpt, redact_sensitive_text
 
 
 def load_messages(filepath: str) -> List[Dict]:
@@ -52,7 +52,7 @@ def find_credential_antipatterns(messages: List[Dict]) -> List[Dict]:
                     "index": i,
                     "timestamp": msg.get("timestamp", ""),
                     "evidence": "Credential assignment detected (value redacted)",
-                    "context": redact_sensitive_text(content[:300]),
+                    "context": redact_sensitive_text(content)[:300],
                 }
             )
 
@@ -68,7 +68,7 @@ def find_credential_antipatterns(messages: List[Dict]) -> List[Dict]:
                         "index": i,
                         "timestamp": msg.get("timestamp", ""),
                         "evidence": "Used PASSWORD env var without reading from secret",
-                        "context": redact_sensitive_text(content[:300]),
+                        "context": redact_sensitive_text(content)[:300],
                     }
                 )
 
@@ -180,7 +180,7 @@ def find_retry_without_diagnosis(messages: List[Dict]) -> List[Dict]:
                                 findings.append(
                                     {
                                         "type": "RETRY_WITHOUT_DIAGNOSIS",
-                                        "command": cmd[:100],
+                                        "command": redact_sensitive_text(cmd)[:100],
                                         "first_attempt": prev["index"],
                                         "retry_attempt": i,
                                         "timestamp": msg.get("timestamp", ""),
@@ -223,14 +223,18 @@ def find_scope_creep(messages: List[Dict]) -> List[Dict]:
             for indicator in expansion_indicators:
                 if indicator in content.lower():
                     # Extract the sentence
-                    sentences = content.split(".")
-                    for sent in sentences:
+                    for match in re.finditer(r"[^.]+", content):
+                        sent = match.group()
                         if indicator in sent.lower():
                             findings.append(
                                 {
                                     "type": "SCOPE_EXPANSION",
-                                    "original_request": current_request[:200],
-                                    "expansion": sent.strip()[:300],
+                                    "original_request": redact_sensitive_text(
+                                        current_request
+                                    )[:200],
+                                    "expansion": redact_sensitive_excerpt(
+                                        content, *match.span()
+                                    ).strip()[:300],
                                     "request_index": current_request_idx,
                                     "expansion_index": i,
                                     "timestamp": msg.get("timestamp", ""),
@@ -261,12 +265,15 @@ def find_missing_verification(messages: List[Dict]) -> List[Dict]:
                     findings.append(
                         {
                             "type": "UNVERIFIED_IP_USAGE",
-                            "evidence": re.findall(
-                                r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", content
-                            ),
+                            "evidence": [
+                                redact_sensitive_excerpt(content, *match.span())
+                                for match in re.finditer(
+                                    r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", content
+                                )
+                            ],
                             "index": i,
                             "timestamp": msg.get("timestamp", ""),
-                            "context": content[:300],
+                            "context": redact_sensitive_text(content)[:300],
                         }
                     )
 
@@ -281,10 +288,13 @@ def find_missing_verification(messages: List[Dict]) -> List[Dict]:
                     findings.append(
                         {
                             "type": "UNVERIFIED_SERVICE_URL",
-                            "evidence": re.findall(r"http://[^\s]+:\d+", content),
+                            "evidence": [
+                                redact_sensitive_excerpt(content, *match.span())
+                                for match in re.finditer(r"http://[^\s]+:\d+", content)
+                            ],
                             "index": i,
                             "timestamp": msg.get("timestamp", ""),
-                            "context": content[:200],
+                            "context": redact_sensitive_text(content)[:200],
                         }
                     )
 
@@ -299,7 +309,13 @@ def extract_conversation_timeline(messages: List[Dict]) -> List[Tuple[str, str, 
         if msg.get("type") == "user":
             content = extract_text(msg.get("message", {}).get("content", ""))
             if content.strip():
-                timeline.append((msg.get("timestamp", ""), "USER", content[:150]))
+                timeline.append(
+                    (
+                        msg.get("timestamp", ""),
+                        "USER",
+                        redact_sensitive_text(content)[:150],
+                    )
+                )
 
     return timeline
 
@@ -352,7 +368,7 @@ def find_tool_opportunities(messages: List[Dict]) -> Dict[str, List]:
                 {
                     "sequence": seq,
                     "count": count,
-                    "tool_name": f'myproject-{seq.split()[0].replace("kubectl", "k8s").replace("docker", "docker")}',
+                    "tool_name": f'myproject-{redact_sensitive_text(seq).split()[0].replace("kubectl", "k8s").replace("docker", "docker")}',
                 }
             )
 
