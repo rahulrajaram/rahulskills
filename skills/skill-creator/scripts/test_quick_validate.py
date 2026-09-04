@@ -23,6 +23,59 @@ def write_skill(root: Path, frontmatter: str) -> Path:
 
 
 class QuickValidateTests(unittest.TestCase):
+    def test_rejects_non_string_or_unsupported_yaml_descriptions(self):
+        for value in (
+            "[one, two]",
+            "{one: two}",
+            "a: b",
+            "false # note",
+            "False",
+            "null # note",
+            "# only a comment",
+            "'first' junk 'last'",
+            "0xFF",
+            "1e3",
+            "1_000.0",
+            ".1_0",
+            "2026-09-04",
+            "&anchor value",
+            "*anchor",
+            "!!str value",
+        ):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as raw_dir:
+                skill = write_skill(
+                    Path(raw_dir), f"name: example-skill\ndescription: {value}"
+                )
+                self.assertFalse(validate_skill(skill)[0])
+
+    def test_supported_scalar_comments_and_quotes_preserve_values(self):
+        for value, expected in (
+            ('"Describe: a # value" # comment', "Describe: a # value"),
+            ("'Describe it''s behavior' # comment", "Describe it's behavior"),
+            ("Describe behavior # comment", "Describe behavior"),
+            ("See https://host.invalid/#anchor", "See https://host.invalid/#anchor"),
+            ("1.0.0", "1.0.0"),
+            ("5-whys analysis", "5-whys analysis"),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    expected, parse_frontmatter(f"description: {value}")["description"]
+                )
+        self.assertIs(
+            False,
+            parse_frontmatter("disable-model-invocation: False # comment")[
+                "disable-model-invocation"
+            ],
+        )
+
+    def test_null_is_not_a_valid_optional_boolean(self):
+        with tempfile.TemporaryDirectory() as raw_dir:
+            skill = write_skill(
+                Path(raw_dir),
+                "name: example-skill\ndescription: Example skill.\ndisable-model-invocation: null",
+            )
+            self.assertFalse(validate_skill(skill)[0])
+
     def test_parses_nested_metadata_without_third_party_yaml(self) -> None:
         self.assertEqual(
             {

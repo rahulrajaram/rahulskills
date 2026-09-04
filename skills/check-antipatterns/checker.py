@@ -9,6 +9,7 @@ import re
 import shlex
 from collections import defaultdict
 from dataclasses import dataclass
+from itertools import groupby
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -67,17 +68,9 @@ NORMAL_REPEAT_COMMANDS = (
     "git log",
 )
 
-CREDENTIAL_PATTERNS = tuple(
-    re.compile(pattern, re.IGNORECASE)
-    for pattern in (
-        r"PASSWORD\s*=",
-        r"SECRET\s*=",
-        r"API_?KEY\s*=",
-        r"TOKEN\s*=",
-        r"CREDENTIAL\s*=",
-        r"APIKEY\s*=",
-        r"SECRET_KEY\s*=",
-    )
+CREDENTIAL_NAME = re.compile(
+    r"(?:^|_)(?:password|secret|token|api_?key|credential)(?:_|$)",
+    re.IGNORECASE,
 )
 
 E2E_TEST_PATTERNS = tuple(
@@ -548,69 +541,93 @@ def check_tool_discovery(
     )
 
 
-def _command_clauses(command: str) -> tuple[tuple[str, ...], ...]:
-    lexer = shlex.shlex(
-        command.replace("\n", " ; "), posix=True, punctuation_chars=";&|"
+@dataclass(frozen=True)
+class ShellWord:
+    text: str
+    is_assignment: bool
+
+
+# Split operators while quotes/escapes are still present, then decode words.
+# This is a bounded lexer for simple commands, not a shell evaluator.
+_SHELL_TOKENS = re.compile(
+    r"""(?P<space>[^\S\n]+)|(?P<comment>\#[^\n]*)|(?P<operator>[;&|\n]+)"""
+    r"""|(?P<word>(?:'[^']*'|"(?:\\[\s\S]|[^"\\])*"|\\[\s\S]|[^\s;&|'"\\])+)"""
+    r"""|(?P<invalid>[\s\S])"""
+)
+
+
+def _command_clauses(command: str) -> tuple[tuple[ShellWord, ...], ...]:
+    tokens = tuple(
+        token
+        for token in _SHELL_TOKENS.finditer(command)
+        if token.lastgroup not in {"space", "comment"}
     )
-    lexer.whitespace_split = True
-    lexer.commenters = ""
-    clauses = []
-    current = []
-    try:
-        tokens = tuple(lexer)
-    except ValueError:
+    if any(token.lastgroup == "invalid" for token in tokens):
         return ()
-    for token in tokens:
-        if token and all(character in ";&|" for character in token):
-            if current:
-                clauses.append(tuple(current))
-                current = []
-        else:
-            current.append(token)
-    if current:
-        clauses.append(tuple(current))
-    return tuple(clauses)
+    return tuple(
+        tuple(
+            ShellWord(
+                shlex.split(token.group())[0],
+                bool(SHELL_ASSIGNMENT.match(token.group())),
+            )
+            for token in group
+        )
+        for kind, group in groupby(tokens, key=lambda token: token.lastgroup)
+        if kind == "word"
+    )
 
 
-def _command_start(clause: Sequence[str]) -> int | None:
+@dataclass(frozen=True)
+class CommandPrefix:
+    start: int | None
+    assignments: tuple[str, ...]
+
+
+def _command_prefix(clause: Sequence[ShellWord]) -> CommandPrefix:
     index = 0
+    assignments: tuple[str, ...] = ()
     while index < len(clause):
-        token = clause[index]
-        if SHELL_ASSIGNMENT.match(token):
+        token = clause[index].text
+        if clause[index].is_assignment:
+            assignments += (token,)
             index += 1
             continue
         if token == "command":
             index += 1
-            if index < len(clause) and clause[index] in {"-v", "-V"}:
-                return None
-            while index < len(clause) and clause[index].startswith("-"):
-                if clause[index] == "--":
+            if index < len(clause) and clause[index].text in {"-v", "-V"}:
+                return CommandPrefix(None, assignments)
+            while index < len(clause) and clause[index].text.startswith("-"):
+                if clause[index].text == "--":
                     index += 1
                     break
                 index += 1
             continue
-        if token == "env":
+        if Path(token).name == "env":
             index += 1
+            options = True
             while index < len(clause):
-                option = clause[index]
-                if option == "--":
-                    index += 1
-                    break
-                if SHELL_ASSIGNMENT.match(option):
+                option = clause[index].text
+                if options and option == "--":
+                    options = False
                     index += 1
                     continue
-                if option in {"-u", "--unset", "-C", "--chdir"}:
+                if SHELL_ASSIGNMENT.match(option):
+                    assignments += (option,)
+                    options = False
+                    index += 1
+                    continue
+                if options and option in {"-u", "--unset", "-C", "--chdir"}:
                     index += 2
                     continue
-                if option.startswith("-"):
+                if options and option.startswith("-"):
                     index += 1
                     continue
                 break
             continue
-        if token == "sudo":
+        if Path(token).name == "sudo":
             index += 1
             while index < len(clause):
-                option = clause[index]
+                option = clause[index].text
                 if option == "--":
                     index += 1
                     break
@@ -641,34 +658,40 @@ def _command_start(clause: Sequence[str]) -> int | None:
                     continue
                 break
             continue
-        return index
-    return None
+        return CommandPrefix(index, assignments)
+    return CommandPrefix(None, assignments)
+
+
+def _command_start(clause: Sequence[ShellWord]) -> int | None:
+    return _command_prefix(clause).start
 
 
 def _credential_assignment_tokens(command: str) -> tuple[str, ...]:
     assignments = []
     for clause in _command_clauses(command):
-        start = _command_start(clause)
-        if start is None:
-            continue
-        executable = Path(clause[start]).name
-        candidates = list(clause[:start])
+        prefix = _command_prefix(clause)
+        start = prefix.start
+        executable = Path(clause[start].text).name if start is not None else None
+        candidates = prefix.assignments
         if executable in SHELL_BUILTINS_WITH_ASSIGNMENTS:
-            candidates.extend(clause[start + 1 :])
+            candidates += tuple(word.text for word in clause[start + 1 :])
         assignments.extend(
             token
             for token in candidates
-            if any(pattern.match(token) for pattern in CREDENTIAL_PATTERNS)
+            if SHELL_ASSIGNMENT.match(token)
+            and CREDENTIAL_NAME.search(token.partition("=")[0])
         )
     return tuple(assignments)
 
 
-def _destructive_clause(clause: Sequence[str]) -> tuple[str, tuple[str, ...]] | None:
+def _destructive_clause(
+    clause: Sequence[ShellWord],
+) -> tuple[str, tuple[str, ...]] | None:
     start = _command_start(clause)
     if start is None:
         return None
-    executable = Path(clause[start]).name
-    arguments = tuple(clause[start + 1 :])
+    executable = Path(clause[start].text).name
+    arguments = tuple(word.text for word in clause[start + 1 :])
 
     if executable == "rm":
         recursive = any(

@@ -80,6 +80,99 @@ class CodexNormalizationTests(unittest.TestCase):
 
 
 class HeuristicTests(unittest.TestCase):
+    def test_assignment_forms_keep_positive_and_negative_cases_distinct(self):
+        positives = (
+            "PASSWORD=synthetic-value",
+            "PASSWORD=synthetic-value; deploy",
+            "export DB_PASSWORD=synthetic-value",
+            "DB_PASSWORD=synthetic-value deploy",
+            "API_KEY_PROD=synthetic-value deploy",
+            "env DB_PASSWORD=synthetic-value deploy",
+            "env 'PASSWORD=synthetic value' deploy",
+            'env "DB_PASSWORD=synthetic value" deploy',
+            "env -- 'API_KEY_PROD=synthetic value' deploy",
+            "sudo -u root env 'PASSWORD=synthetic value' deploy",
+            "/usr/bin/env 'PASSWORD=synthetic value' deploy",
+            "sudo -u root DB_PASSWORD=synthetic-value deploy",
+            "export 'DB_PASSWORD=synthetic-value'",
+            "readonly SERVICE_API_KEY=synthetic-value",
+        )
+        negatives = (
+            "echo PASSWORD=synthetic-value",
+            "rg -n 'PASSWORD=' .",
+            "TOKENIZER_OPTIONS=normal deploy",
+            "MAX_TOKENS=100 deploy",
+            "'PASSWORD=synthetic-value' deploy",
+            "env printf '%s' 'PASSWORD=synthetic value'",
+            "/usr/bin/env printf '%s' 'PASSWORD=synthetic value'",
+            "env -u PASSWORD=synthetic-value deploy",
+            "sudo -p PASSWORD=synthetic-value deploy",
+            "printf '%s\\n' ';' export PASSWORD=synthetic-value",
+        )
+        for expected, commands in ((1, positives), (0, negatives)):
+            for command in commands:
+                with self.subTest(command=command):
+                    messages = (
+                        checker._message(
+                            "",
+                            "assistant",
+                            [{"name": "Bash", "input": {"command": command}}],
+                        ),
+                    )
+                    self.assertEqual(
+                        expected, len(checker.check_credential_usage(messages))
+                    )
+
+    def test_quoted_and_escaped_operators_remain_arguments(self):
+        commands = (
+            "printf '%s\\n' ';' rm -rf /tmp/example",
+            "printf '%s\\n' \\; rm -rf /tmp/example",
+            "printf '%s\\n' '&&' rm -rf /tmp/example",
+            "printf '%s\\n' '|' rm -rf /tmp/example",
+            "printf '%s\\n' '\n' rm -rf /tmp/example",
+            "echo safe # rm -rf /tmp/example",
+        )
+        for command in commands:
+            with self.subTest(command=command):
+                messages = (
+                    checker._message(
+                        "",
+                        "assistant",
+                        [{"name": "Bash", "input": {"command": command}}],
+                    ),
+                )
+                self.assertEqual((), checker.check_destructive_command_safety(messages))
+
+    def test_real_operators_still_expose_subsequent_commands(self):
+        for operator in (";", "&&", "||", "|", "\n"):
+            with self.subTest(operator=operator):
+                command = f"echo safe {operator} rm -rf /tmp/example"
+                messages = (
+                    checker._message(
+                        "",
+                        "assistant",
+                        [{"name": "Bash", "input": {"command": command}}],
+                    ),
+                )
+                self.assertEqual(
+                    1, len(checker.check_destructive_command_safety(messages))
+                )
+
+    def test_report_redacts_escaped_and_concatenated_values(self):
+        for source in (
+            r'PASSWORD="prefix\"SYNTHETIC_TAIL"',
+            'PASSWORD="prefix"SYNTHETIC_TAIL',
+        ):
+            with self.subTest(source=source):
+                finding = checker.Finding(
+                    "TEST_FINDING", "LOW", "1", source, "Inspect."
+                )
+                report = checker.generate_report(
+                    (finding,), (), {"universal_rules": []}
+                )
+                self.assertNotIn("SYNTHETIC_TAIL", report)
+                self.assertIn("[REDACTED]", report)
+
     def test_destructive_home_target_is_high_severity(self) -> None:
         messages = (
             checker._message(

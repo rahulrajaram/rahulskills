@@ -29,29 +29,47 @@ class FrontmatterError(ValueError):
 
 
 def parse_scalar(raw_value):
-    """Parse the scalar forms used by skill frontmatter without dependencies."""
+    """Parse a strict YAML subset; ambiguous/unsupported values must be quoted."""
     value = raw_value.strip()
     if not value:
         return {}
     if value.startswith('"'):
+        quoted = re.fullmatch(r'("(?:\\.|[^"\\])*")(?:\s+#.*)?', value)
+        if quoted is None:
+            raise FrontmatterError("Invalid double-quoted value")
         try:
-            return json.loads(value)
+            return json.loads(quoted.group(1))
         except json.JSONDecodeError as error:
             raise FrontmatterError(
                 f"Invalid double-quoted value: {error.msg}"
             ) from error
     if value.startswith("'"):
-        if len(value) < 2 or not value.endswith("'"):
+        quoted = re.fullmatch(r"('(?:''|[^'])*')(?:\s+#.*)?", value)
+        if quoted is None:
             raise FrontmatterError("Invalid single-quoted value")
-        return value[1:-1].replace("''", "'")
-    if value in {"true", "false"}:
-        return value == "true"
-    if value in {"null", "~"}:
+        return quoted.group(1)[1:-1].replace("''", "'")
+    value = re.split(r"(?:^|\s+)#", value, maxsplit=1)[0].rstrip()
+    if not value:
         return None
-    if re.fullmatch(r"[-+]?\d+", value):
+    if value[0] in "[]{}&*!|>%@`" or re.search(r":(?:\s|$)|^[?:-](?:\s|$)", value):
+        raise FrontmatterError("Unsupported YAML value; quote scalar text")
+    if value.lower() in {"true", "false", "yes", "no", "on", "off"}:
+        return value.lower() in {"true", "yes", "on"}
+    if value.lower() in {"null", "~"}:
+        return None
+    if re.fullmatch(r"[-+]?(?:0|[1-9]\d*)", value):
         return int(value)
     if re.fullmatch(r"[-+]?(?:\d+\.\d*|\.\d+)", value):
         return float(value)
+    if re.fullmatch(
+        r"[-+]?(?:0x[\da-f_]+|0o[0-7_]+|0b[01_]+"
+        r"|(?:\d[\d_]*(?:\.[\d_]*)?|\.[\d_]+)(?:e[-+]?[\d_]+)?"
+        r"|(?:\d+:)+[\d.]+|\.(?:inf|nan))"
+        r"|\d{4}-\d{1,2}-\d{1,2}(?:[Tt ]\d.*)?",
+        value,
+        re.IGNORECASE,
+    ):
+        raise FrontmatterError("Unsupported numeric/date-like value; quote scalar text")
     return value
 
 
@@ -59,6 +77,7 @@ def parse_frontmatter(frontmatter_text):
     """Parse the top-level mapping and nested mappings used by this package."""
     frontmatter = {}
     current_mapping = None
+    mapping_indent = None
 
     for line_number, line in enumerate(frontmatter_text.splitlines(), 1):
         if not line.strip() or line.lstrip().startswith("#"):
@@ -68,6 +87,14 @@ def parse_frontmatter(frontmatter_text):
                 raise FrontmatterError(
                     f"Unexpected indentation on frontmatter line {line_number}"
                 )
+            indent = len(line) - len(line.lstrip(" "))
+            if "\t" in line[: len(line) - len(line.lstrip())] or (
+                mapping_indent is not None and indent != mapping_indent
+            ):
+                raise FrontmatterError(
+                    f"Unsupported indentation on frontmatter line {line_number}"
+                )
+            mapping_indent = indent
             nested = line.strip()
             key, separator, raw_value = nested.partition(":")
             if not separator or not key.strip():
@@ -76,6 +103,13 @@ def parse_frontmatter(frontmatter_text):
                 )
             mapping = frontmatter[current_mapping]
             nested_key = key.strip()
+            if (
+                not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", nested_key)
+                or not raw_value.strip()
+            ):
+                raise FrontmatterError(
+                    f"Unsupported nested mapping on frontmatter line {line_number}"
+                )
             if nested_key in mapping:
                 raise FrontmatterError(
                     f"Duplicate nested key '{nested_key}' on frontmatter line {line_number}"
@@ -85,7 +119,7 @@ def parse_frontmatter(frontmatter_text):
 
         key, separator, raw_value = line.partition(":")
         key = key.strip()
-        if not separator or not key:
+        if not separator or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", key):
             raise FrontmatterError(f"Invalid mapping on frontmatter line {line_number}")
         if key in frontmatter:
             raise FrontmatterError(
@@ -93,6 +127,7 @@ def parse_frontmatter(frontmatter_text):
             )
         frontmatter[key] = parse_scalar(raw_value)
         current_mapping = key if frontmatter[key] == {} else None
+        mapping_indent = None
 
     return frontmatter
 
@@ -137,7 +172,7 @@ def validate_skill(skill_path):
     }
     for key, expected_type in expected_types.items():
         value = frontmatter.get(key)
-        if value is not None and not isinstance(value, expected_type):
+        if key in frontmatter and not isinstance(value, expected_type):
             return (
                 False,
                 f"'{key}' must be {expected_type.__name__}, got {type(value).__name__}",

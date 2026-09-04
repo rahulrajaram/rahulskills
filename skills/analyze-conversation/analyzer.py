@@ -5,11 +5,12 @@ Comprehensive conversation analysis for extracting anti-patterns, tooling gaps, 
 
 import json
 import sys
+import re
 from collections import Counter
 from typing import List, Dict, Any
 from dataclasses import dataclass, field
 
-from redaction import redact_sensitive_text
+from redaction import redact_sensitive_excerpt, redact_sensitive_text
 
 
 @dataclass
@@ -63,7 +64,7 @@ def extract_text_from_content(content: Any) -> str:
                 if item.get("type") == "text":
                     texts.append(item.get("text", ""))
                 elif item.get("type") == "thinking":
-                    texts.append(f"[THINKING: {item.get('thinking', '')[:200]}...]")
+                    texts.append(f"[THINKING: {item.get('thinking', '')}]")
             elif isinstance(item, str):
                 texts.append(item)
         return "\n".join(texts)
@@ -114,8 +115,12 @@ def analyze_tool_use(message: Dict, stats: ConversationStats):
             stats.file_edits.append(
                 {
                     "file": tool_input.get("file_path", ""),
-                    "old": tool_input.get("old_string", "")[:100],
-                    "new": tool_input.get("new_string", "")[:100],
+                    "old": redact_sensitive_text(tool_input.get("old_string", ""))[
+                        :100
+                    ],
+                    "new": redact_sensitive_text(tool_input.get("new_string", ""))[
+                        :100
+                    ],
                 }
             )
 
@@ -142,7 +147,7 @@ def analyze_tool_results(message: Dict, stats: ConversationStats):
                 stats.errors.append(
                     {
                         "tool_use_id": item.get("tool_use_id", ""),
-                        "content": result_str[:500],
+                        "content": redact_sensitive_text(result_str)[:500],
                         "timestamp": message.get("timestamp", ""),
                     }
                 )
@@ -154,26 +159,31 @@ def detect_hardcoded_values(text: str) -> List[Dict[str, str]]:
 
     # Look for password assignments
     if "password" in text.lower() and "=" in text:
-        for line in text.split("\n"):
+        for match in re.finditer(r"[^\n]+", text):
+            line = match.group()
             if "password" in line.lower() and "=" in line:
                 patterns.append(
                     {
                         "type": "password",
-                        "line": redact_sensitive_text(line.strip()[:200]),
+                        "line": redact_sensitive_excerpt(text, *match.span()).strip()[
+                            :200
+                        ],
                     }
                 )
 
     # Look for IP addresses being set
-    import re
-
     ip_pattern = r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"
     if re.search(ip_pattern, text):
         for match in re.finditer(ip_pattern, text):
-            context = text[
-                max(0, match.start() - 50) : min(len(text), match.end() + 50)
-            ]
+            context = redact_sensitive_excerpt(
+                text, max(0, match.start() - 50), match.end() + 50
+            )
             patterns.append(
-                {"type": "ip_address", "value": match.group(), "context": context}
+                {
+                    "type": "ip_address",
+                    "value": redact_sensitive_excerpt(text, *match.span()),
+                    "context": context,
+                }
             )
 
     return patterns
@@ -199,10 +209,12 @@ def detect_scope_expansion(user_msg: str, assistant_msgs: List[str]) -> List[str
         for keyword in expansion_keywords:
             if keyword in msg_lower:
                 # Extract sentence containing keyword
-                sentences = msg.split(".")
-                for sent in sentences:
+                for match in re.finditer(r"[^.]+", msg):
+                    sent = match.group()
                     if keyword in sent.lower():
-                        expansions.append(sent.strip())
+                        expansions.append(
+                            redact_sensitive_excerpt(msg, *match.span()).strip()
+                        )
 
     return expansions
 
