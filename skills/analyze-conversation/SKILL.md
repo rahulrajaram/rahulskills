@@ -9,7 +9,7 @@ argument-hint: "[conversation-id]"
 Performs comprehensive post-mortem analysis of conversations to extract:
 - Systemic anti-patterns (retry-without-diagnosis, credential assumptions, scope creep, etc.)
 - Tooling opportunities (repeated commands that should be automated)
-- Universal rules violated (15 infrastructure work rules)
+- Universal rules violated (using the shared infrastructure rule taxonomy)
 - Recommendations for improvement
 
 ## Autonomy Routing
@@ -32,8 +32,8 @@ python ~/.codex/skills/analyze-conversation/generate_report.py --id <conversatio
 python ~/.codex/skills/analyze-conversation/generate_report.py <conversation-jsonl>
 ```
 
-(Claude Code installs scripts alongside this manifest at
-`~/.claude/skills/analyze-conversation/`; substitute that path there.)
+Other runtimes may install the same scripts beside their own manifest; invoke
+the script from the active skill directory.
 
 ## Arguments
 
@@ -42,9 +42,12 @@ python ~/.codex/skills/analyze-conversation/generate_report.py <conversation-jso
 
 ## Output
 
-Generates a retrospective report at
-`~/.claude/retrospectives/[conversation-id]_retrospective.md`. The directory is
-created on first successful run.
+Generates a retrospective report beneath the active runtime:
+
+- Codex transcripts: `~/.codex/retrospectives/[conversation-id]_retrospective.md`
+- Claude transcripts: `~/.claude/retrospectives/[conversation-id]_retrospective.md`
+
+The selected directory is created on first successful run.
 
 ## Shared taxonomy
 
@@ -88,7 +91,7 @@ The generated report includes:
 - **Executive Summary**: Top anti-patterns, tool needs, rule violations
 - **Detailed Anti-Pattern Analysis**: Each instance with context and fix
 - **Tool Opportunities**: Commands that should be automated
-- **Universal Rules Violated**: Which of 15 rules were broken and how often
+- **Universal Rules Violated**: Which shared rules were broken and how often
 - **Recommendations**: Priority-ranked action items
 - **Success Metrics**: Comparison with target behavior
 
@@ -153,7 +156,10 @@ The analyzer reuses the analysis scripts created during retrospective analysis a
 - Severity ranking (HIGH/MEDIUM/LOW)
 - Actionable recommendations
 - Success metric tracking
-- Codex JSONL normalization for `~/.codex/sessions` transcripts
+- Codex JSONL normalization for current `item_completed` command,
+  file-change, MCP, collaboration, user-message, and agent-message events under
+  `~/.codex/sessions`
+- Observed transcript-span, command-runtime, failure, and tool-kind metrics
 - Autonomy-break detection for user re-prompts and assistant workflow-routing questions
 
 If `--current` cannot identify a readable transcript, list the newest candidate

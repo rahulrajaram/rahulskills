@@ -1,1 +1,1 @@
-allowed-tools: "Bash(pandoc:*), Bash(weasyprint:*), Bash(curl:*), Bash(dot:*), Bash(pdfinfo:*), Bash(pdftoppm:*), Bash(pdffonts:*), Bash(python3:*), Bash(rm:*)"
+allowed-tools: "Bash(pandoc:*), Bash(weasyprint:*), Bash(dot:*), Bash(pdfinfo:*), Bash(pdftoppm:*), Bash(pdffonts:*)"

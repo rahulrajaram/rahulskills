@@ -7,6 +7,7 @@ Entry point for /analyze-conversation skill.
 import sys
 import os
 import json
+import shlex
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -14,14 +15,14 @@ from pathlib import Path
 # Import from analyzer and patterns modules
 sys.path.insert(0, os.path.dirname(__file__))
 from analyzer import analyze_conversation
+from redaction import redact_sensitive_text
 from patterns import (
     find_credential_antipatterns,
     find_retry_without_diagnosis,
     find_scope_creep,
     find_missing_verification,
     find_tool_opportunities,
-    extract_conversation_timeline,
-    load_messages
+    load_messages,
 )
 
 
@@ -64,7 +65,7 @@ def _extract_codex_text(content) -> str:
             if isinstance(item, str):
                 texts.append(item)
             continue
-        if item.get("type") in {"input_text", "output_text", "text"}:
+        if str(item.get("type", "")).lower() in {"input_text", "output_text", "text"}:
             texts.append(item.get("text", ""))
     return "\n".join(texts)
 
@@ -93,6 +94,130 @@ def _codex_tool_item(name: str, arguments: str) -> dict:
     return {"name": name, "input": args}
 
 
+def _duration_seconds(duration) -> float:
+    """Return a Codex duration object as seconds."""
+    if not isinstance(duration, dict):
+        return 0.0
+    return float(duration.get("secs", 0) or 0) + (
+        float(duration.get("nanos", 0) or 0) / 1_000_000_000
+    )
+
+
+def _codex_command_text(command) -> str:
+    """Recover the user command from Codex's shell argv representation."""
+    if not isinstance(command, list):
+        return str(command or "")
+    if len(command) >= 3 and command[1] in {"-c", "-lc"}:
+        return str(command[2])
+    return shlex.join(str(part) for part in command)
+
+
+def _normalized_message(timestamp: str, role: str, content: list) -> dict:
+    return {
+        "timestamp": timestamp,
+        "type": role,
+        "message": {"content": content},
+    }
+
+
+def _normalize_completed_item(event: dict) -> dict | None:
+    """Normalize one current Codex item_completed event without duplicating it."""
+    payload = event.get("payload") or {}
+    item = payload.get("item") or {}
+    item_type = item.get("type")
+    timestamp = event.get("timestamp", "")
+
+    if item_type in {"UserMessage", "AgentMessage"}:
+        text = _extract_codex_text(item.get("content"))
+        if not text:
+            return None
+        role = "user" if item_type == "UserMessage" else "assistant"
+        return _normalized_message(
+            timestamp,
+            role,
+            [{"type": "text", "text": text}],
+        )
+
+    if item_type == "CommandExecution":
+        tool_items = [
+            {
+                "name": "Bash",
+                "input": {
+                    "command": _codex_command_text(item.get("command")),
+                    "description": str(item.get("source", "")),
+                    "duration_seconds": _duration_seconds(item.get("duration")),
+                    "exit_code": item.get("exit_code"),
+                    "status": item.get("status", ""),
+                },
+            }
+        ]
+        for parsed in item.get("parsed_cmd") or []:
+            if not isinstance(parsed, dict):
+                continue
+            parsed_type = parsed.get("type")
+            path = parsed.get("path") or parsed.get("name")
+            if parsed_type == "read" and path:
+                tool_items.append({"name": "Read", "input": {"file_path": str(path)}})
+            elif parsed_type in {"write", "create"} and path:
+                tool_items.append({"name": "Write", "input": {"file_path": str(path)}})
+        tool_items.append(
+            {
+                "type": "tool_result",
+                "tool_use_id": item.get("id", ""),
+                "content": json.dumps(
+                    {
+                        "status": item.get("status"),
+                        "exit_code": item.get("exit_code"),
+                        "stderr": str(item.get("stderr") or "")[:2000],
+                    },
+                    sort_keys=True,
+                ),
+            }
+        )
+        return _normalized_message(timestamp, "assistant", tool_items)
+
+    if item_type == "FileChange":
+        tool_items = []
+        for path, change in (item.get("changes") or {}).items():
+            change_type = change.get("type") if isinstance(change, dict) else "update"
+            tool_name = "Write" if change_type == "add" else "Edit"
+            tool_items.append({"name": tool_name, "input": {"file_path": str(path)}})
+        if tool_items:
+            return _normalized_message(timestamp, "assistant", tool_items)
+        return None
+
+    if item_type == "McpToolCall":
+        name = f"mcp__{item.get('server', '')}__{item.get('tool', '')}"
+        return _normalized_message(
+            timestamp,
+            "assistant",
+            [{"name": name, "input": item.get("arguments") or {}}],
+        )
+
+    if item_type == "CollabAgentToolCall":
+        name = f"collaboration__{item.get('tool', '')}"
+        return _normalized_message(
+            timestamp, "assistant", [{"name": name, "input": {}}]
+        )
+
+    if item_type == "SubAgentActivity":
+        return _normalized_message(
+            timestamp,
+            "assistant",
+            [
+                {
+                    "name": "subagent_activity",
+                    "input": {
+                        "kind": item.get("kind", ""),
+                        "agent_path": item.get("agent_path", ""),
+                    },
+                }
+            ],
+        )
+
+    return None
+
+
 def is_codex_conversation_file(conversation_file: str) -> bool:
     """Return whether a JSONL transcript appears to use Codex event format."""
     try:
@@ -101,7 +226,11 @@ def is_codex_conversation_file(conversation_file: str) -> bool:
                 if not line.strip():
                     continue
                 event = json.loads(line)
-                if event.get("type") in {"session_meta", "turn_context", "response_item"}:
+                if event.get("type") in {
+                    "session_meta",
+                    "turn_context",
+                    "response_item",
+                }:
                     return True
                 return False
     except (OSError, json.JSONDecodeError):
@@ -113,10 +242,26 @@ def normalize_codex_conversation(conversation_file: str) -> str:
     """Normalize Codex JSONL events into the message shape used by this analyzer."""
     normalized = []
     with open(conversation_file) as handle:
-        for line in handle:
-            if not line.strip():
+        events = [json.loads(line) for line in handle if line.strip()]
+
+    has_completed_item_stream = any(
+        event.get("type") == "event_msg"
+        and (event.get("payload") or {}).get("type") == "item_completed"
+        for event in events
+    )
+
+    if has_completed_item_stream:
+        for event in events:
+            if event.get("type") != "event_msg":
                 continue
-            event = json.loads(line)
+            payload = event.get("payload") or {}
+            if payload.get("type") != "item_completed":
+                continue
+            message = _normalize_completed_item(event)
+            if message:
+                normalized.append(message)
+    else:
+        for event in events:
             if event.get("type") != "response_item":
                 continue
             payload = event.get("payload") or {}
@@ -130,26 +275,24 @@ def normalize_codex_conversation(conversation_file: str) -> str:
                 if not text:
                     continue
                 normalized.append(
-                    {
-                        "timestamp": timestamp,
-                        "type": role,
-                        "message": {"content": [{"type": "text", "text": text}]},
-                    }
+                    _normalized_message(
+                        timestamp,
+                        role,
+                        [{"type": "text", "text": text}],
+                    )
                 )
             elif payload_type == "function_call":
                 normalized.append(
-                    {
-                        "timestamp": timestamp,
-                        "type": "assistant",
-                        "message": {
-                            "content": [
-                                _codex_tool_item(
-                                    str(payload.get("name", "")),
-                                    str(payload.get("arguments", "")),
-                                )
-                            ]
-                        },
-                    }
+                    _normalized_message(
+                        timestamp,
+                        "assistant",
+                        [
+                            _codex_tool_item(
+                                str(payload.get("name", "")),
+                                str(payload.get("arguments", "")),
+                            )
+                        ],
+                    )
                 )
 
     temp = tempfile.NamedTemporaryFile(
@@ -183,7 +326,7 @@ def find_conversation_file(conversation_id=None):
         return find_current_codex_conversation_file()
     if conversation_id:
         # Search in .claude/projects/
-        projects_dir = Path.home() / '.claude' / 'projects'
+        projects_dir = Path.home() / ".claude" / "projects"
         if projects_dir.exists():
             for project_dir in projects_dir.iterdir():
                 try:
@@ -192,7 +335,7 @@ def find_conversation_file(conversation_id=None):
                     continue
                 if not is_project_dir:
                     continue
-                conv_file = project_dir / f'{conversation_id}.jsonl'
+                conv_file = project_dir / f"{conversation_id}.jsonl"
                 try:
                     if conv_file.exists():
                         return str(conv_file)
@@ -210,26 +353,29 @@ def find_conversation_file(conversation_id=None):
 
 # Commands that are normal development patterns - don't suggest tools for these
 NORMAL_DEV_COMMANDS = {
-    'git status',
-    'git diff',
-    'git log',
-    'git add',
-    'git commit',
-    'ls',
-    'pwd',
-    'cd',
-    'cat',
-    'echo',
+    "git status",
+    "git diff",
+    "git log",
+    "git add",
+    "git commit",
+    "ls",
+    "pwd",
+    "cd",
+    "cat",
+    "echo",
 }
 
 # Command prefixes that are normal test-fix-test cycles
 NORMAL_TEST_COMMANDS = {
-    'pytest',
-    'python -m pytest',
-    'npm test',
-    'npm run test',
-    'go test',
-    'cargo test',
+    "pytest",
+    "python -m pytest",
+    "python -m unittest",
+    "python3 -m unittest",
+    "npm test",
+    "npm run test",
+    "go test",
+    "cargo test",
+    "cargo clippy",
 }
 
 
@@ -247,66 +393,124 @@ def is_normal_dev_command(cmd: str) -> bool:
         if cmd_lower.startswith(test_cmd):
             return True
 
+    # Overwatch is a monitor around an underlying development command, not a
+    # missing project abstraction merely because a governed gate repeats.
+    if cmd_lower.startswith("overwatch run") and any(
+        marker in cmd_lower
+        for marker in (
+            " -- cargo test",
+            " -- cargo clippy",
+            " -- pytest",
+            " -- npm test",
+        )
+    ):
+        return True
+
     return False
 
 
 def check_project_context(conversation_file: str) -> dict:
     """Check what tools/docs already exist in the project."""
     context = {
-        'has_project_cli': False,
-        'has_tools_doc': False,
-        'has_claude_md': False,
-        'has_operations_md': False,
-        'existing_tools': [],
+        "has_project_cli": False,
+        "has_tools_doc": False,
+        "has_claude_md": False,
+        "has_agents_md": False,
+        "has_operations_md": False,
+        "existing_tools": [],
     }
 
-    # Try to find project root from conversation file path
-    # e.g., ~/.claude/projects/<project-slug>/...
-    # maps to ~/Documents/myproject/
     conv_path = Path(conversation_file)
-    project_dir_name = conv_path.parent.name  # e.g., <project-slug>
+    project_path = None
 
-    if project_dir_name.startswith('-'):
+    if is_codex_conversation_file(conversation_file):
+        try:
+            with open(conversation_file) as handle:
+                for line in handle:
+                    if not line.strip():
+                        continue
+                    event = json.loads(line)
+                    if event.get("type") != "session_meta":
+                        continue
+                    cwd = (event.get("payload") or {}).get("cwd")
+                    if cwd:
+                        project_path = Path(cwd)
+                    break
+        except (OSError, json.JSONDecodeError):
+            project_path = None
+
+    if project_path is None:
+        # Claude transcripts encode their project root in the parent directory.
+        project_dir_name = conv_path.parent.name
+        if project_dir_name.startswith("-"):
+            project_path = Path("/" + project_dir_name[1:].replace("-", "/"))
+
+    if project_path is not None:
         # Convert back to path: <project-slug> -> ~/Documents/myproject
-        project_path = Path('/' + project_dir_name[1:].replace('-', '/'))
-
         # Check for common documentation files
-        if (project_path / 'CLAUDE.md').exists():
-            context['has_claude_md'] = True
-        if (project_path / 'OPERATIONS.md').exists():
-            context['has_operations_md'] = True
-        if (project_path / 'TOOLS.md').exists():
-            context['has_tools_doc'] = True
+        if (project_path / "CLAUDE.md").exists():
+            context["has_claude_md"] = True
+        if (project_path / "AGENTS.md").exists():
+            context["has_agents_md"] = True
+        if (project_path / "OPERATIONS.md").exists():
+            context["has_operations_md"] = True
+        if (project_path / "TOOLS.md").exists():
+            context["has_tools_doc"] = True
 
         # Check for project CLI
-        for subdir in ['myproject_cp', '.']:
-            scripts_dir = project_path / subdir / 'scripts'
+        for subdir in ["myproject_cp", "."]:
+            scripts_dir = project_path / subdir / "scripts"
             if scripts_dir.exists():
-                context['has_project_cli'] = True
+                context["has_project_cli"] = True
                 break
 
         # Check for bin/myproject or similar
-        for pattern in ['bin/myproject', 'scripts/myproject', '.local/bin/myproject']:
+        for pattern in ["bin/myproject", "scripts/myproject", ".local/bin/myproject"]:
             if (project_path / pattern).exists() or (Path.home() / pattern).exists():
-                context['has_project_cli'] = True
+                context["has_project_cli"] = True
                 break
 
     return context
 
 
+def _format_duration(seconds: float) -> str:
+    total = max(0, int(round(seconds)))
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}h {minutes}m {secs}s"
+    if minutes:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
+
+
+def _timestamp_span_seconds(first: str, last: str) -> float:
+    if not first or not last:
+        return 0.0
+    try:
+        start = datetime.fromisoformat(first.replace("Z", "+00:00"))
+        end = datetime.fromisoformat(last.replace("Z", "+00:00"))
+    except ValueError:
+        return 0.0
+    return max(0.0, (end - start).total_seconds())
+
+
 def generate_markdown_report(conversation_file: str, output_dir: str = None) -> str:
     """Generate comprehensive markdown report."""
 
+    codex_input = is_codex_conversation_file(conversation_file)
+
     # Create output directory
     if output_dir is None:
-        output_dir = Path.home() / '.claude' / 'retrospectives'
+        runtime_dir = ".codex" if codex_input else ".claude"
+        output_dir = Path.home() / runtime_dir / "retrospectives"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     original_conversation_file = conversation_file
     analysis_file = conversation_file
     normalized_temp_file = None
-    if is_codex_conversation_file(conversation_file):
+    if codex_input:
         normalized_temp_file = normalize_codex_conversation(conversation_file)
         analysis_file = normalized_temp_file
 
@@ -328,7 +532,6 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     scope_patterns = find_scope_creep(messages)
     verify_patterns = find_missing_verification(messages)
     tool_opps = find_tool_opportunities(messages)
-    timeline = extract_conversation_timeline(messages)
     autonomy_user_signals = [
         msg
         for msg in stats.user_messages
@@ -337,7 +540,8 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     autonomy_assistant_signals = [
         msg
         for msg in stats.assistant_messages
-        if "?" in msg and any(marker in msg.lower() for marker in AUTONOMY_ASSISTANT_MARKERS)
+        if "?" in msg
+        and any(marker in msg.lower() for marker in AUTONOMY_ASSISTANT_MARKERS)
     ]
 
     # Generate report
@@ -346,7 +550,9 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     # Header
     report_lines.append(f"# Conversation Retrospective: {conv_id}")
     report_lines.append("")
-    report_lines.append(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report_lines.append(
+        f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
     report_lines.append(f"**Conversation File:** `{original_conversation_file}`")
     if normalized_temp_file:
         report_lines.append("**Runtime Adapter:** Codex JSONL normalized for analysis")
@@ -359,11 +565,18 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     report_lines.append("")
     report_lines.append("### Top Anti-Patterns Found")
     report_lines.append("")
-    report_lines.append(f"1. **Retry-Without-Diagnosis**: {len(retry_patterns)} instances")
-    report_lines.append(f"2. **Credential Assumptions**: {len(cred_patterns)} instances")
+    report_lines.append(
+        f"1. **Retry-Without-Diagnosis**: {len(retry_patterns)} instances"
+    )
+    report_lines.append(
+        f"2. **Credential Assumptions**: {len(cred_patterns)} instances"
+    )
     report_lines.append(f"3. **Scope Expansions**: {len(scope_patterns)} instances")
     report_lines.append(f"4. **Unverified Values**: {len(verify_patterns)} instances")
-    report_lines.append(f"5. **Tool Discovery Gaps**: {len(stats.file_writes)} scripts written (potential duplicates)")
+    report_lines.append(
+        f"5. **File Creation Events**: {len(stats.file_writes)} "
+        "(reported for review; not inherently a tooling gap)"
+    )
     report_lines.append(
         f"6. **Autonomy Break Signals**: {len(autonomy_user_signals)} user prompts, "
         f"{len(autonomy_assistant_signals)} assistant routing questions"
@@ -377,23 +590,37 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         if count >= 3 and not is_normal_dev_command(cmd):
             tool_opp_count += 1
             tool_name = f"myproject-{cmd.split()[0] if cmd.split() else 'cmd'}"
-            report_lines.append(f"{tool_opp_count}. **Repeated {count}x**: `{cmd[:80]}...` → Tool: `{tool_name}`")
+            report_lines.append(
+                f"{tool_opp_count}. **Repeated {count}x**: `{cmd[:80]}...` → Tool: `{tool_name}`"
+            )
             if tool_opp_count >= 5:
                 break
     if tool_opp_count == 0:
-        report_lines.append("- None identified (repeated commands are normal dev patterns)")
+        report_lines.append(
+            "- None identified (repeated commands are normal dev patterns)"
+        )
     report_lines.append("")
 
     report_lines.append("### Top Universal Rules Violated")
     report_lines.append("")
     if len(retry_patterns) > 0:
-        report_lines.append(f"- **Rule 2** (diagnose before retry): {len(retry_patterns)} violations")
+        report_lines.append(
+            f"- **Rule 2** (diagnose before retry): {len(retry_patterns)} violations"
+        )
     if len(cred_patterns) > 0:
-        report_lines.append(f"- **Rule 1** (never hardcode creds): {len(cred_patterns)} violations")
+        report_lines.append(
+            f"- **Rule 1** (never hardcode creds): {len(cred_patterns)} violations"
+        )
     if len(scope_patterns) > 0:
-        report_lines.append(f"- **Rule 3** (ask before scope expansion): {len(scope_patterns)} violations")
+        report_lines.append(
+            f"- **Rule 3** (ask before scope expansion): {len(scope_patterns)} violations"
+        )
     if len(verify_patterns) > 0:
-        report_lines.append(f"- **Rule 6** (verify external values): {len(verify_patterns)} violations")
+        report_lines.append(
+            f"- **Rule 6** (verify external values): {len(verify_patterns)} violations"
+        )
+    if not any((retry_patterns, cred_patterns, scope_patterns, verify_patterns)):
+        report_lines.append("- None detected by the implemented heuristics")
     report_lines.append("")
     report_lines.append("---")
     report_lines.append("")
@@ -407,8 +634,12 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         "help requests."
     )
     report_lines.append("")
-    report_lines.append(f"- **User re-prompt / frustration signals**: {len(autonomy_user_signals)}")
-    report_lines.append(f"- **Assistant routing questions**: {len(autonomy_assistant_signals)}")
+    report_lines.append(
+        f"- **User re-prompt / frustration signals**: {len(autonomy_user_signals)}"
+    )
+    report_lines.append(
+        f"- **Assistant routing questions**: {len(autonomy_assistant_signals)}"
+    )
     report_lines.append("")
     if autonomy_user_signals:
         report_lines.append("### User Signals")
@@ -449,7 +680,18 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     report_lines.append(f"- **Total Turns**: {stats.total_turns}")
     report_lines.append(f"- **User Messages**: {len(stats.user_messages)}")
     report_lines.append(f"- **Assistant Messages**: {len(stats.assistant_messages)}")
-    report_lines.append(f"- **Bash Commands**: {len(stats.bash_commands)}")
+    report_lines.append(f"- **Shell Commands**: {len(stats.bash_commands)}")
+    report_lines.append(f"- **Failed Shell Commands**: {len(stats.failed_commands)}")
+    report_lines.append(
+        f"- **Cumulative Shell Runtime**: {_format_duration(stats.command_duration_seconds)}"
+    )
+    span = _timestamp_span_seconds(stats.first_timestamp, stats.last_timestamp)
+    if span:
+        report_lines.append(
+            f"- **Observed Transcript Span**: {_format_duration(span)} "
+            "(includes user/agent idle time)"
+        )
+    report_lines.append(f"- **Distinct Tool Kinds**: {len(stats.tool_calls)}")
     report_lines.append(f"- **Files Read**: {len(stats.file_reads)}")
     report_lines.append(f"- **Files Written**: {len(stats.file_writes)}")
     report_lines.append(f"- **Files Edited**: {len(stats.file_edits)}")
@@ -467,7 +709,9 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         report_lines.append("")
         report_lines.append(f"**Found**: {len(retry_patterns)} instances")
         report_lines.append("")
-        report_lines.append("**What Happened**: Commands were retried without checking logs/events between attempts.")
+        report_lines.append(
+            "**What Happened**: Commands were retried without checking logs/events between attempts."
+        )
         report_lines.append("")
         report_lines.append("**Examples**:")
         for i, p in enumerate(retry_patterns[:5], 1):
@@ -491,7 +735,9 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         report_lines.append("")
         report_lines.append(f"**Found**: {len(cred_patterns)} instances")
         report_lines.append("")
-        report_lines.append("**What Happened**: Passwords/secrets used without reading from K8s secrets.")
+        report_lines.append(
+            "**What Happened**: Passwords/secrets used without reading from K8s secrets."
+        )
         report_lines.append("")
         report_lines.append("**Examples**:")
         for i, p in enumerate(cred_patterns[:3], 1):
@@ -501,7 +747,9 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         report_lines.append("")
         report_lines.append("**Fix**: Always read from K8s secrets:")
         report_lines.append("```bash")
-        report_lines.append("kubectl get secret <name> -o jsonpath='{.data.password}' | base64 -d")
+        report_lines.append(
+            "kubectl get secret <name> -o jsonpath='{.data.password}' | base64 -d"
+        )
         report_lines.append("# Or use: myproject-creds get <secret> --namespace <ns>")
         report_lines.append("```")
         report_lines.append("")
@@ -512,7 +760,9 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         report_lines.append("")
         report_lines.append(f"**Found**: {len(scope_patterns)} instances")
         report_lines.append("")
-        report_lines.append("**What Happened**: Task scope expanded beyond original request without asking user.")
+        report_lines.append(
+            "**What Happened**: Task scope expanded beyond original request without asking user."
+        )
         report_lines.append("")
         report_lines.append("**Examples**:")
         for i, p in enumerate(scope_patterns[:3], 1):
@@ -520,10 +770,12 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
             report_lines.append(f"   - Expansion: {p['expansion']}")
         report_lines.append("")
         report_lines.append("**Fix**: Stop and ask before expanding scope:")
-        report_lines.append("> \"Encountered blocker: [X]. This is outside the original task scope. Should I:")
+        report_lines.append(
+            '> "Encountered blocker: [X]. This is outside the original task scope. Should I:'
+        )
         report_lines.append("> a) Fix it now (expands scope)")
         report_lines.append("> b) Document it and continue")
-        report_lines.append("> c) Stop here\"")
+        report_lines.append('> c) Stop here"')
         report_lines.append("")
 
     # Unverified values
@@ -532,7 +784,9 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         report_lines.append("")
         report_lines.append(f"**Found**: {len(verify_patterns)} instances")
         report_lines.append("")
-        report_lines.append("**What Happened**: IP addresses or URLs used without verification.")
+        report_lines.append(
+            "**What Happened**: IP addresses or URLs used without verification."
+        )
         report_lines.append("")
         report_lines.append("**Examples**:")
         for i, p in enumerate(verify_patterns[:3], 1):
@@ -543,9 +797,13 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         report_lines.append("**Fix**: Always verify external values:")
         report_lines.append("```bash")
         report_lines.append("# For cluster IPs:")
-        report_lines.append("docker inspect <container> | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress'")
+        report_lines.append(
+            "docker inspect <container> | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress'"
+        )
         report_lines.append("# For service URLs:")
-        report_lines.append("kubectl get svc <name> -o jsonpath='{.status.loadBalancer.ingress[0].ip}'")
+        report_lines.append(
+            "kubectl get svc <name> -o jsonpath='{.status.loadBalancer.ingress[0].ip}'"
+        )
         report_lines.append("```")
         report_lines.append("")
 
@@ -561,21 +819,31 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     actionable_tool_opps = []
     for cmd, count in stats.repeated_commands.most_common(10):
         if count >= 3 and not is_normal_dev_command(cmd):
-            tool_name = f"myproject-{cmd.split()[0]}" if cmd.split() else "myproject-cmd"
+            tool_name = (
+                f"myproject-{cmd.split()[0]}" if cmd.split() else "myproject-cmd"
+            )
             report_lines.append(f"- **{count}x**: `{cmd[:80]}` → Tool: `{tool_name}`")
             actionable_tool_opps.append((cmd, count))
 
     if not actionable_tool_opps:
-        report_lines.append("- None identified (all repeated commands are normal dev patterns like git, pytest)")
+        report_lines.append(
+            "- None identified (all repeated commands are normal dev patterns like git, pytest)"
+        )
         report_lines.append("")
-        report_lines.append("**Note**: Commands like `git status`, `pytest`, etc. are expected to repeat")
-        report_lines.append("during normal development and don't indicate tooling gaps.")
+        report_lines.append(
+            "**Note**: Commands like `git status`, `pytest`, etc. are expected to repeat"
+        )
+        report_lines.append(
+            "during normal development and don't indicate tooling gaps."
+        )
 
     report_lines.append("")
     report_lines.append("**Repeated Command Sequences**:")
-    if tool_opps['repeated_sequences']:
-        for seq_info in tool_opps['repeated_sequences']:
-            report_lines.append(f"- **{seq_info['count']}x**: `{seq_info['sequence'][:100]}`")
+    if tool_opps["repeated_sequences"]:
+        for seq_info in tool_opps["repeated_sequences"]:
+            report_lines.append(
+                f"- **{seq_info['count']}x**: `{seq_info['sequence'][:100]}`"
+            )
             report_lines.append(f"  → Potential tool: `{seq_info['tool_name']}`")
     else:
         report_lines.append("- None found (single commands only)")
@@ -608,12 +876,16 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         )
 
     # MEDIUM priority - context-aware (only suggest if not already present)
-    if not project_context['has_tools_doc'] and not project_context['has_claude_md']:
+    if (
+        not project_context["has_tools_doc"]
+        and not project_context["has_claude_md"]
+        and not project_context["has_agents_md"]
+    ):
         medium_priority_items.append(
             "**Create `TOOLS.md` or `CLAUDE.md`** - Document available tools for discoverability"
         )
 
-    if not project_context['has_project_cli'] and actionable_tool_opps:
+    if not project_context["has_project_cli"] and actionable_tool_opps:
         medium_priority_items.append(
             "**Consider unified CLI** - Consolidate repeated command patterns into tools"
         )
@@ -638,14 +910,20 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         for i, item in enumerate(medium_priority_items, 1):
             report_lines.append(f"{i}. {item}")
     else:
-        report_lines.append("- None identified - project already has good tooling/documentation")
+        report_lines.append(
+            "- None identified - project already has good tooling/documentation"
+        )
     report_lines.append("")
 
     report_lines.append("### Priority 3 (LOW) - Long-Term")
     report_lines.append("")
-    report_lines.append("1. **Add telemetry** - Track anti-pattern occurrences over time")
+    report_lines.append(
+        "1. **Add telemetry** - Track anti-pattern occurrences over time"
+    )
     report_lines.append("2. **Build metrics dashboard** - Visualize improvement trends")
-    report_lines.append("3. **Continuous learning loop** - Feed learnings back into `/check-antipatterns`")
+    report_lines.append(
+        "3. **Continuous learning loop** - Feed learnings back into `/check-antipatterns`"
+    )
     report_lines.append("")
     report_lines.append("---")
     report_lines.append("")
@@ -657,29 +935,48 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     report_lines.append("|--------|---------|--------|")
     report_lines.append(f"| Retry-without-diagnosis | {len(retry_patterns)} | 0 |")
     report_lines.append(f"| Hardcoded credentials | {len(cred_patterns)} | 0 |")
-    report_lines.append(f"| Scope expansions without asking | {len(scope_patterns)} | 0 |")
+    report_lines.append(
+        f"| Scope expansions without asking | {len(scope_patterns)} | 0 |"
+    )
     report_lines.append(f"| Unverified values | {len(verify_patterns)} | 0 |")
-    report_lines.append(f"| Manual command sequences | {len(stats.bash_commands)} | <50 (with tooling) |")
+    report_lines.append(
+        f"| Shell commands captured | {len(stats.bash_commands)} | Informational; no universal target |"
+    )
     report_lines.append("")
 
-    # Calculate compliance score
-    total_violations = len(retry_patterns) + len(cred_patterns) + len(scope_patterns) + len(verify_patterns)
+    # This score summarizes only the implemented heuristics. It is not a
+    # completeness or policy-compliance proof.
+    total_violations = (
+        len(retry_patterns)
+        + len(cred_patterns)
+        + len(scope_patterns)
+        + len(verify_patterns)
+    )
     total_opportunities = total_violations + 15  # 15 universal rules
-    compliance_score = int(((total_opportunities - total_violations) / total_opportunities) * 100) if total_opportunities > 0 else 100
+    compliance_score = (
+        int(((total_opportunities - total_violations) / total_opportunities) * 100)
+        if total_opportunities > 0
+        else 100
+    )
 
-    report_lines.append(f"**Compliance Score**: {compliance_score}% (Target: 95%+)")
+    report_lines.append(
+        f"**Heuristic Signal Score**: {compliance_score}% (Target: 95%+; "
+        "not a compliance or completeness claim)"
+    )
     report_lines.append("")
     report_lines.append("---")
     report_lines.append("")
 
     # Footer
-    report_lines.append(f"*Report generated by `/analyze-conversation` skill*")
-    report_lines.append(f"*For real-time anti-pattern detection, use `/check-antipatterns`*")
+    report_lines.append("*Report generated by `/analyze-conversation` skill*")
+    report_lines.append(
+        "*For real-time anti-pattern detection, use `/check-antipatterns`*"
+    )
 
     # Write report
     report_file = output_dir / f"{conv_id}_retrospective.md"
-    with open(report_file, 'w') as f:
-        f.write('\n'.join(report_lines))
+    with open(report_file, "w") as f:
+        f.write(redact_sensitive_text("\n".join(report_lines)))
 
     if normalized_temp_file:
         try:
@@ -691,13 +988,13 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     return str(report_file)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) < 2:
         conversation_file = find_conversation_file()
 
-    elif sys.argv[1] == '--current':
+    elif sys.argv[1] == "--current":
         conversation_file = find_conversation_file("--current")
-    elif sys.argv[1] == '--id':
+    elif sys.argv[1] == "--id":
         if len(sys.argv) < 3:
             print("Error: Conversation ID required")
             sys.exit(1)
@@ -706,5 +1003,5 @@ if __name__ == '__main__':
         conversation_file = sys.argv[1]
 
     output_file = generate_markdown_report(conversation_file)
-    print(f"\nRetrospective analysis complete!")
+    print("\nRetrospective analysis complete!")
     print(f"Report: {output_file}")

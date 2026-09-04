@@ -47,10 +47,14 @@ def validate_schema(path: Path) -> None:
     if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
         raise SystemExit(f"{path}: checkpoint schema must use JSON Schema 2020-12")
     if not expected <= required:
-        raise SystemExit(f"{path}: missing required fields: {sorted(expected - required)}")
+        raise SystemExit(
+            f"{path}: missing required fields: {sorted(expected - required)}"
+        )
     max_frontier = schema["properties"]["next_ready_actions"].get("maxItems")
     if max_frontier != 5:
-        raise SystemExit(f"{path}: ready frontier must be capped at 5, got {max_frontier!r}")
+        raise SystemExit(
+            f"{path}: ready frontier must be capped at 5, got {max_frontier!r}"
+        )
     event_kinds = set(schema["properties"]["event_kind"].get("enum", []))
     lifecycle_kinds = {
         "patch_completed",

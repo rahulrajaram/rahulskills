@@ -10,6 +10,7 @@ import re
 import selectors
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
@@ -151,7 +152,9 @@ def capture_session(command: list[str], timeout: float) -> Capture:
                 try:
                     message = json.loads(line)
                 except json.JSONDecodeError as error:
-                    raise RuntimeError(f"invalid JSON-RPC output: {line.rstrip()}") from error
+                    raise RuntimeError(
+                        f"invalid JSON-RPC output: {line.rstrip()}"
+                    ) from error
                 transcript.append(message)
                 message_id = message.get("id")
                 if message_id in (1, 2):
@@ -282,7 +285,10 @@ def paired_artifacts(
             f"artifact labels differ; missing runtime={missing_runtime}, "
             f"missing source={missing_source}"
         )
-    return [(source_by_label[label], runtime_by_label[label]) for label in sorted(source_by_label)]
+    return [
+        (source_by_label[label], runtime_by_label[label])
+        for label in sorted(source_by_label)
+    ]
 
 
 def create_staging_dir(output_dir: Path) -> Path:
@@ -311,7 +317,10 @@ def write_report(
         canonical_json(normalize(capture.tools_list)), encoding="utf-8"
     )
     (output_dir / "transcript.jsonl").write_text(
-        "".join(json.dumps(normalize(item), sort_keys=True) + "\n" for item in capture.transcript),
+        "".join(
+            json.dumps(normalize(item), sort_keys=True) + "\n"
+            for item in capture.transcript
+        ),
         encoding="utf-8",
     )
     (output_dir / "stderr.log").write_text(capture.stderr, encoding="utf-8")
@@ -335,7 +344,9 @@ def write_report(
         "comparisons": comparisons,
         "rollback_artifacts": rollback_paths,
     }
-    (output_dir / "manifest.json").write_text(canonical_json(manifest), encoding="utf-8")
+    (output_dir / "manifest.json").write_text(
+        canonical_json(manifest), encoding="utf-8"
+    )
 
 
 def main() -> int:
@@ -355,14 +366,15 @@ def main() -> int:
 
     capture = capture_session(command, args.timeout)
     comparisons = {
-        source.label: compare_artifacts(source, runtime)
-        for source, runtime in pairs
+        source.label: compare_artifacts(source, runtime) for source, runtime in pairs
     }
     staging = create_staging_dir(args.output_dir)
     try:
         rollback_paths = {
             runtime.label: str(
-                copy_rollback_artifact(runtime, staging / "rollback").relative_to(staging)
+                copy_rollback_artifact(runtime, staging / "rollback").relative_to(
+                    staging
+                )
             )
             for _, runtime in pairs
         }
@@ -380,8 +392,17 @@ def main() -> int:
             parser.error(f"output directory appeared during capture: {args.output_dir}")
         (staging / "report").rename(args.output_dir)
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
-    return int(args.fail_on_diff and any(not item["equal"] for item in comparisons.values()))
+        # A successful capture moves both children out of the staging
+        # directory, so a non-recursive removal is sufficient. If capture
+        # fails and evidence remains, preserve it rather than recursively
+        # deleting an only-partially-known tree.
+        try:
+            staging.rmdir()
+        except OSError:
+            print(f"staging evidence retained at {staging}", file=sys.stderr)
+    return int(
+        args.fail_on_diff and any(not item["equal"] for item in comparisons.values())
+    )
 
 
 if __name__ == "__main__":

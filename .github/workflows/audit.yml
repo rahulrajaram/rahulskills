@@ -13,3 +13,18 @@ jobs:
 
       - name: Run audit-skills check
         run: ./audit-skills.sh check
+
+      - name: Test conversation analyzer
+        working-directory: skills/analyze-conversation
+        run: python3 -m unittest -v test_generate_report.py
+
+      - name: Test live anti-pattern checker
+        working-directory: skills/check-antipatterns
+        run: python3 -m unittest -v test_checker.py
+
+      - name: Test skill manifest validator
+        working-directory: skills/skill-creator/scripts
+        run: python3 -m unittest -v test_quick_validate.py
+
+      - name: Test stitch backup allocation
+        run: python3 -m unittest -v test_stitch_skills.py
