@@ -1,102 +1,133 @@
 %%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
 flowchart TB
-    entry(["ENTRY · someone submits an ObjectiveRequest"])
+    principal(["HUMAN PRINCIPAL · original authority owner"])
+    delegation[/"TARGET VALUE · StandingDelegation<br/>scope, decision classes, ceilings, reserved choices, expiry, revocation"/]
+    request[/"ENTRY VALUE · ObjectiveRequest<br/>requester, principal, objective, delegation reference"/]
+    revocation[/"TARGET VALUE · current revocation and policy state"/]
 
-    subgraph Legend["Shape is kind · color is status"]
-        legend_actor(["Actor · stadium"])
-        legend_artifact[("Authority-bearing value · cylinder")]
-        legend_runtime[["Enforcing runtime · subroutine"]]
-        legend_decision{"Authority decision · diamond"}
-        legend_note["Standing rule · yellow note"]
-        legend_current["BLUE · current role or mechanism"]
-        legend_proposed["GREEN · proposed typed mechanism"]
+    subgraph Orchestrator["PROCESS 1 · ORCHESTRATOR · delegated judgment"]
+        direction LR
+        o_read["STATE · Understand objective and material uncertainty"]
+        o_classify{"DECISION · routine under delegation, reserved, or unknown?"}
+        o_ratify["TARGET · Ratify routine decision as named delegate"]
+        o_escalate["STATE · Return exact reserved decision to principal"]
+        o_continue{"DECISION · evidence supports a fresh bounded campaign?"}
     end
 
-    subgraph HumanAuthority["Human authority plane"]
-        requester(["Requester<br/>sends the objective"])
-        principal(["Principal · authority owner<br/>defines success and reserved decisions"])
-        operator(["Operator<br/>observes and requests permitted intervention"])
-        approver(["Approver<br/>makes a reserved decision"])
+    subgraph MetaBuilder["PROCESS 2 · METABUILDER · mechanical authority enforcement"]
+        direction LR
+        m_auth{"TARGET · proof authentic, current, scoped, and unrevoked?"}
+        m_envelope["TARGET · Derive an attenuated AuthorityEnvelope"]
+        m_broker{"INSTALLED · intent within envelope, resources, and enforced adapter?"}
+        m_observe["INSTALLED · Record observation independently of worker claim"]
+        m_verify["TARGET · Verify exact evidence and preserve assurance dimensions"]
+        m_refuse["REFUSED · no effect, no continuation, durable reason"]
     end
 
-    subgraph ControllerPlane["MetaBuilder controller plane"]
-        controller[["MetaBuilder controller<br/>admits, records, verifies, transitions and stops"]]
-        broker[["Capability broker<br/>intersects intent with the authority ceiling"]]
-        approval_verifier[["PROPOSED · authenticated approval verifier"]]
-        evidence_verifier[["PROPOSED · controller evidence verifier"]]
+    subgraph Harness["PROCESS 3 · HARNESS · authority consumer"]
+        direction LR
+        h_intent[/"MESSAGE · prepared EffectIntent"/]
+        h_grant[/"MESSAGE · one attenuated capability grant"/]
+        h_execute["STATE · Execute only the compiled granted action"]
+        h_claim[/"MESSAGE · worker Claim"/]
     end
 
-    subgraph WorkerPlane["Worker plane"]
-        command_worker(["Current deterministic command adapter"])
-        agent_worker(["MISSING · governed agent adapter"])
-        independent(["MISSING · independent reviewer"])
+    subgraph Target["PROCESS 4 · TARGET PROGRAM · no authority of its own"]
+        direction LR
+        p_source[/"VALUE · exact source or isolated candidate"/]
+        p_read[["INSTALLED · build, test, or run against read-only source"]]
+        p_edit[["TARGET · edit only an isolated candidate through a governed worker"]]
+        p_output[/"VALUE · observed files and raw outcome"/]
     end
 
-    request[("PROPOSED VALUE · ObjectiveRequest<br/>submittedBy, principal, objective, optional delegation")]
-    same{"Requester is principal?"}
-    delegation[("PROPOSED VALUE · DelegationProof")]
-    envelope[("PROPOSED VALUE · AuthorityEnvelopeRef")]
-    intervention[("CURRENT VALUE · bounded intervention request")]
-    attestation[("PROPOSED VALUE · DecisionAttestation")]
-    intent[("CURRENT VALUE · prepared EffectIntent")]
-    grant[("CURRENT VALUE · attenuated capability grant")]
-    claim[("CURRENT VALUE · worker Claim")]
-    observation[("CURRENT VALUE · controller Observation")]
-    record[("PROPOSED VALUE · VerificationRecord")]
-    admitted[("Admitted result or explicit denial")]
+    decision_proof[/"TARGET VALUE · RatificationProof<br/>actual ratifier, delegation, decision digest, expiry"/]
+    principal_decision[/"MESSAGE · authenticated principal decision for the exact reserved packet"/]
+    envelope[/"TARGET VALUE · AuthorityEnvelope<br/>maximum effects and resources"/]
+    record[/"TARGET VALUE · VerificationRecord<br/>exact observation, check, verifier, result"/]
+    next_request[/"OUTPUT · proposed fresh ObjectiveRequest"/]
+    exit(["EXIT · admitted result, explicit refusal, or principal decision required"])
 
-    exit(["EXIT · authority preserved, result admitted, or operation refused"])
+    principal --> delegation
+    principal --> revocation
+    request --> o_read
+    delegation -.-> o_read
+    o_read --> o_classify
+    o_classify -->|routine and fully delegated| o_ratify
+    o_classify -->|reserved or unknown| o_escalate
+    o_escalate --> principal_decision
+    principal --> principal_decision
+    o_ratify --> decision_proof
+    principal_decision --> decision_proof
+    delegation --> m_auth
+    revocation --> m_auth
+    request --> m_auth
+    decision_proof --> m_auth
+    m_auth -->|valid| m_envelope
+    m_auth -->|invalid, stale, expired, or revoked| m_refuse
+    m_envelope --> envelope
 
-    entry --> requester
-    requester -.-> request
-    request -.-> same
-    same -.->|yes| principal
-    same -.->|no| delegation
-    principal -.-> delegation
-    delegation -.-> controller
+    h_intent --> m_broker
+    envelope --> m_broker
+    m_broker -->|admit narrower grant| h_grant
+    m_broker -->|deny or unsupported| m_refuse
+    h_grant --> h_execute
+    h_execute --> p_read
+    h_execute -.-> p_edit
+    p_source --> p_read
+    p_source -.-> p_edit
+    p_read --> p_output
+    p_edit -.-> p_output
+    p_output --> h_claim
+    h_claim --> m_observe
+    m_observe --> m_verify
+    m_verify --> record
+    record --> o_continue
+    o_continue -->|accepted or bounded stop| exit
+    o_continue -->|new work within remaining delegation| next_request
+    next_request --> exit
+    o_continue -->|reserved, ambiguous, or authority exhausted| exit
+    m_refuse --> exit
 
-    principal -.-> rel_principal["PRINCIPAL IS NOT THE REQUEST MESSAGE<br/>The principal owns meaning, success, effect ceilings and reserved decisions.<br/>An agent may request work as a delegate but cannot appoint itself principal."] -.-> envelope
-    envelope -.-> controller
-    request -.-> controller
+    no_self_grant["INVARIANT · no requester, orchestrator, controller, harness, worker, or program may grant itself authority"]
+    attenuation["INVARIANT · every downstream grant is equal to or narrower than the principal's ceiling"]
+    claim_rule["INVARIANT · a worker may claim but may not observe, verify, admit, integrate, or continue its own work"]
+    auth_boundary["EVIDENCE BOUNDARY · digests bind bytes; they do not authenticate the human or prove reviewer independence"]
+    continuation_rule["INVARIANT · convergence can evaluate evidence; only the orchestrator may admit continuation"]
+    delegation -.-> no_self_grant
+    m_envelope -.-> attenuation
+    h_claim -.-> claim_rule
+    decision_proof -.-> auth_boundary
+    o_continue -.-> continuation_rule
 
-    operator --> intervention
-    intervention --> controller
-    approver -.-> attestation
-    attestation -.-> approval_verifier
-    approval_verifier -.-> controller
+    classDef actor fill:#ffffff,stroke:#0f172a,stroke-width:3px,color:#0f172a
+    classDef process fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef data fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef message fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef state fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef blocked fill:#ffffff,stroke:#991b1b,stroke-width:3px,color:#7f1d1d
+    classDef decision fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef artifact fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef note fill:#ffffff,stroke:#475569,stroke-width:1.7px,stroke-dasharray:7 5,color:#334155,font-size:13px
+    classDef installed fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#0f172a
+    classDef source fill:#ffffff,stroke:#7c3aed,stroke-width:3px,color:#4c1d95
+    classDef target fill:#ffffff,stroke:#16a34a,stroke-width:3px,stroke-dasharray:6 4,color:#14532d
+    classDef reserved fill:#ffffff,stroke:#f97316,stroke-width:3px,color:#7c2d12
+    classDef refused fill:#ffffff,stroke:#991b1b,stroke-width:3px,color:#7f1d1d
 
-    controller --> intent
-    intent --> broker
-    envelope -.-> broker
-    broker --> grant
-    grant --> command_worker
-    grant -.-> agent_worker
+    class principal actor,reserved
+    class request,delegation,revocation,decision_proof,envelope,record,p_source,p_output,next_request artifact
+    class principal_decision,h_intent,h_grant,h_claim message
+    class o_read,o_ratify,o_escalate,h_execute state
+    class o_classify,o_continue,m_auth,m_broker decision
+    class m_envelope,m_verify target
+    class m_observe,p_read process,installed
+    class p_edit process,target
+    class m_refuse blocked,refused
+    class exit actor
+    class no_self_grant,attenuation,claim_rule,auth_boundary,continuation_rule note
+    class delegation,revocation,decision_proof,envelope,record,o_classify,o_ratify,o_continue,m_auth target
 
-    command_worker --> claim
-    agent_worker -.-> claim
-    claim --> rel_claim["SEPARATION OF DUTIES<br/>A worker may report a result but cannot verify itself, widen its grant,<br/>authenticate approval, or transition controller state directly."] --> controller
-    controller --> observation
-    observation -.-> evidence_verifier
-    independent -.-> evidence_verifier
-    evidence_verifier -.-> record
-    record -.-> controller
-    controller --> admitted
-    admitted --> exit
-
-    authority_rule["AUTHORITY MONOTONICITY<br/>Every child grant is equal to or narrower than the ratified envelope.<br/>Unsupported or unauthenticated expansion fails closed."]
-    broker -.-> authority_rule
-
-    classDef current fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#000000,font-weight:bold;
-    classDef proposed fill:#ffffff,stroke:#16a34a,stroke-width:3px,color:#14532d,font-weight:bold;
-    classDef neutral fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#000000;
-    classDef relationship fill:#fef3c7,stroke:#111827,stroke-width:1.5px,color:#000000;
-
-    class requester,principal,operator,approver,controller,broker,command_worker,intervention,intent,grant,claim,observation,legend_current current;
-    class approval_verifier,evidence_verifier,agent_worker,independent,request,delegation,envelope,attestation,record,legend_proposed proposed;
-    class entry,exit,same,admitted,legend_actor,legend_artifact,legend_runtime,legend_decision neutral;
-    class rel_principal,rel_claim,authority_rule,legend_note relationship;
-
-    style Legend fill:#ffffff,stroke:#111827,stroke-width:1.5px
-    style HumanAuthority fill:#ffffff,stroke:#1d4ed8,stroke-width:2px
-    style ControllerPlane fill:#ffffff,stroke:#1d4ed8,stroke-width:2px
-    style WorkerPlane fill:#ffffff,stroke:#64748b,stroke-width:1.5px,stroke-dasharray:6 4
+    style Orchestrator fill:transparent,stroke:#0f172a,stroke-width:2.5px
+    style MetaBuilder fill:transparent,stroke:#1d4ed8,stroke-width:2.5px
+    style Harness fill:transparent,stroke:#7c3aed,stroke-width:2.2px
+    style Target fill:transparent,stroke:#64748b,stroke-width:1.8px,stroke-dasharray:6 4

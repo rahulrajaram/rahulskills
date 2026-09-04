@@ -16,7 +16,7 @@ This skill is guidance only. Rust admission, the compiled bundle, and the run
 journal remain authority.
 
 When this repository-local skill is unavailable, emit the same installed guide
-with `metabuilder qualify guide`.
+with `metabuilder harness qualification guide`.
 
 Use the installed `metabuilder` CLI for every governed operation. MetaBuilder
 does not currently expose an MCP server, and this qualification does not
@@ -88,11 +88,11 @@ projection, scaffold the exact pending intervention, save and edit that
 complete object (not its nested `record` alone), then submit it:
 
 ```bash
-metabuilder run retrospectives --run-root .metabuilder/consumer-run --json
+metabuilder run retrospectives --run-root RUN --json
 metabuilder run retrospectives scaffold \
-  --run-root .metabuilder/consumer-run --json
+  --run-root RUN --json
 metabuilder run retrospectives record \
-  --run-root .metabuilder/consumer-run \
+  --run-root RUN \
   --input retrospective-record.json --json
 ```
 
@@ -101,6 +101,26 @@ pending. `record` accepts only a complete `retrospective_recorded` intervention
 and uses the existing workflow reducer, so selector, current-head, and replay
 checks remain in force under the single-controller run-store contract.
 Do not run concurrent controller writers against the same run root.
+
+Operating notes verified in a real governed campaign:
+
+- Every worker action is followed by a `retrospective_required` blocker that
+  makes the workflow idle until its retrospective is recorded; the epoch
+  retrospective is the last one. `record.actor_id` must be a valid tranche id
+  (lowercase-hyphen slug such as `gptqueue-controller`); an empty string fails
+  with "invalid retrospective id: invalid tranche identifier".
+- Author runs with the run root OUTSIDE the target repository. The run's own
+  journal dirties the worktree and `harness author` refuses a dirty tree.
+- Attestation verdicts are `meets` / `does_not_meet` / `uncertain`, and each
+  `consumer_evidence[].digest` must be a real SHA-256 digest (journaled action
+  evidence digests are the natural choice).
+- Bundle-backed runs need `--bundle BUNDLE` on `run workflow apply`.
+- A finished consumer run rests at campaign state `awaiting_assessment` with
+  the workflow selection `status: "complete"`; that is the normal resting
+  state, not an error.
+- Recompute every auxiliary-directory digest with the current binary
+  immediately before authoring; `node_modules` drifts silently. An auxiliary
+  directory may not overlap committed source.
 
 Here “epoch” means one root-workflow incarnation; autonomous multi-epoch
 self-rebuild remains deferred.
@@ -144,23 +164,26 @@ Use the installed binary:
 ```bash
 command -v metabuilder
 metabuilder --help
-metabuilder qualify guide
+metabuilder harness qualification guide
+RUN_ROOT=/absolute/path/outside/the/repository/consumer-run
 metabuilder harness compile \
   --input metabuilder.consumer.json > metabuilder.bundle.json
 metabuilder harness check --input metabuilder.bundle.json
+# Run root OUTSIDE the repository: the run journal would dirty the worktree
+# and authoring requires a clean tree.
 metabuilder harness author \
   --bundle metabuilder.bundle.json \
-  --run-root .metabuilder/consumer-run \
+  --run-root "$RUN_ROOT" \
   --repo . \
   --harness-repo <clean-repository-containing-the-module> \
   --json
 metabuilder run workflow preview \
-  --run-root .metabuilder/consumer-run --json
+  --run-root "$RUN_ROOT" --json
 metabuilder run workflow effects \
-  --run-root .metabuilder/consumer-run \
+  --run-root "$RUN_ROOT" \
   --bundle metabuilder.bundle.json --json
 metabuilder run workflow apply \
-  --run-root .metabuilder/consumer-run \
+  --run-root "$RUN_ROOT" \
   --bundle metabuilder.bundle.json \
   --workspace . --json
 ```
@@ -188,7 +211,7 @@ iteration:
 
 ```bash
 metabuilder run workflow intervene \
-  --run-root .metabuilder/consumer-run \
+  --run-root "$RUN_ROOT" \
   --input repeat-observed.json --json
 ```
 
@@ -196,9 +219,9 @@ Prepare the exact attestation subject after the run reaches the boundary being
 assessed:
 
 ```bash
-metabuilder qualify prepare \
+metabuilder harness qualification prepare \
   --bundle metabuilder.bundle.json \
-  --run-root .metabuilder/consumer-run \
+  --run-root "$RUN_ROOT" \
   > metabuilder.qualification-preparation.json
 ```
 
@@ -206,7 +229,7 @@ Emit the attestation template, then copy the preparation's
 `subject.subject_digest` into every requirement entry:
 
 ```bash
-metabuilder qualify template \
+metabuilder harness qualification template \
   --kind attestations > metabuilder.attestations.json
 ```
 
@@ -218,14 +241,14 @@ evidence. Actor labels are content-bound but unauthenticated.
 Create and verify the MetaBuilder-owned report:
 
 ```bash
-metabuilder qualify report \
+metabuilder harness qualification report \
   --bundle metabuilder.bundle.json \
-  --run-root .metabuilder/consumer-run \
+  --run-root "$RUN_ROOT" \
   --attestations metabuilder.attestations.json \
   > metabuilder.report.json
-metabuilder qualify check \
+metabuilder harness qualification check \
   --bundle metabuilder.bundle.json \
-  --run-root .metabuilder/consumer-run \
+  --run-root "$RUN_ROOT" \
   --attestations metabuilder.attestations.json \
   --input metabuilder.report.json
 ```

@@ -1,156 +1,117 @@
 %%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
 flowchart TB
-    entry(["ENTRY · a typed ObjectiveRequest arrives"])
-    overview_notice["MIXED ARCHITECTURAL OVERVIEW<br/>This inventory combines actors, skills, artifacts, proposed functions and runtime components.<br/>Use the functional, authority and runtime projections for type-specific explanations."]
+    principal(["HUMAN PRINCIPAL · owns goals, standing delegation, and reserved decisions"])
+    entry[/"ENTRY · objective, authority ceiling, acceptance, and hard bounds"/]
 
-    subgraph Legend["How to read this review"]
-        legend_actor(["Actor shape"])
-        legend_artifact[("Artifact shape")]
-        legend_runtime[["Runtime component shape"]]
-        legend_major["Established major component"]
-        legend_minor["Established minor component"]
-        legend_improve["Existing component needing improvement"]
-        legend_missing["Missing or proposed component"]
-        legend_relation["Relationship note: present handoff plus missing contract"]
-        legend_solid["Solid path = currently declared or supported"]
-        legend_dashed["Dashed path = proposed, weakly typed, or not yet supported"]
+    subgraph Orchestrator["PROCESS 1 · ORCHESTRATOR · strategic delegate"]
+        direction LR
+        o_understand["STATE · Understand intent and discover options"]
+        o_decide{"DECISION · delegated, evidenced, reversible, and enforceable?"}
+        o_frame["STATE · Frame one finite campaign"]
+        o_judge{"DECISION · accept, continue with a new request, or stop?"}
+        o_escalate["STATE · Explain the smallest reserved decision"]
     end
 
-    subgraph Authoring["Current human and skill-guided authoring"]
-        requester(["Requester<br/>submits the objective"])
-        principal(["Principal · authority owner<br/>defines success and reserved decisions"])
-        frame["Product thesis<br/>frame-goals-constraints"]
-        grill["Task understanding<br/>grilling"]
-        charter["Operating authority model<br/>define-operating-charter"]
-        dag["Typed plan<br/>objective-to-dag-decomposition"]
-        guidance["Human guidance<br/>SKILL.md"]
+    subgraph MetaBuilder["PROCESS 2 · METABUILDER · control plane"]
+        direction LR
+        m_bind["INSTALLED · Bind exact source, plan, policy, adapters, and limits"]
+        m_admit{"INSTALLED · Can every requested effect be enforced?"}
+        m_persist["INSTALLED · Persist intent before dispatch"]
+        m_observe["INSTALLED · Observe, verify, recover, replay, and settle"]
+        m_candidate["INSTALLED MAINTAINER PATH · Materialize isolated no-hardlink candidate clone"]
+        m_prove["INSTALLED MAINTAINER PATH · Test, blind-review, and admit exact candidate"]
+        m_binary[/"VALUE · admitted MetaBuilder binary identity"/]
     end
 
-    subgraph Composition["Proposed repository-owned composition kernel"]
-        contracts["PROPOSED · Phase Skill Contracts<br/>nominal ports, failures, scoped operations"]
-        binding["PROPOSED · Callable Execution Binding<br/>exact adapter that implements one phase"]
-        recipes["PROPOSED · RecipeSpec<br/>roles, multiplicity, completeness predicates"]
-        authority["PROPOSED · AuthorityEnvelopeRef<br/>ratified ceiling that composition may only attenuate"]
-        resolver["PROPOSED · Resolver and Compatibility Checker<br/>producer-to-consumer assignability"]
-        lockfile["PROPOSED · ResolutionLock<br/>bindings, adapters, policy and compiler identities"]
-        compose["PROPOSED · compose or update-module frontend<br/>build-time only; never mutates a live run"]
+    subgraph Harness["PROCESS 3 · HARNESS · finite execution runtime"]
+        direction LR
+        h_select["STATE · Select one compiled bounded action"]
+        h_direct[["INSTALLED · Run admitted local command"]]
+        h_protocol[["COMMITTED SOURCE · Run bounded offline MCP or agent protocol"]]
+        h_claim[/"MESSAGE · worker claim and produced artifacts"/]
     end
 
-    subgraph Runtime["Current MetaBuilder runtime substrate"]
-        module["Harness Module v2<br/>current admitted workflow format"]
-        compile["Deterministic compile and check"]
-        bundle["Content-addressed bundle"]
-        broker["Capability broker and effect preview"]
-        runner["Static workflow runner<br/>bounded control flow"]
-        attempts["Durable intent, attempt, observation<br/>and effect-outcome Unknown"]
-        claims["Worker or adapter output<br/>remains a claim"]
-        evidence["Current artifacts, journal,<br/>receipts, recovery and replay"]
-        qualify["Consumer qualification<br/>needs clearer assurance dimensions"]
-        retro["Worker and epoch retrospectives"]
+    subgraph Target["PROCESS 4 · TARGET PROGRAM · governed subject"]
+        direction LR
+        p_source[/"VALUE · exact source and isolated candidate state"/]
+        p_tools[["PROCESS · build, test, or run inside the granted boundary"]]
+        p_result[/"VALUE · candidate delta and test outputs"/]
     end
 
-    subgraph Verification["Proposed trust and verification boundary"]
-        approver["PROPOSED · Authenticated Approval Verifier"]
-        decision["PROPOSED · Decision Attestation<br/>actor, scope, digest, expiry and revocation"]
-        verification["PROPOSED · Controller VerificationRecord<br/>subject, check, adapter, observation and verifier"]
-        enforcement["PROPOSED · Resource Enforcement Matrix<br/>declared, enforced, evidenced or unsupported"]
-    end
+    evidence[("DURABLE STORE · controller state, journal, artifacts, and checkpoints")]
+    next_request[/"OUTPUT · checkpointed next ObjectiveRequest for a later campaign"/]
+    exit(["EXIT · accepted result, explicit bounded stop, or separately admitted next request"])
 
-    subgraph Kernel["Smallest credible first slice · composition-conformance kernel"]
-        producer["PROPOSED · Deterministic task-spec producer adapter"]
-        typed_artifact[("PROPOSED · Typed immutable task artifact")]
-        consumer["PROPOSED · Read-only validating consumer adapter"]
-        kernel_proof["PROPOSED · Kernel proof suite<br/>transfer, refusal, timeout, reconciliation and replay"]
-        kernel_exit(["EXIT A · substrate qualifies or fails closed"])
-    end
+    principal --> entry
+    entry --> o_understand
+    o_understand --> o_decide
+    o_decide -->|routine and inside standing delegation| o_frame
+    o_decide -->|reserved, ambiguous, expired, or revoked| o_escalate
+    o_escalate --> principal
+    o_frame --> m_bind
+    m_bind --> m_admit
+    m_admit -->|admit| m_persist
+    m_admit -->|refuse or unsupported| o_judge
+    m_persist --> evidence
+    m_persist --> h_select
+    h_select --> h_direct
+    h_select -.-> h_protocol
+    p_source --> p_tools
+    h_direct --> p_tools
+    h_protocol -.-> p_tools
+    p_tools --> p_result
+    p_result --> h_claim
+    h_claim --> m_observe
+    m_observe --> evidence
+    m_observe --> o_judge
+    evidence -.-> o_judge
+    o_judge -->|accepted or bounded stop| exit
+    o_judge -->|real work remains| next_request
+    next_request --> exit
 
-    subgraph Complete["Later graduation milestone · complete bounded autonomous harness"]
-        agent["MISSING · Governed agent claim adapter<br/>exact route and hard limits"]
-        candidate["MISSING · Isolated writable candidate<br/>never ambient target authority"]
-        observe["MISSING · Controller observes patch and tests"]
-        independent["MISSING · Independent review and admission"]
-        integrate["MISSING · Qualified integration or local commit"]
-        continue["MISSING · Finite multi-slice continuation<br/>checkpoint, recover, stop or trip breaker"]
-        complete_exit(["EXIT B · objective accepted or bounded stop"])
-    end
+    o_decide -.->|MetaBuilder capability gap · separate bounded campaign| m_candidate
+    m_candidate --> m_prove
+    m_prove --> m_binary
+    m_binary -.->|input only to a later exact campaign| exit
 
-    entry --> overview_notice
-    overview_notice -.-> requester
-    requester --> rel_requester_principal["ACTOR DISTINCTION<br/>Requester and principal may be the same human, but remain separate fields.<br/>An agent requester needs delegation and cannot appoint itself principal."] --> principal
-    principal --> rel_principal_frame["OWNS DECISION<br/>The principal ratifies meaning, success and reserved choices after the request arrives.<br/>No skill may widen this authority by composing itself."] --> frame
-    principal -.-> grill
-    frame --> rel_frame_dag["CONSUMES ARTIFACT · ESTABLISHED<br/>The DAG skill is an explicit planning handoff from the product thesis.<br/>A versioned thesis artifact and preservation check are still missing."] --> dag
-    frame -.-> rel_frame_grill["PROPOSED HANDOFF<br/>Grilling can challenge the thesis, but no typed decision record connects them."] -.-> grill
-    grill -.-> rel_grill_charter["PROPOSED HANDOFF<br/>Resolved unknowns should inform authority, but approver identity and provenance are not portable."] -.-> charter
+    grants["STANDING RULE · authority and narrower grants flow down"]
+    evidence_rule["STANDING RULE · claims, observations, and evidence flow up"]
+    source_rule["TYPE RULE · program source is a value; invoked tools are processes"]
+    discovery_rule["SAFETY RULE · discovery may propose work but can never grant execution"]
+    principal -.-> grants
+    grants -.-> m_admit
+    h_claim -.-> evidence_rule
+    evidence_rule -.-> o_judge
+    p_source -.-> source_rule
+    o_understand -.-> discovery_rule
 
-    guidance -.-> rel_guidance_contract["PROPOSED BINDING<br/>Human guidance remains normative prose; each callable phase needs explicit instruction references,<br/>a semantic version and a concrete execution binding."] -.-> contracts
-    contracts -.-> binding
-    dag -.-> recipes
-    charter -.-> authority
-    contracts -.-> resolver
-    binding -.-> resolver
-    recipes -.-> resolver
-    authority -.-> rel_authority_resolver["AUTHORITY CHECK<br/>Resolution may only attenuate a ratified ceiling; repository contracts are claims,<br/>never a source of authority."] -.-> resolver
-    resolver -.-> rel_resolver_lock["RESOLVES THEN LOCKS<br/>Compatibility uses nominal type identity and direction-aware assignability.<br/>Digests identify the exact accepted result; they do not define compatibility."] -.-> lockfile
-    lockfile -.-> compose
-    compose -.-> rel_compose_module["PROPOSED ADAPTER<br/>The frontend emits a new Harness Module and requires fresh qualification.<br/>Changing an active run is a separate quiescent revision operation."] -.-> module
+    classDef actor fill:#ffffff,stroke:#0f172a,stroke-width:3px,color:#0f172a
+    classDef process fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef data fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef message fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef state fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef blocked fill:#ffffff,stroke:#991b1b,stroke-width:3px,color:#7f1d1d
+    classDef decision fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef artifact fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef note fill:#ffffff,stroke:#475569,stroke-width:1.7px,stroke-dasharray:7 5,color:#334155,font-size:13px
+    classDef installed fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#0f172a
+    classDef source fill:#ffffff,stroke:#7c3aed,stroke-width:3px,color:#4c1d95
+    classDef target fill:#ffffff,stroke:#16a34a,stroke-width:3px,stroke-dasharray:6 4,color:#14532d
+    classDef reserved fill:#ffffff,stroke:#f97316,stroke-width:3px,color:#7c2d12
 
-    module --> compile
-    compile --> bundle
-    bundle --> broker
-    broker --> runner
-    runner --> attempts
-    attempts --> claims
-    claims --> rel_claim_verification["EVIDENCE BOUNDARY<br/>A producer cannot label its own output controller evidence.<br/>The controller must observe and verify the claim independently."] --> evidence
-    evidence --> qualify
-    evidence --> retro
-    qualify -.-> rel_qual_dimensions["IMPROVEMENT NEEDED<br/>Report structural integrity, execution provenance, semantic adequacy<br/>and production readiness as separate assurance dimensions."] -.-> verification
-    retro -.-> principal
+    class principal actor,reserved
+    class entry,m_binary,h_claim,p_source,p_result,next_request artifact
+    class o_understand,o_frame,o_escalate,h_select state
+    class o_decide,o_judge,m_admit decision
+    class m_bind,m_persist,m_observe,m_candidate,m_prove,h_direct,p_tools process,installed
+    class h_protocol process,source
+    class o_decide,o_frame,o_judge target
+    class o_escalate reserved
+    class evidence data,installed
+    class exit actor
+    class grants,evidence_rule,source_rule,discovery_rule note
 
-    approver -.-> decision
-    decision -.-> authority
-    verification -.-> evidence
-    enforcement -.-> broker
-
-    producer -.-> typed_artifact
-    typed_artifact -.-> consumer
-    producer -.-> contracts
-    consumer -.-> contracts
-    producer -.-> recipes
-    consumer -.-> recipes
-    consumer -.-> kernel_proof
-    attempts -.-> kernel_proof
-    verification -.-> kernel_proof
-    kernel_proof -.-> rel_kernel_boundary["SCOPE LIMIT<br/>This proves contract resolution, runtime transfer, denial, recovery and replay.<br/>It does not execute autonomy-loop or autonomous-execution-contract semantics."] -.-> kernel_exit
-
-    agent -.-> candidate
-    candidate -.-> observe
-    observe -.-> verification
-    verification -.-> independent
-    independent -.-> integrate
-    integrate -.-> continue
-    continue -.-> complete_exit
-    agent -.-> enforcement
-    decision -.-> agent
-    continue -.-> principal
-
-    classDef major fill:#ffffff,stroke:#1d4ed8,stroke-width:4px,color:#000000,font-weight:bold;
-    classDef minor fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#000000;
-    classDef improveMajor fill:#ffffff,stroke:#f97316,stroke-width:4px,color:#7c2d12,font-weight:bold;
-    classDef improveMinor fill:#ffffff,stroke:#f97316,stroke-width:2.5px,color:#7c2d12;
-    classDef missing fill:#ffffff,stroke:#16a34a,stroke-width:3px,color:#14532d,font-weight:bold;
-    classDef relationship fill:#fef3c7,stroke:#111827,stroke-width:1.5px,color:#000000;
-
-    class entry,requester,principal,module,bundle,broker,runner,attempts,evidence,retro,legend_major major;
-    class frame,grill,charter,dag,guidance,compile,claims,legend_actor,legend_artifact,legend_runtime,legend_minor minor;
-    class qualify,legend_improve improveMajor;
-    class contracts,binding,recipes,authority,resolver,lockfile,compose,approver,decision,verification,enforcement,producer,typed_artifact,consumer,kernel_proof,kernel_exit,agent,candidate,observe,independent,integrate,continue,complete_exit,legend_missing missing;
-    class overview_notice,legend_relation,legend_solid,legend_dashed,rel_requester_principal,rel_principal_frame,rel_frame_dag,rel_frame_grill,rel_grill_charter,rel_guidance_contract,rel_authority_resolver,rel_resolver_lock,rel_compose_module,rel_claim_verification,rel_qual_dimensions,rel_kernel_boundary relationship;
-
-    style Legend fill:#ffffff,stroke:#111827,stroke-width:1.5px
-    style Authoring fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
-    style Composition fill:#ffffff,stroke:#16a34a,stroke-width:2px,stroke-dasharray:6 4
-    style Runtime fill:#ffffff,stroke:#1d4ed8,stroke-width:2px
-    style Verification fill:#ffffff,stroke:#16a34a,stroke-width:2px,stroke-dasharray:6 4
-    style Kernel fill:#ffffff,stroke:#16a34a,stroke-width:2px,stroke-dasharray:6 4
-    style Complete fill:#ffffff,stroke:#16a34a,stroke-width:2px,stroke-dasharray:6 4
+    style Orchestrator fill:transparent,stroke:#0f172a,stroke-width:2.5px
+    style MetaBuilder fill:transparent,stroke:#1d4ed8,stroke-width:2.5px
+    style Harness fill:transparent,stroke:#7c3aed,stroke-width:2.2px
+    style Target fill:transparent,stroke:#64748b,stroke-width:1.8px,stroke-dasharray:6 4

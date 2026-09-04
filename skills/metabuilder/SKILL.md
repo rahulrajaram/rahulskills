@@ -22,14 +22,27 @@ before authoring artifacts:
 command -v metabuilder
 metabuilder --help
 metabuilder harness --help
-metabuilder qualify guide
+metabuilder harness qualification guide
+metabuilder harness qualification template --kind module
 ```
 
-The current consumer surface includes `metabuilder harness brief` and
-`metabuilder qualify`. If the installed binary lacks either family, stop and
-report installation drift. Do not fall back to a hidden legacy command. Do not
-substitute an uncommitted development binary unless the MetaBuilder maintainer
-has explicitly admitted and identified those exact bytes.
+The current consumer surface (verified against the installed binary) is the
+`metabuilder harness` family: `compile`, `check`, `author`, `review`,
+`auxiliary-directory digest`, `offline-protocol-fixture`, `brief`, `diagrams`,
+`package`, `generate`, `generation check`, `intent
+check|propose|approve|lower|freeze|author`, `candidate plan`, and
+`harness qualification
+template|guide|prepare|report|check`. The `metabuilder run` family owns
+execution: `run status`, `run workflow
+preview|effects|prepare|apply|recover|resolve|retry|intervene`, `run
+retrospectives scaffold|record`, and read paths (`attempts`, `artifacts`,
+`evidence`, `monitor`). There is NO `metabuilder qualify` family — if you see
+it in older notes or skills, treat it as stale drift and use `metabuilder
+harness qualification ...`. If the installed binary lacks a family your plan
+needs, stop and report installation drift. Do not fall back to a hidden
+legacy command. Do not substitute an uncommitted development binary unless
+the MetaBuilder maintainer has explicitly admitted and identified those exact
+bytes.
 
 Do not infer authority from this skill or the README.
 
@@ -41,20 +54,56 @@ Use the companion skills as the detailed operating procedures:
    [metabuilder-harness-design](../metabuilder-harness-design/SKILL.md). It owns
    repository discovery, thorough grilling, exact brief agreement, typed
    intent, executable module design, compilation, and bundle re-admission.
-2. After design produces an exact admitted bundle, read and follow
+2. Before authoring any module whose actions must actually execute under
+   `run workflow apply`, verify the current confinement profile against the
+   installed qualification guide and MetaBuilder source. Account explicitly
+   for no network, the 4 GiB address-space limit, a read-only workspace,
+   tmpfs-backed `/tmp`, a fixed environment, the admitted toolchain surface,
+   auxiliary-directory rules, and a run root outside the target repository.
+   If an already-installed `metabuilder-sandbox-runtime` playbook is available,
+   use it as operational guidance but revalidate it against the current binary.
+3. After design produces an exact admitted bundle, read and follow
    [metabuilder-consumer-qualification](../metabuilder-consumer-qualification/SKILL.md).
    It owns execution, recovery, evidence assessment, attestations, and the
    qualification report without changing the approved design.
-3. If an already agreed module and bundle are supplied, begin at consumer
+4. If an already agreed module and bundle are supplied, begin at consumer
    qualification. If qualification exposes a design gap, return upstream; do
    not repair the design silently.
-4. When modifying MetaBuilder itself, use the repository-local
+5. When modifying MetaBuilder itself, use the repository-local
    `metabuilder-rust-functional-core` skill and repository authority. That
    maintainer discipline is not part of a target project's consumer workflow.
 
 Design states what should be tested. The Harness Module commits to executable
 checks. Qualification records what the controller observed and leaves semantic
 adequacy to the consumer. No layer alone proves production readiness.
+
+## Model-first discipline
+
+The first material artifact of any harness campaign is the reviewed PROGRAM
+(Harness Module, or the defineIntent source rendition beside it), not target
+implementation code. Do not edit target source until the model passes
+`harness check` and an independent semantic review against the principal's
+hypotheses; record the review (verdict, findings, disposition) beside the
+module. MetaBuilder actions acquire no source-mutation authority: when
+evidence exposes a defect, make one normal repository repair, commit it,
+recompute digests, and author a FRESH run bound to the new commit — never
+mutate an old bundle or pretend an old run covers a new tree.
+
+The two authoring surfaces:
+
+- **Hand-authored Harness Module v2/v3 JSON** — the supported consumer route
+  (`harness qualification template --kind module` → `harness compile` →
+  `harness check`). v3 actions wrap invocations as
+  `invocation: {kind: "command"|"external_target"|"mcp_tool"|"agent", ...}`.
+- **defineIntent source (`*.mb.ts`)** — the TypeScript-esque meaning layer.
+  Validate any rendition with `metabuilder intent check --input X --json`
+  (valid:true, executable:false). The FULL source-origin pipeline
+  (`harness package create` → `harness generate` → `intent propose|approve`
+  → `lower` → `freeze` → `author`) requires PAID generation dispatch — a
+  stop-for-principal-direction event. Grammar traps: semantic IDs and
+  artifact IDs are kebab-case slugs; object keys containing `-` must be
+  quoted strings; verification cannot be mixed with generic
+  consumes/produces.
 
 Verify each operation against the current README, CLI help, and code. Do not
 assume a planned feature exists or infer an MCP server; MetaBuilder currently
