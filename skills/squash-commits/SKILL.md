@@ -1,315 +1,254 @@
 ---
 name: squash-commits
-description: "Analyze git history, identify contiguous thematic groups, and interactively squash them with clean conventional commit messages. Use when user says /squash-commits, 'squash commits', 'clean up git history', 'compress commits', or asks to tidy commit history."
-argument-hint: "[N] [--all] [--batch] [--max-passes M]"
+description: "Analyze Git history and safely squash contiguous thematic commits with recoverable backups and clean conventional messages. Use when the user asks to squash, consolidate, compress, or tidy commit history."
 ---
 
 # Squash Commits
 
-Before rewriting commits, follow
-[`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md).
-This skill adds grouping and message composition only.
+Analyze first and rewrite only after the user approves an exact plan.
 
-Analyze a range of git commits, identify contiguous groups that share a theme, and squash them non-interactively with clean commit messages following git conventions.
+Before any mutation, read and follow
+[`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md)
+completely. That shared contract governs clean-tree checks, shared-history
+boundaries, backups, verification, rollback, and force-push restrictions. This
+skill adds contiguous grouping, commit-message composition, and squash-specific
+execution rules.
 
-## Usage
+## Arguments
 
-`/squash-commits [N] [--all] [--batch] [--max-passes M]`
+`$squash-commits [N] [--all] [--batch] [--max-passes M]`
 
-- `N`: number of recent commits to analyze (default: 20)
-- `--all`: include pushed history (requires force push later)
-- `--batch`: run repeated conservative squashes over multiple contiguous groups
-- `--max-passes M`: cap batch iterations (default: 5, recommended <= 20)
+- `N` limits analysis to the most recent N eligible commits; default to 20.
+- Without `--all`, analyze only commits ahead of the upstream tracking branch.
+- `--all` may include pushed commits in the preview. It does not authorize
+  rewriting shared history or force-pushing it.
+- `--batch` permits multiple approved, conservative passes.
+- `--max-passes M` bounds batch mode; default to 5 and reject non-positive
+  values. Recommend no more than 20.
+- An explicit `<base>..<tip>` supplied by the user overrides `N`, but not the
+  safety or approval requirements.
 
-By default, only **unpushed commits** (ahead of the remote tracking branch) are analyzed. This prevents accidentally proposing to rewrite published history. Pass `--all` to include pushed commits in the scan (will require force push).
+## Candidate Rules
 
-## Large History Mode (100+ commits)
+Only propose a group when all of its commits are adjacent in the selected
+first-parent history. Never skip an unrelated commit to join similar work.
 
-For large histories, prefer conservative iterative passes instead of one large rewrite:
+Good candidates include:
 
-1. Use first-parent history (`git log --first-parent --oneline`) to avoid side-branch noise.
-2. Pick one small contiguous group per pass.
-3. Create a unique backup tag before each pass (for example `pre-big-band-<N>-YYYYMMDD`).
-4. Recompute candidates after each pass.
-5. Run `git range-diff` plus health checks and tests after every pass.
-6. Stop when remaining candidates are tiny or semantically high-value.
+- a feature immediately followed by its correction;
+- contiguous implementation, tests, and documentation for one cohesive unit;
+- repeated handoff or workspace-state commits from one session;
+- related cleanup or formatting commits;
+- consecutive commits with identical or nearly identical messages.
 
-### Replay-sensitivity note
+Leave these untouched unless the user explicitly chooses otherwise:
 
-Contiguity is necessary for proposing a squash group, but it is **not**
-sufficient to guarantee a conflict-free rebase. Interactive rebase rewrites the
-selected commits and then replays later commits on top of the rewritten base.
-That means a perfectly contiguous `A/B/C` squash can still trigger conflicts in
-later `D/E/F` commits if those later commits touch the same regions or depend on
-the original parent chain's exact file state.
+- a distinct, self-contained commit;
+- a merge commit;
+- commits separated by unrelated work;
+- commits on opposite sides of a release, milestone, or work-wave boundary;
+- a group whose relationship is inferred only from similar wording.
 
-Practical consequence:
-- prefer the smallest contiguous range that achieves the cleanup goal
-- avoid crossing multiple tranche waves or repeated hotspot edits in one pass
-- be especially conservative around histories containing auto-repairs, reapply
-  commits, conflict-fix commits, or repeated edits to the same files
+Contiguity does not guarantee a conflict-free rebase. Later commits are replayed
+on the rewritten parent and may conflict even when the proposed group itself is
+coherent. Prefer a tip group, then the smallest useful range.
 
-## Squash Candidate Rules
+## Commit Messages
 
-### Contiguity Rule (MANDATORY)
+Propose a conventional message that represents the resulting commit:
 
-Only commits that are **adjacent** in `git log` order are candidates. If commit A and C share a theme but commit B (unrelated) sits between them, A and C are **NOT** candidates. Never skip over unrelated commits to form a group.
-
-### Thematic Grouping Patterns
-
-These contiguous sequences should be squashed:
-
-1. **Handoff sequences**: Multiple `handoff:` commits updating docs in the same session.
-
-2. **Fix + recovery pairs**: A commit that broke something followed immediately by its fix (e.g., `feat: add X` then `fix: correct X` where X is the same feature).
-
-3. **Multi-step feature work**: Implementation commit + its test commit + its doc commit, **only if contiguous** and clearly part of the same unit of work.
-
-4. **Identical repeated messages**: Multiple commits with the same or near-identical message (e.g., repeated `chore: sync workspace state`).
-
-5. **Chore batches**: Contiguous `chore:` commits doing related cleanup (e.g., lint fixes, formatting, dependency bumps in one session).
-
-### NOT Candidates
-
-- Standalone commits with a distinct, self-contained purpose
-- Commits from different logical batches even if they look similar
-- Anything where contiguity is broken by an unrelated commit
-- Merge commits (skip these; do not include in groups)
-- Commits spanning major phase/milestone boundaries unless explicitly approved
-
-## Commit Message Rules
-
-All squashed commit messages MUST follow these conventions:
-
-### Subject Line
-- **Imperative mood**: "Add feature" not "Added feature" or "Adds feature"
-- **Max 72 characters**
-- **Conventional prefix**: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`, `handoff:`
-- **Capitalize** first word after prefix
-- **No trailing period**
-- **Be specific**: avoid generic "Consolidate related work" unless requested
-
-### Body (optional, separated by blank line)
-- Wrap at 72 characters
-- Explain *what* and *why*, not *how*
-- Reference tranche IDs (YRLI-XX) when applicable
-- Use bullet points for multi-item changes
-
-### Trailer
-- Include `Co-Authored-By: Claude <noreply@anthropic.com>` when AI-assisted
+- imperative subject of at most 72 characters;
+- a specific conventional type such as `feat`, `fix`, `docs`, `refactor`,
+  `test`, or `chore`;
+- no trailing period;
+- optional body wrapped near 72 characters that explains why the combined
+  change exists;
+- no inferred co-author trailers;
+- never add a `Co-Authored-By` trailer identifying Claude.
 
 ## Workflow
 
-### Step 0: Record Original HEAD
+### 1. Inspect Without Mutating
 
-Before anything else, capture and display the full HEAD commit hash:
-
-```bash
-ORIGINAL_HEAD=$(git rev-parse HEAD)
-```
-
-**Always print this prominently** at the start of output:
-
-```
-Original HEAD: <full 40-char SHA>
-To restore: git reset --hard <full 40-char SHA>
-```
-
-This is the single source of truth for recovery. The backup tag (Step 4) is a convenience alias, but the SHA is authoritative because tags can be accidentally deleted or moved.
-
-### Step 1: Determine Scan Range
-
-**Default: unpushed commits only.** Run:
+Record the full original HEAD first:
 
 ```bash
-UPSTREAM=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null)
+git rev-parse HEAD
+git status --porcelain=v1
+git rev-parse --abbrev-ref HEAD
+git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null
 ```
 
-- **If upstream exists and `--all` was NOT passed**: Use `git log --oneline $UPSTREAM..HEAD` to scan only unpushed commits. If user passed N, cap at N. If there are zero unpushed commits, report "No unpushed commits to squash" and stop (suggest `--all` if they want to include pushed history).
-- **If upstream exists and `--all` WAS passed**: Use `git log --oneline -N` for the full requested range. Warn prominently: "Including pushed commits — squashing will require `git push --force-with-lease`."
-- **If no upstream**: Use `git log --oneline -N` for the requested range (no remote to diverge from).
-- **If user specifies a SHA range**: Use `git log --oneline <base>..<tip>` regardless of upstream.
+Print the original 40-character SHA prominently. Do not present
+`git reset --hard` as the only recovery mechanism; a real backup ref is
+required before rewriting.
 
-Display the scan range and commit count before proceeding.
+Stop before analysis becomes execution when:
 
-Before proposing any groups, also state whether this is a **tip-only cleanup**
-or a deeper rewrite that will force many later commits to be replayed. If the
-history is large or conflict-prone, bias toward tip-only cleanup first.
+- the working tree or index is dirty;
+- a rebase is already in progress;
+- `.git/index.lock` or a ref lock exists and another Git process may be active;
+- HEAD changes during planning;
+- repository ownership, target branch, or requested range is ambiguous.
 
-### Step 2: Analyze
+Determine the analysis range:
 
-Identify contiguous squash groups using the rules above. For each group, record:
-- The SHAs (first and last in the group)
-- The commit count
-- A proposed squashed commit message
-- Estimated impact using `git diff --shortstat <base>..<tip>`
+1. If the user supplied `<base>..<tip>`, validate and use that range.
+2. Otherwise, when an upstream exists and `--all` is absent, inspect
+   `@{upstream}..HEAD`, capped by `N`.
+3. When no upstream exists, inspect the latest `N` first-parent commits.
+4. With `--all`, inspect the requested first-parent range and label every
+   pushed or shared commit explicitly.
 
-Present a **table** to the user:
+If there are no eligible unpushed commits, report that fact and stop. Suggest
+`--all` only as a broader *analysis* option.
 
-```
-| # | Group Label              | Commits | SHA Range          | Proposed Message                        |
-|---|--------------------------|---------|--------------------|-----------------------------------------|
-| 1 | Fix + recovery pair      | 2       | abc1234..def5678   | feat: Shareable AI session command |
-| 2 | Handoff docs update      | 2       | 111aaaa..222bbbb   | handoff: Update session handoff docs    |
-```
-
-Also show commits that will be **left untouched** (not in any group) so the user can verify nothing was missed or incorrectly excluded.
-
-Flag groups as high risk if any of these are true:
-- More than 300 files changed
-- More than 20,000 lines touched
-- Crosses a named phase or milestone boundary
-- Crosses multiple work waves or repeated hotspot files
-
-Also explicitly call out:
-- whether the group is at the tip of history
-- how many later commits would need to be replayed after the rewrite
-- whether the range contains automated workspace-merge, auto-repair,
-  `reapply`, or conflict-fix commits, since these are often replay-sensitive
-
-### Step 3: Confirm
-
-Ask the user to approve, modify, or reject the plan. Offer options:
-- **Approve as-is**: Proceed with the proposed groups and messages
-- **Conservative**: Only squash groups with 3+ commits
-- **Custom**: User specifies which groups to keep/drop/edit
-
-Do NOT proceed without explicit user approval.
-
-If `--batch` is used, collect one explicit approval for:
-- Maximum passes (`--max-passes`)
-- High-risk thresholds
-- Per-pass test command
-
-Recommend `Conservative` by default on large branches or replay-sensitive
-histories.
-
-### Step 4: Execute
-
-Build a `GIT_SEQUENCE_EDITOR` shell script:
+Inspect enough evidence to identify replay and trust risks:
 
 ```bash
-#!/bin/bash
-# Auto-generated squash editor
-sed -i '
-  # For each group: keep first as "pick", change rest to "fixup"
-  # Then use "exec" to amend the message
-  <sed commands here>
-' "$1"
+git log --first-parent --reverse --format='%H%x09%P%x09%s' <range>
+git diff --stat <base>..<tip>
+git submodule status
+git lfs env 2>/dev/null
 ```
 
-Save it to `/tmp/haake-squash-editor.sh`, make it executable, then run:
+Also identify merge commits, signed commits or tags, branch protection
+implications, repeated hotspot files, auto-repair or conflict-fix commits, and
+the number of later commits that a deeper rewrite would replay.
+
+### 2. Present an Exact Plan
+
+For each proposed group, show:
+
+| Field | Required content |
+|---|---|
+| Group | A short thematic label |
+| Commits | Count and every full or unambiguous SHA |
+| Range | Oldest through newest commit |
+| Location | Tip group or number of later commits replayed |
+| Impact | Files and insertions/deletions from the group diff |
+| Message | Complete proposed subject and body |
+| Risk | Normal or a concrete high-risk reason |
+
+Then list every analyzed commit not included in a group. This makes omissions
+and accidental grouping visible.
+
+Mark a group high risk when it:
+
+- changes more than 300 files or 20,000 lines;
+- crosses a milestone or work wave;
+- requires replay through merges or repeated hotspot edits;
+- includes auto-repair, reapply, conflict-fix, generated, signed, submodule, or
+  LFS-sensitive commits;
+- includes history known to be pushed or shared.
+
+State whether the plan is tip-only or a deeper rewrite. Do not mutate anything
+until the user explicitly approves the exact groups and messages. Offer a
+conservative choice that keeps only groups of at least three commits when the
+range is large or replay-sensitive.
+
+For batch mode, approval must also fix:
+
+- the maximum number of passes;
+- the high-risk thresholds;
+- the verification or test command run after every pass;
+- whether the work occurs on a dedicated cleanup branch.
+
+### 3. Revalidate and Create a Backup Ref
+
+Immediately before execution, confirm that the tree is still clean, HEAD still
+equals the recorded original HEAD, and the approved range still resolves to
+the same commits.
+
+Create a collision-safe ref without moving or overwriting an existing ref:
 
 ```bash
-GIT_SEQUENCE_EDITOR=/tmp/haake-squash-editor.sh git rebase -i <base-sha>^
+backup_ref="refs/tags/pre-squash-$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short=12 HEAD)"
+git show-ref --verify --quiet "$backup_ref" && exit 1
+git update-ref "$backup_ref" "$(git rev-parse HEAD)"
+git rev-parse --verify "$backup_ref"
 ```
 
-For the commit message amendments, use `exec git commit --amend -m "..."` lines in the rebase todo.
+Record the unchanged base SHA as well as the backup ref. In batch mode, create
+a distinct backup ref before every pass.
 
-For batch mode:
-- Create a fresh editor script per pass (`/tmp/haake-squash-editor-<pass>.sh`)
-- Create a unique backup tag per pass before rebasing
-- Recompute groups after each successful pass
-- Stop immediately on any failed health check or test failure
+### 4. Execute the Smallest Approved Rewrite
 
-For any non-trivial cleanup, prefer running on a dedicated cleanup branch first.
+Prefer one contiguous group per pass. Build a deterministic sequence editor in
+a directory created with `mktemp -d`:
 
-For conflict-heavy batch mode on an isolated branch, enable rerere before passes:
+- match the approved commit identities, not merely their subject text;
+- leave the oldest commit in a group as `pick`;
+- change each immediately following approved commit to `fixup`;
+- insert an `exec git commit --amend -F <message-file>` after the final fixup;
+- fail if any approved commit is absent, duplicated, reordered, or no longer
+  adjacent;
+- leave every unapproved todo line unchanged.
 
-```bash
-git config rerere.enabled true
-git config rerere.autoupdate true
-```
+Run interactive rebase from the parent of the oldest rewritten commit. Use
+`--root` when the approved group includes the root commit. Do not flatten merge
+topology accidentally: if the replay range includes a merge, stop unless the
+approved plan explicitly describes and verifies `--rebase-merges` behavior.
 
-Prefer the merge backend behavior and avoid apply-style workflows for conflict
-prone cleanups, because merge-aware replay handles renames and context more
-robustly than apply-style patching.
+If rebase conflicts, abort with `git rebase --abort` and stop. Do not improvise
+conflict resolutions. A single rerere-assisted retry is allowed only when the
+user approved it in advance on an isolated cleanup branch.
 
-### Step 5: Verify
+Delete only the temporary directory created for this pass after rebase finishes
+or aborts. Never delete the backup ref as cleanup.
 
-After rebase completes:
-1. Run `git log --oneline -N` to show the cleaned-up history
-2. Run `git range-diff` against the pre-pass backup ref to verify what changed
-3. Run the project test suite if one exists (`cargo test`, `npm test`, `pytest`, etc.)
-4. Report pass/fail status
-5. Report per-pass and cumulative commit-count reduction
+### 5. Verify Preservation and Health
 
-If tests fail, warn the user and suggest `git rebase --abort` or `git reflog` to recover.
+After each pass:
 
-### Step 6: Cleanup and Health Check
+1. Verify that the final tree is byte-equivalent to the pre-pass tip:
 
-Remove the temp script and verify the repository is in a healthy state:
+   ```bash
+   git diff --exit-code "$backup_ref^{tree}" "HEAD^{tree}"
+   ```
 
-```bash
-# Remove temp files
-rm -f /tmp/haake-squash-editor.sh
+2. Compare the old and new commit series:
 
-# Ensure no rebase is in progress
-if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
-  echo "WARNING: Rebase state directory still exists!"
-fi
+   ```bash
+   git range-diff <unchanged-base>..<backup-ref> <unchanged-base>..HEAD
+   ```
 
-# Ensure no stale lock files
-if [ -f .git/index.lock ]; then
-  echo "WARNING: .git/index.lock exists — git may be locked!"
-fi
-if [ -f .git/refs/heads/*.lock ] 2>/dev/null; then
-  echo "WARNING: Stale ref lock files found!"
-fi
+3. Confirm the expected commit-count reduction and inspect every rewritten
+   message.
+4. Fail verification if any rewritten message contains a case-insensitive
+   `Co-Authored-By` trailer identifying Claude.
+5. Run the agreed focused checks and project test suite.
+6. Confirm the tree is clean, HEAD is valid, no rebase state remains, and no
+   stale lock file is present.
 
-# Verify working tree is clean
-git status --porcelain
+If a check fails, stop batch mode and report both the original SHA and backup
+ref. Do not reset, delete a ref, or retry another rewrite without authorization.
 
-# Verify HEAD is valid
-git rev-parse --verify HEAD
-```
+For another approved batch pass, recompute candidates from the new history.
+Stop when the pass limit is reached, no approved group remains, a check fails,
+or the expected reduction is at most one commit.
 
-Run all of the above checks. If any warnings fire:
-- **Rebase state directories**: Attempt `git rebase --abort`. If that fails, inform the user.
-- **Lock files**: Warn the user and suggest `rm .git/index.lock` only after confirming no other git process is running (`ps aux | grep git`).
-- **Dirty working tree**: Warn the user — the rebase may have left uncommitted changes.
+### 6. Report
 
-**Always print the final summary** including the original HEAD for recovery:
+Always report:
 
-```
+```text
 Squash complete.
-  Original HEAD: <full 40-char SHA>
-  Current HEAD:  <full 40-char SHA>
-  Backup ref:    <collision-safe backup ref>
-  To restore:    git reset --hard <original HEAD SHA>
-  Repo health:   OK (clean tree, no locks, no dangling rebase)
+  Original HEAD: <full SHA before all passes>
+  Current HEAD:  <full final SHA>
+  Backup refs:   <one per executed pass>
+  Reduction:     <old count> -> <new count>
+  Verification:  <tree, range-diff, messages, tests, repository health>
+  Restore point: <backup ref and original SHA>
 ```
 
-## Safety Guardrails
+If the rewritten history was previously pushed, explain that updating the
+remote would require a separately authorized `git push --force-with-lease`.
+Never push, delete backup refs, expire reflogs, or garbage-collect as part of
+this skill unless the user separately authorizes that exact action.
 
-- The shared history-rewrite contract governs clean-tree checks, approval,
-  backups, verification, rollback, and shared-history boundaries.
-- Scan unpushed commits by default. `--all` only broadens the preview; it does
-  not authorize rewriting pushed history or force-pushing.
-- Create collision-safe backup refs rather than overwriting a fixed tag.
-- Create a separate backup ref before every approved batch pass.
-- **Prefer small passes**: Rewrite the smallest contiguous group that buys a
-  meaningful reduction. Do not squash across multiple tranche waves at once
-  unless the user explicitly accepts the replay risk.
-- **Replay warning**: Contiguous commits can still cause later conflicts because
-  later commits are replayed on the rewritten base during rebase.
-- **Use rerere on cleanup branches**: Prefer `git config rerere.enabled true`
-  and `git config rerere.autoupdate true` before multi-pass cleanup.
-- **Prefer tip-first cleanup**: Start with the newest self-contained group so
-  fewer later commits must be replayed.
-- **Verify with range-diff**: After each successful pass, compare pre/post
-  ranges with `git range-diff` before attempting another pass.
-- **Size guard**: If a proposed squash exceeds 300 files or 20,000 touched lines, require explicit user confirmation.
-- **Milestone guard**: Avoid squashing across major phase boundaries unless explicitly approved.
-- **Conflict policy (default)**: Abort on conflict with `git rebase --abort` and report the recovery SHA.
-- **Conflict policy with rerere (explicit opt-in)**:
-  - Only on an isolated history-cleanup branch
-  - Allow at most one rerere-assisted retry
-  - If still conflicted, abort and stop batch mode
-- **Diminishing returns stop**: In batch mode, stop when no contiguous group has 3+ commits or expected reduction is <= 1 commit/pass.
-- After completion, verify no rebase state directories or stale lock files and
-  confirm the tree is clean. Report anomalies rather than deleting locks.
+## Related Workflows
 
-## Related Skills
-
-- `/handoff`: Session handoff with commit and docs update
+- Use `$commit` to create a new commit from working-tree changes.
+- Use `$rewrite-commit-messages` for message-only history rewrites.
+- Use `$handoff` for a verified continuation artifact after repository work.
