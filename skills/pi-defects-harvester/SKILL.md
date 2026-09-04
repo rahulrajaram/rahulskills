@@ -1,6 +1,6 @@
 ---
 name: pi-defects-harvester
-description: "Scavenge the local shell history and pi/agent artifact directories at the end of an interactive pi session, extracting actionable defect signals (errors, repeated tool failures, token/length truncations, reasoning clamping, cost spikes, unfinished shells) into a short markdown digest. Use at the end of a pi shell to capture what went wrong without the main agent manually mining every history file, or when the user says /pi-defects-harvester. Read-only; writes one digest file under ~/.pi/agent/reports/."
+description: "Scavenge local shell history and pi/agent artifacts at the end of an interactive pi session, extracting actionable defect signals into a short redacted markdown digest. Use to capture errors, repeated tool failures, truncations, cost spikes, or unfinished shells without manually opening every history file. Source-preserving; writes one digest under ~/.pi/agent/reports/."
 argument-hint: "[--since \"2026-08-20\" | --last 3d | --out <file>]"
 ---
 
@@ -24,6 +24,28 @@ A single markdown digest, default written to the user digests dir
 (`~/.pi/agent/reports/YYYY-MM-DD_shell-harvest.md`; override with
 `--out <file>`). The digest also prints to the chat.
 
+## Sensitive-source boundary
+
+Shell histories and agent artifacts are sensitive local sources and may contain
+credentials even when credential discovery is not the task. Treat explicit
+invocation as authorization to read only the named/default sources for the
+requested time window; do not broaden into unrelated home-directory content.
+
+Before counting, grouping, retaining, writing, or displaying any source-derived
+text, replace credential values with `[REDACTED]`. At minimum, redact:
+
+- assignments such as `API_TOKEN=value` or `password="value"`;
+- mapping fields such as `"api_key": "value"`;
+- flags such as `--token value` and `--secret=value`;
+- `Authorization: Bearer ...` and `Authorization: Basic ...` values; and
+- URL userinfo between the `//` and `@` delimiters.
+
+Run all frequency and failure aggregation on the redacted copy so a repeated
+command cannot leak a value through a count table. Never print a credential
+value to chat, the digest, diagnostics, or error output. If a form cannot be
+redacted confidently, omit that source line and record only its source path,
+timestamp, and signal category.
+
 ## Sources
 
 Scavenge, in order (skip any that do not exist):
@@ -46,9 +68,11 @@ skipped ones. Do not chase entries that are empty or still being written.
 1. **Locate histories.** Resolve `$SHELL` and read `~/.zsh_history` /
    `~/.bash_history` if present. For extended zsh lines, decode epoch + duration
    and map to map timestamps.
-2. **Filter a window.** Only include entries newer than the window start
+2. **Filter and redact a window.** Only include entries newer than the window start
    (default last 24h; honor `--window <n>d` / `--dir <date>`). Keep enough raw
-   lines to run the analytics below; do not token-dump everything.
+   lines to create an in-memory redacted copy, then discard raw values from the
+   working set. Run the analytics below only on redacted text; do not token-dump
+   everything.
 3. **Extract history signals**:
    - **Repeated commands** — collapsed count of stem (command word); flag ones seen
      more than a threshold (default 3x) as possible inefficiency/loops.
@@ -77,8 +101,9 @@ skipped ones. Do not chase entries that are empty or still being written.
 
 ## Rules
 
-- **Read-only.** Only write the digest file, never modify the histories, the
-  agent artifacts, or any tool. `audit`/`report` are the only allowed writes.
+- **Source-preserving.** Only write the redacted digest file; never modify the
+  histories, agent artifacts, or any tool. `audit`/`report` are the only allowed
+  writes.
 - Keep the digest short: no raw dump of every command; a compact table where
   useful. Remove nothing from the originals.
 - Do not run network commands or side-effecting analyses.

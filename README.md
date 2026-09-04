@@ -72,7 +72,7 @@ exclusions prevent package copies from shadowing system-owned Codex skills.
 | `archdiagram` | Generate architecture diagrams from context or codebase |
 | `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |
 | `autonomy-loop` | Drive an epic as a principal-architect loop with bounded execution and controlled reactor chaining |
-| `check-antipatterns` | Real-time anti-pattern detection during active work |
+| `check-antipatterns` | Read-only transcript anti-pattern checks plus evidence-backed review of active code changes |
 | `clear-writing` | Edit dense, awkward, repetitive, or AI-generated prose into clear, direct, readable writing as an editor, not a ghostwriter; default and grill modes |
 | `clean-code-refine` | Review or refactor code across behavior, idiom, size, complexity, dataflow, testability, and simplicity |
 | `commit` | Smart commit with file triage, artifact filtering, and secret detection |
@@ -147,23 +147,29 @@ leftover `.pre-pi-sync` dirs, so Pi reports no skill collisions. Honors
 ### `stitch-skills.sh`
 
 Assembles generic skills with CLI-specific overlays and installs to both CLIs.
+Assembly and installation use staged replacements. Prior generated or installed
+trees are moved to timestamped backup directories and retained; these commands
+do not recursively delete the trees they replace.
 
 ```bash
 ./stitch-skills.sh repo-layout   # Validate skills/ and overlays/ directories
 ./stitch-skills.sh assemble      # Build assembled output in build/ from skills/ + overlays/
 ./stitch-skills.sh install       # Assemble + install to ~/.codex/skills, ~/.claude/skills
-./stitch-skills.sh check         # Compare assembled output against installed locations
+./stitch-skills.sh check         # Freshly assemble, then compare against installed locations
 ./stitch-skills.sh all           # repo-layout + install + check
 ```
 
 ### `sync-skills.sh`
 
-Bidirectional sync between this repo and installed locations. Push delegates to `stitch-skills.sh install`.
+Bidirectional sync between this repo and installed locations. Push delegates to
+`stitch-skills.sh install`. Pull stages each incoming skill and moves an
+existing source tree into a timestamped Git-metadata backup before publishing
+the replacement. Excluded skills are left untouched.
 
 ```bash
 ./sync-skills.sh pull      # Copy installed skills into this repo (strips CLI-specific keys)
 ./sync-skills.sh push      # Assemble and install skills to all CLI locations
-./sync-skills.sh diff      # Show differences between assembled output and installed
+./sync-skills.sh diff      # Freshly assemble, then show installed differences
 ./sync-skills.sh status    # List which skills exist in repo, Codex, Pi, and Claude
 ./sync-skills.sh source-coverage  # Verify all installed Pi/Codex skills are represented
 ./sync-skills.sh compare-implementations  # Validate repo/Codex/Pi/Claude skill parity
@@ -186,15 +192,23 @@ Discover skills, scripts, agents, and build targets across all local projects li
 Tags each discovered item as `[COLLECTED]`, `[EXCLUDED]`, or `[NEW]` relative to this repo.
 ### `audit-skills.sh`
 
-Pre-commit guard that scans skill files for private references (project names in blocklists, personal filesystem paths). The full check also parses `capabilities/skills.toml` so malformed or duplicate TOML keys fail in CI.
+Pre-commit guard that scans skill files for private references (project names
+in blocklists and personal filesystem paths). The full check also validates
+every manifest, verifies that source, README inventory, and capability catalog
+agree, and checks that maintained local Markdown links resolve, including new
+skill/reference/docs files before their first commit.
 
 ```bash
-./audit-skills.sh check          # Scan all skill files
+./audit-skills.sh check          # Run the full package integrity audit
 ./audit-skills.sh pre-commit     # Scan only staged files (used by git hook)
 ./audit-skills.sh install-hook   # Write pre-commit hook into .git/hooks/
 ```
 
 Uses patterns from `.blocklist.local`. Also matches personal home-directory paths under `Documents/`.
+
+Secret scans use exact historical fingerprints in `.gitleaksignore`; no rule is
+disabled. `.trufflehog-exclude-paths` excludes only Git internals, generated
+builds, and tool caches so filesystem scans stay bounded to maintained source.
 
 ### `bin/` Shared Assistant Helpers
 
@@ -220,13 +234,17 @@ Pass `--skip-skills` to skip the interactive skill deployment prompt.
 
 ## CI
 
-The `audit-skills.sh check` scan runs on every push to `master` and on pull requests via GitHub Actions. This catches any private references that slip past the local pre-commit hook.
+The `audit-skills.sh check` audit and focused analyzer/checker/validator unit
+tests run on every push to `master` and on pull requests via GitHub Actions.
+They catch private references, invalid manifests, inventory/catalog drift,
+broken local links, and transcript-normalization regressions that slip past the
+focused pre-commit hook.
 
 ## Adding a New Skill
 
 1. Create `skills/<name>/SKILL.md` with required `name` and `description` frontmatter. Preserve supported optional fields such as `argument-hint`, and add `agents/`, `references/`, or `scripts/` only when needed.
 2. If the skill needs Claude-specific metadata (e.g. `allowed-tools`), create `overlays/claude/<name>.yml`.
-3. Run `./audit-skills.sh check` to verify no private references leaked.
+3. Run `./audit-skills.sh check` to validate the package and verify no private references leaked.
 4. Commit and `./sync-skills.sh push` to assemble and deploy to all CLI locations.
 
 ## Git Hooks
