@@ -11,6 +11,8 @@ import re
 import sys
 from pathlib import Path
 
+from quick_validate import FrontmatterError, parse_frontmatter
+
 ACRONYMS = {
     "GH",
     "MCP",
@@ -113,11 +115,9 @@ def read_frontmatter_name(skill_dir):
         return None
     frontmatter_text = match.group(1)
 
-    import yaml
-
     try:
-        frontmatter = yaml.safe_load(frontmatter_text)
-    except yaml.YAMLError as exc:
+        frontmatter = parse_frontmatter(frontmatter_text)
+    except FrontmatterError as exc:
         print(f"[ERROR] Invalid YAML frontmatter: {exc}")
         return None
     if not isinstance(frontmatter, dict):
@@ -148,18 +148,24 @@ def parse_interface_overrides(raw_overrides):
             print(f"[ERROR] Unknown interface field '{key}'. Allowed: {allowed}")
             return None, None
         overrides[key] = value
-        if key not in ("display_name", "short_description") and key not in optional_order:
+        if (
+            key not in ("display_name", "short_description")
+            and key not in optional_order
+        ):
             optional_order.append(key)
     return overrides, optional_order
 
 
-def write_openai_yaml(skill_dir, skill_name, raw_overrides):
+def render_openai_yaml(skill_name, raw_overrides):
+    """Validate interface inputs and return the complete YAML document."""
     overrides, optional_order = parse_interface_overrides(raw_overrides)
     if overrides is None:
         return None
 
     display_name = overrides.get("display_name") or format_display_name(skill_name)
-    short_description = overrides.get("short_description") or generate_short_description(display_name)
+    short_description = overrides.get(
+        "short_description"
+    ) or generate_short_description(display_name)
 
     if not (25 <= len(short_description) <= 64):
         print(
@@ -179,12 +185,25 @@ def write_openai_yaml(skill_dir, skill_name, raw_overrides):
         if value is not None:
             interface_lines.append(f"  {key}: {yaml_quote(value)}")
 
+    return "\n".join(interface_lines) + "\n"
+
+
+def write_openai_yaml_content(skill_dir, content):
+    """Write a prevalidated OpenAI interface document into a skill directory."""
+
     agents_dir = Path(skill_dir) / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
     output_path = agents_dir / "openai.yaml"
-    output_path.write_text("\n".join(interface_lines) + "\n")
-    print(f"[OK] Created agents/openai.yaml")
+    output_path.write_text(content)
+    print("[OK] Created agents/openai.yaml")
     return output_path
+
+
+def write_openai_yaml(skill_dir, skill_name, raw_overrides):
+    content = render_openai_yaml(skill_name, raw_overrides)
+    if content is None:
+        return None
+    return write_openai_yaml_content(skill_dir, content)
 
 
 def main():

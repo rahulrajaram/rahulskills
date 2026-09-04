@@ -16,9 +16,10 @@ Examples:
 import argparse
 import re
 import sys
+import tempfile
 from pathlib import Path
 
-from generate_openai_yaml import write_openai_yaml
+from generate_openai_yaml import render_openai_yaml, write_openai_yaml_content
 
 MAX_SKILL_NAME_LENGTH = 64
 ALLOWED_RESOURCES = {"scripts", "references", "assets"}
@@ -123,7 +124,9 @@ def parse_resources(raw_resources):
     return deduped
 
 
-def create_resource_dirs(skill_dir, skill_name, skill_title, resources, include_examples):
+def create_resource_dirs(
+    skill_dir, skill_name, skill_title, resources, include_examples
+):
     for resource in resources:
         resource_dir = skill_dir / resource
         resource_dir.mkdir(exist_ok=True)
@@ -138,7 +141,9 @@ def create_resource_dirs(skill_dir, skill_name, skill_title, resources, include_
         elif resource == "references":
             if include_examples:
                 example_reference = resource_dir / "api_reference.md"
-                example_reference.write_text(EXAMPLE_REFERENCE.format(skill_title=skill_title))
+                example_reference.write_text(
+                    EXAMPLE_REFERENCE.format(skill_title=skill_title)
+                )
                 print("[OK] Created references/api_reference.md")
             else:
                 print("[OK] Created references/")
@@ -164,50 +169,59 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
     Returns:
         Path to created skill directory, or None if error
     """
-    # Determine skill directory path
-    skill_dir = Path(path).resolve() / skill_name
+    base_path = Path(path).resolve()
+    skill_dir = base_path / skill_name
 
-    # Check if directory already exists
-    if skill_dir.exists():
+    if skill_dir.exists() or skill_dir.is_symlink():
         print(f"[ERROR] Skill directory already exists: {skill_dir}")
         return None
 
-    # Create skill directory
-    try:
-        skill_dir.mkdir(parents=True, exist_ok=False)
-        print(f"[OK] Created skill directory: {skill_dir}")
-    except Exception as e:
-        print(f"[ERROR] Error creating directory: {e}")
+    interface_content = render_openai_yaml(skill_name, interface_overrides)
+    if interface_content is None:
         return None
 
-    # Create SKILL.md from template
-    skill_title = title_case_skill_name(skill_name)
-    skill_content = SKILL_TEMPLATE.format(skill_name=skill_name, skill_title=skill_title)
-
-    skill_md_path = skill_dir / "SKILL.md"
     try:
+        base_path.mkdir(parents=True, exist_ok=True)
+        stage_dir = Path(
+            tempfile.mkdtemp(prefix=f".{skill_name}.stage-", dir=base_path)
+        )
+        print(f"[OK] Created staging directory: {stage_dir}")
+    except Exception as e:
+        print(f"[ERROR] Error creating staging directory: {e}")
+        return None
+
+    skill_title = title_case_skill_name(skill_name)
+    skill_content = SKILL_TEMPLATE.format(
+        skill_name=skill_name, skill_title=skill_title
+    )
+
+    try:
+        skill_md_path = stage_dir / "SKILL.md"
         skill_md_path.write_text(skill_content)
         print("[OK] Created SKILL.md")
+        write_openai_yaml_content(stage_dir, interface_content)
+        if resources:
+            create_resource_dirs(
+                stage_dir,
+                skill_name,
+                skill_title,
+                resources,
+                include_examples,
+            )
     except Exception as e:
-        print(f"[ERROR] Error creating SKILL.md: {e}")
+        print(f"[ERROR] Error building staged skill: {e}")
+        print(f"[ERROR] Staging directory retained for inspection: {stage_dir}")
         return None
 
-    # Create agents/openai.yaml
     try:
-        result = write_openai_yaml(skill_dir, skill_name, interface_overrides)
-        if not result:
-            return None
+        if skill_dir.exists() or skill_dir.is_symlink():
+            raise FileExistsError(f"destination appeared during build: {skill_dir}")
+        stage_dir.rename(skill_dir)
+        print(f"[OK] Published skill directory: {skill_dir}")
     except Exception as e:
-        print(f"[ERROR] Error creating agents/openai.yaml: {e}")
+        print(f"[ERROR] Error publishing skill directory: {e}")
+        print(f"[ERROR] Staging directory retained for inspection: {stage_dir}")
         return None
-
-    # Create resource directories if requested
-    if resources:
-        try:
-            create_resource_dirs(skill_dir, skill_name, skill_title, resources, include_examples)
-        except Exception as e:
-            print(f"[ERROR] Error creating resource directories: {e}")
-            return None
 
     # Print next steps
     print(f"\n[OK] Skill '{skill_name}' initialized successfully at {skill_dir}")
@@ -215,14 +229,20 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
     print("1. Edit SKILL.md to complete the TODO items and update the description")
     if resources:
         if include_examples:
-            print("2. Customize or delete the example files in scripts/, references/, and assets/")
+            print(
+                "2. Customize or delete the example files in scripts/, references/, and assets/"
+            )
         else:
             print("2. Add resources to scripts/, references/, and assets/ as needed")
     else:
-        print("2. Create resource directories only if needed (scripts/, references/, assets/)")
+        print(
+            "2. Create resource directories only if needed (scripts/, references/, assets/)"
+        )
     print("3. Update agents/openai.yaml if the UI metadata should differ")
     print("4. Run the validator when ready to check the skill structure")
-    print("5. Consider independent forward-testing only when complexity or risk warrants it")
+    print(
+        "5. Consider independent forward-testing only when complexity or risk warrants it"
+    )
 
     return skill_dir
 

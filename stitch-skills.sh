@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_DIR="$ROOT_DIR/skills"
 OVERLAYS_DIR="$ROOT_DIR/overlays"
 BUILD_DIR="$ROOT_DIR/build"
@@ -16,6 +16,116 @@ RUNTIME_EXCLUSIONS_DIR="$ROOT_DIR/runtime-exclusions"
 # When no overlay exists for a CLI, these keys are stripped from the build.
 CLI_SPECIFIC_KEYS="allowed-tools"
 
+new_backup_root() {
+    local parent="$1" label="$2"
+    [[ "$label" =~ ^[a-z0-9][a-z0-9-]*$ ]] || {
+        echo "ERROR: refusing unsafe backup label: $label" >&2
+        return 1
+    }
+    mkdir -p "$parent"
+    mktemp -d "$parent/${label}-$(date -u +%Y%m%dT%H%M%SZ)-$$.XXXXXX"
+}
+
+git_common_dir() {
+    git -C "$ROOT_DIR" rev-parse --path-format=absolute --git-common-dir
+}
+
+assert_exact_build_target() {
+    local root_real expected_real target_real
+    root_real="$(realpath -e -- "$ROOT_DIR")"
+    expected_real="$root_real/build"
+    target_real="$(realpath -m -- "$BUILD_DIR")"
+
+    if [[ "$target_real" != "$expected_real" || "$target_real" == "/" ]]; then
+        echo "ERROR: refusing build replacement; unexpected target: $target_real" >&2
+        return 1
+    fi
+    if [[ -L "$BUILD_DIR" ]]; then
+        echo "ERROR: refusing build replacement through symlink: $BUILD_DIR" >&2
+        return 1
+    fi
+}
+
+assert_install_root() {
+    local install_root="$1" expected_root="$2" label="$3"
+    local actual_real expected_real
+
+    [[ -n "${HOME:-}" && "$HOME" == /* && "$HOME" != "/" ]] || {
+        echo "ERROR: refusing $label install; HOME is not a safe absolute path" >&2
+        return 1
+    }
+    actual_real="$(realpath -m -- "$install_root")"
+    expected_real="$(realpath -m -- "$expected_root")"
+    if [[ "$actual_real" != "$expected_real" || "$actual_real" == "/" ]]; then
+        echo "ERROR: refusing $label install; unexpected root: $actual_real" >&2
+        return 1
+    fi
+    if [[ -L "$install_root" ]]; then
+        echo "ERROR: refusing $label install through symlink: $install_root" >&2
+        return 1
+    fi
+}
+
+assert_skill_name() {
+    local skill_name="$1"
+    [[ "$skill_name" =~ ^[a-z0-9][a-z0-9-]*$ ]] || {
+        echo "ERROR: refusing unsafe skill name: $skill_name" >&2
+        return 1
+    }
+}
+
+copy_tree_without_caches() {
+    local source_dir="$1" destination_dir="$2"
+    mkdir -p "$destination_dir"
+    tar \
+        --exclude='__pycache__' \
+        --exclude='*.pyc' \
+        --exclude='*.pyo' \
+        -C "$source_dir" -cf - . \
+        | tar -C "$destination_dir" -xf -
+}
+
+move_existing_to_backup() {
+    local target="$1" backup_root="$2" backup_name="$3"
+    MOVED_BACKUP=""
+    if [[ ! -e "$target" && ! -L "$target" ]]; then
+        return 0
+    fi
+
+    mkdir -p "$backup_root"
+    MOVED_BACKUP="$backup_root/$backup_name"
+    if [[ -e "$MOVED_BACKUP" || -L "$MOVED_BACKUP" ]]; then
+        echo "ERROR: refusing to overwrite backup: $MOVED_BACKUP" >&2
+        return 1
+    fi
+    mv -- "$target" "$MOVED_BACKUP"
+    echo "  Backup retained: $MOVED_BACKUP"
+}
+
+replace_installed_skill() {
+    local source_dir="$1" install_root="$2" backup_root="$3" skill_name="$4"
+    local target stage
+
+    assert_skill_name "$skill_name"
+    target="$install_root/$skill_name"
+    [[ "$(realpath -m -- "$(dirname -- "$target")")" == "$(realpath -e -- "$install_root")" ]] || {
+        echo "ERROR: refusing install outside expected root: $target" >&2
+        return 1
+    }
+
+    stage="$(mktemp -d "$install_root/.${skill_name}.stage.XXXXXX")"
+    cp -a "$source_dir/." "$stage/"
+    move_existing_to_backup "$target" "$backup_root" "$skill_name"
+    if ! mv -- "$stage" "$target"; then
+        echo "ERROR: install failed; staged tree retained at $stage" >&2
+        if [[ -n "$MOVED_BACKUP" && ! -e "$target" && ! -L "$target" ]]; then
+            mv -- "$MOVED_BACKUP" "$target"
+            echo "  Restored prior install: $target" >&2
+        fi
+        return 1
+    fi
+}
+
 usage() {
     cat <<'USAGE'
 Usage: stitch-skills.sh <command>
@@ -24,7 +134,7 @@ Commands:
   repo-layout   Validate skills/ and overlays/ directories exist
   assemble      Build assembled output in build/ from skills/ + overlays/
   install       Assemble, then copy build/ output to install locations
-  check         Run compare + diff checks against assembled output
+  check         Freshly assemble, then compare against installed output
   all           repo-layout + install + check
 USAGE
     exit 1
@@ -58,7 +168,6 @@ extract_body() {
 merge_overlay() {
     local overlay_file="$1"
     local -a orig_lines=()
-    local -A orig_keys=()
     local -A overlay_map=()
     local -a overlay_order=()
     local line key val
@@ -66,9 +175,6 @@ merge_overlay() {
     # Read original frontmatter from stdin
     while IFS= read -r line; do
         orig_lines+=("$line")
-        if [[ "$line" =~ ^([A-Za-z0-9_-]+):[[:space:]]*(.*) ]]; then
-            orig_keys["${BASH_REMATCH[1]}"]=1
-        fi
     done
 
     # Read overlay file
@@ -151,9 +257,9 @@ is_runtime_excluded() {
     grep -qxF "$skill_name" <(grep -v '^[[:space:]]*#' "$exclusions" | sed '/^[[:space:]]*$/d')
 }
 
-assemble_skills() {
-    echo "Assembling skills into $BUILD_DIR ..."
-    rm -rf "$BUILD_DIR"
+assemble_skills_into() {
+    local output_root="$1"
+    echo "Assembling skills into staging directory $output_root ..."
 
     local skill_dir skill_name manifest cli overlay_file
     local fm body merged
@@ -175,7 +281,7 @@ assemble_skills() {
                 echo "  SKIP [$cli] runtime-owned conflict: $skill_name"
                 continue
             fi
-            local out_dir="$BUILD_DIR/$cli/skills/$skill_name"
+            local out_dir="$output_root/$cli/skills/$skill_name"
             mkdir -p "$out_dir"
 
             # Merge overlay if present; otherwise strip CLI-specific keys
@@ -200,7 +306,7 @@ assemble_skills() {
                 local sub_name
                 sub_name="$(basename "$sub")"
                 [[ "$sub_name" == "__pycache__" ]] && continue
-                cp -a "$sub" "$out_dir/$sub_name"
+                copy_tree_without_caches "$sub" "$out_dir/$sub_name"
             done
 
             # Copy any non-SKILL.md files at the skill root (e.g. .py, .json)
@@ -213,11 +319,6 @@ assemble_skills() {
                 cp -a "$f" "$out_dir/$fname"
             done
 
-            # Runtime caches are never capability source and must not be
-            # deployed merely because a local verification imported a helper.
-            find "$out_dir" -type d -name __pycache__ -prune -exec rm -rf {} +
-            find "$out_dir" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
-
         done
     done
 
@@ -225,16 +326,41 @@ assemble_skills() {
     # skill links such as ../../references/<name>.md resolve in every runtime.
     if [[ -d "$ROOT_DIR/references" ]]; then
         for cli in "${CLIS[@]}"; do
-            mkdir -p "$BUILD_DIR/$cli/references"
-            cp -a "$ROOT_DIR/references/." "$BUILD_DIR/$cli/references/"
+            copy_tree_without_caches \
+                "$ROOT_DIR/references" \
+                "$output_root/$cli/references"
         done
     fi
 
     # Count assembled skills
     local claude_count codex_count
-    claude_count="$(find "$BUILD_DIR/claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
-    codex_count="$(find "$BUILD_DIR/codex/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+    claude_count="$(find "$output_root/claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+    codex_count="$(find "$output_root/codex/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
     echo "Assembled: claude=$claude_count skills, codex=$codex_count skills"
+}
+
+assemble_skills() {
+    local stage backup_root
+
+    ensure_repo_layout
+    assert_exact_build_target
+    stage="$(mktemp -d "$ROOT_DIR/.build-stage.XXXXXX")"
+    # Invoke directly so `set -e` remains effective inside the function. A
+    # failed assembly intentionally leaves this printed staging path intact.
+    echo "Assembly staging path: $stage"
+    assemble_skills_into "$stage"
+
+    backup_root="$(new_backup_root "$(git_common_dir)/rahulskills-backups" build)"
+    move_existing_to_backup "$BUILD_DIR" "$backup_root" "build"
+    if ! mv -- "$stage" "$BUILD_DIR"; then
+        echo "ERROR: publish failed; assembled tree retained at $stage" >&2
+        if [[ -n "$MOVED_BACKUP" && ! -e "$BUILD_DIR" && ! -L "$BUILD_DIR" ]]; then
+            mv -- "$MOVED_BACKUP" "$BUILD_DIR"
+            echo "  Restored prior build: $BUILD_DIR" >&2
+        fi
+        return 1
+    fi
+    echo "Published assembled output: $BUILD_DIR"
 }
 
 install_skills() {
@@ -244,17 +370,21 @@ install_skills() {
     echo ""
     echo "Installing from assembled output ..."
 
-    local skill_name installed=0
+    local skill_name installed=0 codex_backup_root claude_backup_root
 
-    # Codex: ~/.codex/skills/ — overwrite managed skills, leave others untouched.
+    # Codex: replace managed skills with backups; leave others untouched.
     # NOT ~/.agents/skills: pi scans that global dir and would report a
     # duplicate-name collision for every codex copy.
+    assert_install_root "$CODEX_INSTALL" "$HOME/.codex/skills" "Codex"
     mkdir -p "$CODEX_INSTALL"
+    codex_backup_root="$(
+        new_backup_root "$(dirname "$CODEX_INSTALL")/skill-backups" codex
+    )"
     for skill_dir in "$BUILD_DIR/codex/skills"/*/; do
         [[ -d "$skill_dir" ]] || continue
         skill_name="$(basename "$skill_dir")"
-        rm -rf "$CODEX_INSTALL/$skill_name"
-        cp -a "$skill_dir" "$CODEX_INSTALL/$skill_name"
+        replace_installed_skill \
+            "$skill_dir" "$CODEX_INSTALL" "$codex_backup_root" "$skill_name"
         installed=$((installed + 1))
     done
     echo "  Codex: $installed skills -> $CODEX_INSTALL"
@@ -263,14 +393,18 @@ install_skills() {
         cp -a "$BUILD_DIR/codex/references/." "$(dirname "$CODEX_INSTALL")/references/"
     fi
 
-    # Claude skills: ~/.claude/skills/ — overwrite managed skills, leave others untouched
+    # Claude: replace managed skills with backups; leave others untouched.
+    assert_install_root "$CLAUDE_SKILLS_INSTALL" "$HOME/.claude/skills" "Claude"
     mkdir -p "$CLAUDE_SKILLS_INSTALL"
+    claude_backup_root="$(
+        new_backup_root "$(dirname "$CLAUDE_SKILLS_INSTALL")/skill-backups" claude
+    )"
     installed=0
     for skill_dir in "$BUILD_DIR/claude/skills"/*/; do
         [[ -d "$skill_dir" ]] || continue
         skill_name="$(basename "$skill_dir")"
-        rm -rf "$CLAUDE_SKILLS_INSTALL/$skill_name"
-        cp -a "$skill_dir" "$CLAUDE_SKILLS_INSTALL/$skill_name"
+        replace_installed_skill \
+            "$skill_dir" "$CLAUDE_SKILLS_INSTALL" "$claude_backup_root" "$skill_name"
         installed=$((installed + 1))
     done
     echo "  Claude skills: $installed skills -> $CLAUDE_SKILLS_INSTALL"
@@ -284,12 +418,9 @@ install_skills() {
 
 check_sync() {
     ensure_repo_layout
-
-    # Ensure build exists
-    if [[ ! -d "$BUILD_DIR/claude/skills" || ! -d "$BUILD_DIR/codex/skills" ]]; then
-        echo "No assembled output found. Running assemble first ..."
-        assemble_skills
-    fi
+    # A pre-existing build may represent an older source revision. Rebuild
+    # unconditionally so a successful comparison always covers current source.
+    assemble_skills
 
     local has_issue=0
 
@@ -327,17 +458,23 @@ check_sync() {
     fi
 }
 
-[[ $# -lt 1 ]] && usage
+main() {
+    [[ $# -lt 1 ]] && usage
 
-case "$1" in
-    repo-layout) ensure_repo_layout ;;
-    assemble)    assemble_skills ;;
-    install)     install_skills ;;
-    check)       check_sync ;;
-    all)
-        ensure_repo_layout
-        install_skills
-        check_sync
-        ;;
-    *) usage ;;
-esac
+    case "$1" in
+        repo-layout) ensure_repo_layout ;;
+        assemble)    assemble_skills ;;
+        install)     install_skills ;;
+        check)       check_sync ;;
+        all)
+            ensure_repo_layout
+            install_skills
+            check_sync
+            ;;
+        *) usage ;;
+    esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

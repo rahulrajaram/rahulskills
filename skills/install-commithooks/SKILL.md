@@ -68,11 +68,36 @@ done
 ### Step 3: Copy Library into `.git/lib/`
 
 ```bash
-rm -rf "${GIT_DIR:?}/lib"
-cp -r "$SOURCE/lib" "$GIT_DIR/lib"
+git_dir_real="$(realpath -e -- "$GIT_DIR")"
+target="$git_dir_real/lib"
+
+[[ "$git_dir_real" != "/" && ! -L "$GIT_DIR" ]]
+[[ "$(realpath -m -- "$(dirname -- "$target")")" == "$git_dir_real" ]]
+
+stage="$(mktemp -d "$git_dir_real/.lib-stage.XXXXXX")"
+cp -a "$SOURCE/lib/." "$stage/"
+
+backup=""
+if [[ -e "$target" || -L "$target" ]]; then
+  backup_root="$git_dir_real/commithooks-backups/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  backup="$backup_root/lib"
+  mkdir -p "$backup_root"
+  mv -- "$target" "$backup"
+fi
+
+if ! mv -- "$stage" "$target"; then
+  if [[ -n "$backup" && ! -e "$target" && ! -L "$target" ]]; then
+    mv -- "$backup" "$target"
+  fi
+  echo "Install failed; staged tree retained at $stage" >&2
+  exit 1
+fi
 ```
 
-Always safe — `.git/lib/` is our namespace and is not tracked by git.
+The exact target must be proven even though `.git/lib/` is an untracked
+namespace. Never use a nonempty-variable check as the only guard for recursive
+deletion. Stage the replacement, move the prior tree to a recoverable backup,
+and restore it if publication fails.
 
 ### Step 4: Unset `core.hooksPath`
 
@@ -161,6 +186,8 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -175,7 +202,9 @@ def main() -> None:
         print("Not in a git repository (skipping)")
         return
 
-    git_dir = Path(result.stdout.strip())
+    git_dir = Path(result.stdout.strip()).resolve()
+    if git_dir == Path("/") or not git_dir.is_dir():
+        raise RuntimeError(f"Unsafe git directory: {git_dir}")
 
     hooks_dir = git_dir / "hooks"
     hooks_dir.mkdir(exist_ok=True)
@@ -186,9 +215,26 @@ def main() -> None:
             (hooks_dir / hook).chmod(0o755)
 
     lib_dst = git_dir / "lib"
-    if lib_dst.exists():
-        shutil.rmtree(lib_dst)
-    shutil.copytree(commithooks / "lib", lib_dst)
+    if lib_dst.parent.resolve() != git_dir:
+        raise RuntimeError(f"Library target escaped git directory: {lib_dst}")
+
+    stage = Path(tempfile.mkdtemp(prefix=".lib-stage-", dir=git_dir))
+    shutil.copytree(commithooks / "lib", stage, dirs_exist_ok=True, symlinks=True)
+
+    backup = None
+    if lib_dst.exists() or lib_dst.is_symlink():
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        backup = git_dir / "commithooks-backups" / stamp / "lib"
+        backup.parent.mkdir(parents=True, exist_ok=False)
+        lib_dst.rename(backup)
+
+    try:
+        stage.rename(lib_dst)
+    except OSError:
+        if backup is not None and not lib_dst.exists() and not lib_dst.is_symlink():
+            backup.rename(lib_dst)
+        print(f"Install failed; staged tree retained at {stage}")
+        raise
 
     print(f"Commithooks installed from {commithooks}")
 ```
@@ -207,13 +253,19 @@ Add a `build.rs` that runs the copy, or add a `xtask` subcommand.
 
 #### Node projects (`package.json`)
 
-Add a `"prepare"` script:
+Create a checked `scripts/install-commithooks` program that performs the same
+resolve, validate, stage, backup, publish, and rollback transaction as Step 3.
+Then make `prepare` invoke that program:
 
 ```json
 "scripts": {
-  "prepare": "bash -c 'COMMITHOOKS=${COMMITHOOKS_DIR:-$HOME/Documents/commithooks}; GIT_DIR=$(git rev-parse --git-dir); [ -d $COMMITHOOKS/lib ] && for h in pre-commit commit-msg pre-push post-checkout post-merge; do [ -f $COMMITHOOKS/$h ] && cp $COMMITHOOKS/$h $GIT_DIR/hooks/$h && chmod +x $GIT_DIR/hooks/$h; done && rm -rf ${GIT_DIR}/lib && cp -r $COMMITHOOKS/lib $GIT_DIR/lib || true'"
+  "prepare": "scripts/install-commithooks"
 }
 ```
+
+Do not embed an unquoted shell pipeline or destructive tree replacement in
+`package.json`. Do not append `|| true`; installation failures must remain
+visible.
 
 ### Step 7: Check .gitignore
 

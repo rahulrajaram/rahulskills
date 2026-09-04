@@ -19,9 +19,9 @@ copies by hand. Assemble and validate the package before offering to install
 it; installation into Pi, Codex, or Claude is a separate external-state action.
 
 Preserve repository-supported frontmatter extensions such as `argument-hint`
-and `disable-model-invocation`. The bundled upstream validator may not
-recognize every cross-runtime extension, so pair it with the repository audit
-and catalog checks instead of deleting supported metadata to satisfy one
+and `disable-model-invocation`. The bundled validator recognizes the package's
+declared cross-runtime extensions; pair it with the repository audit and
+catalog checks rather than deleting supported metadata to satisfy one
 runtime's schema.
 
 ## Core Principles
@@ -153,8 +153,8 @@ A short skill can instead route to details only when an advanced operation needs
 
 Handle ordinary edits directly.
 
-- For tracked changes, read [references/redlining.md](references/redlining.md).
-- For document internals, read [references/ooxml.md](references/ooxml.md).
+- For tracked changes, a skill might define `references/redlining.md`.
+- For document internals, a skill might define `references/ooxml.md`.
 ```
 
 These examples illustrate options, not a required structure. Choose the organization that makes the skill easier to use without loading irrelevant material.
