@@ -12,7 +12,9 @@ Use this workflow for a clean shell handoff or to resume one.
 
 Determine the mode before reading any workflow reference or changing files:
 
-- No argument: read [references/write-workflow.md](references/write-workflow.md)
+- No argument: prepare a coherent commit when covered by current authority,
+  then write a verified continuation artifact; this mode includes commit triage.
+  Read [references/write-workflow.md](references/write-workflow.md)
   completely and run the write workflow.
 - `extract`: run the activation protocol below. Do not read the write workflow,
   rewrite the artifact, reconcile docs, or commit merely because this skill also

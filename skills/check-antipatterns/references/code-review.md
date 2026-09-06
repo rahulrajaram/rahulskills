@@ -12,7 +12,9 @@ Treat a diff as a focus hint, not the complete program. Read the changed code,
 the nearest callers and sibling implementations, relevant configuration, and
 tests that claim to cover the behavior. For a user-supplied path, review the
 smallest complete package or component containing that path. Never infer a code
-target when the repository is clean and none was supplied.
+target when the repository is clean and none was supplied. An explicit branch
+or commit range is a supplied target: review that diff and its relevant context
+even when staged and unstaged changes are empty.
 
 Do not repeat mechanical lint, line-length, TODO, or complexity-threshold output
 unless it exposes a deeper defect. Review behavior that requires reasoning.

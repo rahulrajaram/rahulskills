@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MetaBuilder Runtime Loop</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #0f172a;
+      --muted: #526075;
+      --line: #111827;
+      --soft-line: #cbd5e1;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: transparent; color: var(--ink); }
+    body { min-height: 100vh; }
+    header {
+      display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
+      padding: 1rem 1.4rem; background: #0f172a; color: #ffffff;
+      border-bottom: 3px solid #020617;
+    }
+    header h1 { margin: 0; font-size: 1.08rem; letter-spacing: .015em; }
+    header p { margin: .22rem 0 0; color: #cbd5e1; font-size: .82rem; }
+    .badge {
+      border: 1px solid #e2e8f0; border-radius: 999px; padding: .35rem .7rem;
+      color: #ffffff; font-size: .72rem; white-space: nowrap;
+    }
+    main {
+      display: grid; grid-template-columns: minmax(0, 1fr) 8px var(--rail-width, 410px);
+      height: calc(100vh - 72px); min-height: 0; overflow: hidden; background: transparent;
+    }
+    .viewer {
+      min-width: 0; min-height: 0; display: flex; flex-direction: column;
+      background: transparent;
+    }
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: .72rem 1rem; border-bottom: 2px solid var(--line); background: #ffffff;
+      position: sticky; top: 0; z-index: 5;
+    }
+    .toolbar strong { font-size: .8rem; letter-spacing: .035em; text-transform: uppercase; }
+    .controls { display: flex; gap: .38rem; }
+    button {
+      border: 2px solid #111827; background: #ffffff; color: #111827; border-radius: 7px;
+      padding: .34rem .58rem; font-weight: 750; cursor: pointer;
+    }
+    button:hover { background: #f8fafc; }
+    #viewport {
+      position: relative; flex: 1; min-height: 0; overflow: auto; padding: 2rem;
+      background: transparent; cursor: grab; touch-action: none; user-select: none;
+    }
+    #viewport.dragging { cursor: grabbing; }
+    #diagram { width: max-content; min-width: 100%; }
+    #diagram svg {
+      display: block; max-width: none !important; height: auto !important;
+      margin: 0 auto; background: transparent !important;
+    }
+    .error {
+      width: auto !important; margin: 1rem; padding: 1rem; border: 3px solid #991b1b;
+      color: #7f1d1d; background: #ffffff; white-space: pre-wrap;
+    }
+    .rail-resizer {
+      position: relative; z-index: 10; width: 8px; min-height: 0;
+      cursor: col-resize; background: #e2e8f0; touch-action: none;
+      border: 0; border-left: 1px solid #94a3b8; border-right: 1px solid #94a3b8;
+    }
+    .rail-resizer::after {
+      content: ''; position: absolute; top: 50%; left: 2px; width: 2px; height: 46px;
+      transform: translateY(-50%); border-left: 1px solid #64748b; border-right: 1px solid #64748b;
+    }
+    .rail-resizer:hover, .rail-resizer:focus-visible, .rail-resizer.dragging {
+      background: #cbd5e1; outline: none;
+    }
+    body.resizing-rail, body.resizing-rail * { cursor: col-resize !important; user-select: none !important; }
+    aside { min-height: 0; padding: 1.1rem 1.15rem 2rem; overflow: auto; background: #f5f5f5; }
+    aside h2 { margin: 0 0 .3rem; font-size: 1.02rem; }
+    .where-we-are { margin: .7rem 0 1rem; padding-bottom: .3rem; }
+    .where-we-are p { margin: 0 0 .72rem; color: #334155; font-size: .82rem; line-height: 1.55; }
+    .where-we-are p:last-child { margin-bottom: 0; }
+    .where-we-are strong { color: #0f172a; }
+    .rail-section { border-top: 1px solid var(--soft-line); }
+    .rail-section summary {
+      display: flex; align-items: center; gap: .55rem; padding: .85rem 0;
+      cursor: pointer; color: #334155; font-size: .7rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .11em; list-style: none;
+    }
+    .rail-section summary::-webkit-details-marker { display: none; }
+    .rail-section summary::before {
+      content: '▸'; width: 1rem; color: #0f172a; font-size: .9rem;
+      transform-origin: center; transition: transform 120ms ease;
+    }
+    .rail-section[open] summary::before { transform: rotate(90deg); }
+    .rail-section summary:focus-visible { outline: 2px solid #111827; outline-offset: 4px; }
+    .rail-content { padding: 0 0 .9rem 1.55rem; }
+    .rail-content p, .rail-content li { margin-top: .32rem; font-size: .82rem; line-height: 1.48; }
+    ul, ol { margin: .35rem 0 0; padding-left: 1.15rem; }
+    pre {
+      overflow: auto; margin: .5rem 0 0; padding: .7rem; border: 1px solid #94a3b8;
+      background: #ffffff; color: #111827; font: .72rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .boundary { border: 2px dashed #111827; padding: .7rem; background: #ffffff; }
+    .digest { overflow-wrap: anywhere; color: var(--muted); font-size: .7rem; }
+    .legend { display: grid; grid-template-columns: 34px 1fr; gap: .5rem .65rem; align-items: center; }
+    .shape { height: 24px; border: 2px solid #111827; background: #ffffff; }
+    .shape.actor { border-radius: 999px; }
+    .shape.state { width: 24px; border-radius: 50%; justify-self: center; }
+    .shape.decision { width: 20px; height: 20px; transform: rotate(45deg); justify-self: center; }
+    .shape.data { border-radius: 50% / 18%; }
+    .shape.note { border-style: dashed; }
+    .legend span { font-size: .77rem; color: #334155; }
+    @media (max-width: 1000px) {
+      main { grid-template-columns: 1fr; height: auto; overflow: visible; }
+      .viewer { height: 700px; min-height: 700px; border-bottom: 2px solid var(--line); }
+      .rail-resizer { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>MetaBuilder · pure transitions around bounded effects</h1>
+      <p>Version 3 · split by construct type · pending operator review</p>
+    </div>
+    <span class="badge">v3 · 15184b93…4b4d3d</span>
+  </header>
+  <main>
+    <article class="viewer">
+      <div class="toolbar">
+        <strong>Drag in any direction · mouse wheel zooms at the pointer</strong>
+        <div class="controls">
+          <button type="button" id="zoom-out" aria-label="Zoom out">−</button>
+          <button type="button" id="fit">Fit</button>
+          <button type="button" id="actual">100%</button>
+          <button type="button" id="zoom-in" aria-label="Zoom in">＋</button>
+        </div>
+      </div>
+      <div id="viewport">
+        <div id="diagram" aria-label="Runtime loop showing pure intent and transition functions, effect interpreters, durable records, verification, reconciliation, and bounded exits"></div>
+      </div>
+    </article>
+    <div
+      id="rail-resizer"
+      class="rail-resizer"
+      role="separator"
+      aria-label="Resize information panel"
+      aria-orientation="vertical"
+      aria-valuemin="280"
+      aria-valuemax="760"
+      aria-valuenow="410"
+      tabindex="0"
+      title="Drag to resize · double-click to reset"
+    ></div>
+    <aside>
+      <h2>MetaBuilder Runtime Loop</h2>
+      <div class="where-we-are">
+        <p><strong>Question.</strong> How does the controller plan, execute, observe, verify, recover, and stop without mixing effects with state?</p>
+        <p><strong>Where we are.</strong> This is the runtime view. The functional core computes intents and state transitions; effect interpreters perform admitted work and return controller observations.</p>
+      </div>
+      <details class="rail-section" open><summary>Constructs and ownership</summary><div class="rail-content"><ul><li>The controller owns RunState, intent persistence, observations, transitions, checkpoints, and stopping.</li><li>The broker admits effects against authority and resources.</li><li>Interpreters perform effects but cannot transition state directly.</li><li>Recovery reconciles ambiguous outcomes before any retry.</li></ul></div></details>
+      <details class="rail-section"><summary>Reading the shapes</summary><div class="rail-content"><div class="legend">
+        <span class="shape actor"></span><span>Stadium: actor, entry, or terminal outcome.</span>
+        <span class="shape"></span><span>Rectangle: callable or pure function.</span>
+        <span class="shape data"></span><span>Cylinder: immutable typed value or durable record.</span>
+        <span class="shape" style="border:3px solid #1d4ed8"></span><span>Blue border: current or established.</span>
+        <span class="shape" style="border:3px solid #16a34a"></span><span>Green border: proposed or missing.</span>
+        <span class="shape" style="border:3px solid #f97316"></span><span>Orange border: current but needing improvement.</span>
+        <span class="shape" style="background:#fef3c7"></span><span>Yellow box: standing rule or evidence boundary.</span>
+      </div></div></details>
+      <details class="rail-section"><summary>Relationship convention</summary><div class="rail-content"><p>Solid arrows show a currently supported relationship. Dashed arrows show a proposed, weakly typed, indirect, or not-yet-supported relationship.</p></div></details>
+      <details class="rail-section"><summary>Plain-language glossary</summary><div class="rail-content"><ul><li><strong>Reducer:</strong> a pure function from state and event to new state or stop reason.</li><li><strong>EffectOutcomeUnknown:</strong> an operation may have happened, so blind retry is unsafe.</li><li><strong>Interpreter:</strong> the runtime adapter that performs an admitted effect.</li></ul></div></details>
+      <details class="rail-section"><summary>Evidence boundary</summary><div class="rail-content"><p class="boundary">This projection shows the intended functional separation around current MetaBuilder mechanisms. It does not prove the future governed agent or external-provider interpreters.</p></div></details>
+      <details class="rail-section" open><summary>Review status</summary><div class="rail-content"><p>Version 3 · split by construct type after operator walkthrough · pending review.</p><div class="digest">Exact Mermaid digest: 15184b93a937fc98a2aa26f6364271ae7a475ad86da2ae9537a33c60134b4d3d</div></div></details>
+    </aside>
+  </main>
+  <script type="text/plain" id="diagram-source">
+%%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
+flowchart TB
+    entry(["ENTRY · admitted bundle plus AuthorizedObjective"])
+
+    subgraph Legend["Shape is kind · color is status"]
+        legend_state[("Immutable state or record · cylinder")]
+        legend_pure["Pure reducer function · rectangle"]
+        legend_runtime[["Effectful runtime · subroutine"]]
+        legend_decision{"Decision · diamond"}
+        legend_note["Standing rule · yellow note"]
+        legend_current["BLUE · currently supported"]
+        legend_proposed["GREEN · proposed or missing"]
+        legend_improve["ORANGE · current but needs improvement"]
+    end
+
+    subgraph Durable["Controller-owned durable records"]
+        state_store[("CURRENT · RunState and exact bundle pins")]
+        journal[("CURRENT · intent, attempt, observation and event journal")]
+        checkpoints[("CURRENT · artifacts, receipts and checkpoints")]
+    end
+
+    subgraph Controller["MetaBuilder controller · owns the state transition"]
+        load[["CURRENT · load exact state and pins"]]
+        next["PURE FUNCTION · nextIntent state"]
+        next_choice{"Stop or execute?"}
+        persist[["CURRENT · persist prepared intent before dispatch"]]
+        broker[["CURRENT · capability and resource admission"]]
+        classify["FUNCTION · classify observation"]
+        outcome_choice{"Succeeded, failed,<br/>outcome unknown, or denied?"}
+        transition["PURE FUNCTION · transition state event"]
+        checkpoint[["CURRENT · persist next state and evidence"]]
+        stop_choice{"Acceptance reached,<br/>breaker tripped, or budget exhausted?"}
+    end
+
+    subgraph Effects["Effect interpretation"]
+        direct[["CURRENT · sandboxed direct-command interpreter"]]
+        agent[["MISSING · governed agent interpreter"]]
+        external[["MISSING · authenticated provider or external-effect adapter"]]
+        raw[("Raw adapter outcome")]
+    end
+
+    subgraph Evidence["Observation and verification"]
+        observe[["CURRENT · controller records Observation"]]
+        observation[("CURRENT · Observation")]
+        claim[("Worker output · Claim")]
+        verify[["PROPOSED · controller verification function"]]
+        record[("PROPOSED · VerificationRecord")]
+    end
+
+    subgraph Recovery["Ambiguous-outcome recovery"]
+        unknown[("CURRENT · EffectOutcomeUnknown")]
+        reconcile[["CURRENT · reconcile persisted intent and external state"]]
+        redispatch_rule["NO BLIND REDISPATCH<br/>An effect that may have happened is reconciled first.<br/>Replay reuses the persisted observation."]
+    end
+
+    exit_success(["EXIT · accepted qualified outcome"])
+    exit_stop(["EXIT · explicit bounded stop with evidence"])
+
+    entry --> load
+    state_store --> load
+    load --> next
+    next --> next_choice
+    next_choice -->|stop| exit_stop
+    next_choice -->|execute| persist
+    persist --> journal
+    persist --> broker
+    broker -->|admit current command| direct
+    broker -.->|future agent profile| agent
+    broker -.->|future external profile| external
+    broker -->|deny| outcome_choice
+
+    direct --> raw
+    agent -.-> claim
+    claim -.-> raw
+    external -.-> raw
+    raw --> observe
+    observe --> journal
+    observe --> observation
+    observation --> classify
+    classify --> outcome_choice
+
+    outcome_choice -->|succeeded| verify
+    outcome_choice -->|conclusive failure or denial| transition
+    outcome_choice -->|effect outcome unknown| unknown
+    unknown --> reconcile
+    reconcile --> journal
+    reconcile --> observation
+    unknown -.-> redispatch_rule
+
+    verify -.-> record
+    record -.-> transition
+    transition --> checkpoint
+    checkpoint --> checkpoints
+    checkpoint --> state_store
+    checkpoint --> stop_choice
+    stop_choice -->|continue within bounds| load
+    stop_choice -->|accepted| exit_success
+    stop_choice -->|breaker or budget| exit_stop
+
+    reducer_rule["FUNCTIONAL CORE<br/>nextIntent and transition are pure over immutable state.<br/>Only interpreters perform effects; observations return as explicit events."]
+    next -.-> reducer_rule
+    transition -.-> reducer_rule
+
+    assurance_rule["ASSURANCE DIMENSIONS<br/>Structural integrity, execution provenance, semantic adequacy and production readiness<br/>must be reported separately rather than collapsed into one qualified label."]
+    record -.-> assurance_rule
+
+    classDef current fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#000000,font-weight:bold;
+    classDef proposed fill:#ffffff,stroke:#16a34a,stroke-width:3px,color:#14532d,font-weight:bold;
+    classDef improve fill:#ffffff,stroke:#f97316,stroke-width:3px,color:#7c2d12,font-weight:bold;
+    classDef neutral fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#000000;
+    classDef relationship fill:#fef3c7,stroke:#111827,stroke-width:1.5px,color:#000000;
+
+    class state_store,journal,checkpoints,load,next,next_choice,persist,broker,classify,outcome_choice,transition,checkpoint,stop_choice,direct,raw,observe,observation,unknown,reconcile,entry,exit_success,exit_stop,legend_current current;
+    class agent,external,verify,record,legend_proposed proposed;
+    class claim,legend_improve improve;
+    class legend_state,legend_pure,legend_runtime,legend_decision neutral;
+    class redispatch_rule,reducer_rule,assurance_rule,legend_note relationship;
+
+    style Legend fill:#ffffff,stroke:#111827,stroke-width:1.5px
+    style Durable fill:#ffffff,stroke:#64748b,stroke-width:1.5px,stroke-dasharray:6 4
+    style Controller fill:#ffffff,stroke:#1d4ed8,stroke-width:2.5px
+    style Effects fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Evidence fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Recovery fill:#ffffff,stroke:#1d4ed8,stroke-width:2px
+</script>
+  <script src="../../../mermaid_viewer/node_modules/mermaid/dist/mermaid.min.js"></script>
+  <script>
+    const viewport = document.getElementById('viewport');
+    const target = document.getElementById('diagram');
+    const source = document.getElementById('diagram-source').textContent.trim();
+    const layout = document.querySelector('main');
+    const rail = document.querySelector('aside');
+    const railResizer = document.getElementById('rail-resizer');
+    const railWidthKey = 'metabuilder-runtime-loop-review-v3-rail-width';
+    let naturalWidth = 1800;
+    let scale = 1;
+    let drag = null;
+    let railDrag = null;
+
+    function railBounds() {
+      return { min: 280, max: Math.min(760, Math.floor(window.innerWidth * 0.58)) };
+    }
+
+    function setRailWidth(width, persist) {
+      const bounds = railBounds();
+      const next = Math.round(Math.max(bounds.min, Math.min(bounds.max, width)));
+      layout.style.setProperty('--rail-width', next + 'px');
+      railResizer.setAttribute('aria-valuemax', String(bounds.max));
+      railResizer.setAttribute('aria-valuenow', String(next));
+      if (persist) {
+        try { localStorage.setItem(railWidthKey, String(next)); } catch (_) { /* local file storage unavailable */ }
+      }
+    }
+
+    let savedRailWidth = NaN;
+    try { savedRailWidth = Number(localStorage.getItem(railWidthKey)); } catch (_) { /* use default */ }
+    if (Number.isFinite(savedRailWidth) && savedRailWidth > 0) setRailWidth(savedRailWidth, false);
+
+    function paintScale() {
+      const svg = target.querySelector('svg');
+      if (!svg) return;
+      svg.style.width = Math.round(naturalWidth * scale) + 'px';
+      document.getElementById('actual').textContent = Math.round(scale * 100) + '%';
+    }
+
+    function setScale(nextScale, clientX, clientY) {
+      const svg = target.querySelector('svg');
+      if (!svg) return;
+      const viewportBox = viewport.getBoundingClientRect();
+      const localX = clientX === undefined ? viewport.clientWidth / 2 : clientX - viewportBox.left;
+      const localY = clientY === undefined ? viewport.clientHeight / 2 : clientY - viewportBox.top;
+      const oldWidth = svg.getBoundingClientRect().width;
+      const oldHeight = svg.getBoundingClientRect().height;
+      const focusX = viewport.scrollLeft + localX;
+      const focusY = viewport.scrollTop + localY;
+      const ratioX = oldWidth > 0 ? focusX / oldWidth : 0;
+      const ratioY = oldHeight > 0 ? focusY / oldHeight : 0;
+
+      scale = Math.max(0.2, Math.min(2.5, nextScale));
+      paintScale();
+
+      const newWidth = svg.getBoundingClientRect().width;
+      const newHeight = svg.getBoundingClientRect().height;
+      viewport.scrollLeft = Math.max(0, ratioX * newWidth - localX);
+      viewport.scrollTop = Math.max(0, ratioY * newHeight - localY);
+    }
+
+    function fitDiagram() {
+      const usable = Math.max(600, viewport.clientWidth - 64);
+      scale = Math.min(1, usable / naturalWidth);
+      paintScale();
+      viewport.scrollTo({ top: 0, left: 0 });
+    }
+
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'base',
+      suppressErrorRendering: true,
+      themeVariables: {
+        background: 'transparent',
+        primaryColor: '#ffffff',
+        primaryBorderColor: '#111827',
+        primaryTextColor: '#111827',
+        lineColor: '#334155',
+        clusterBkg: 'transparent',
+        clusterBorder: '#111827'
+      }
+    });
+
+    mermaid.render('metabuilder-runtime-loop-review-v3', source).then(function(result) {
+      target.innerHTML = result.svg;
+      const svg = target.querySelector('svg');
+      const box = svg.viewBox && svg.viewBox.baseVal;
+      naturalWidth = box && box.width ? Math.max(1600, box.width) : 1900;
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      svg.style.background = 'transparent';
+      scale = Math.min(1, (viewport.clientWidth - 64) / naturalWidth);
+      paintScale();
+      if (result.bindFunctions) result.bindFunctions(target);
+    }).catch(function(error) {
+      target.className = 'error';
+      target.textContent = 'Diagram rendering failed: ' + String(error);
+    });
+
+    document.getElementById('zoom-in').addEventListener('click', function() { setScale(scale + 0.1); });
+    document.getElementById('zoom-out').addEventListener('click', function() { setScale(scale - 0.1); });
+    document.getElementById('fit').addEventListener('click', fitDiagram);
+    document.getElementById('actual').addEventListener('click', function() { setScale(1); });
+
+    viewport.addEventListener('pointerdown', function(event) {
+      if (event.button !== 0) return;
+      drag = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        left: viewport.scrollLeft,
+        top: viewport.scrollTop
+      };
+      viewport.setPointerCapture(event.pointerId);
+      viewport.classList.add('dragging');
+      event.preventDefault();
+    });
+
+    viewport.addEventListener('pointermove', function(event) {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      viewport.scrollLeft = drag.left - (event.clientX - drag.x);
+      viewport.scrollTop = drag.top - (event.clientY - drag.y);
+    });
+
+    function stopDragging(event) {
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      drag = null;
+      viewport.classList.remove('dragging');
+      if (viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+    }
+
+    viewport.addEventListener('pointerup', stopDragging);
+    viewport.addEventListener('pointercancel', stopDragging);
+    viewport.addEventListener('wheel', function(event) {
+      event.preventDefault();
+      const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+      setScale(scale * factor, event.clientX, event.clientY);
+    }, { passive: false });
+
+    railResizer.addEventListener('pointerdown', function(event) {
+      if (event.button !== 0) return;
+      railDrag = { pointerId: event.pointerId, x: event.clientX, width: rail.getBoundingClientRect().width };
+      railResizer.setPointerCapture(event.pointerId);
+      railResizer.classList.add('dragging');
+      document.body.classList.add('resizing-rail');
+      event.preventDefault();
+    });
+
+    railResizer.addEventListener('pointermove', function(event) {
+      if (!railDrag || railDrag.pointerId !== event.pointerId) return;
+      setRailWidth(railDrag.width + railDrag.x - event.clientX, false);
+    });
+
+    function stopRailResize(event) {
+      if (!railDrag || railDrag.pointerId !== event.pointerId) return;
+      railDrag = null;
+      railResizer.classList.remove('dragging');
+      document.body.classList.remove('resizing-rail');
+      setRailWidth(rail.getBoundingClientRect().width, true);
+      if (railResizer.hasPointerCapture(event.pointerId)) railResizer.releasePointerCapture(event.pointerId);
+    }
+
+    railResizer.addEventListener('pointerup', stopRailResize);
+    railResizer.addEventListener('pointercancel', stopRailResize);
+    railResizer.addEventListener('dblclick', function() { setRailWidth(410, true); });
+    railResizer.addEventListener('keydown', function(event) {
+      const step = event.shiftKey ? 48 : 16;
+      const current = rail.getBoundingClientRect().width;
+      if (event.key === 'ArrowLeft') setRailWidth(current + step, true);
+      else if (event.key === 'ArrowRight') setRailWidth(current - step, true);
+      else if (event.key === 'Home') setRailWidth(railBounds().min, true);
+      else if (event.key === 'End') setRailWidth(railBounds().max, true);
+      else return;
+      event.preventDefault();
+    });
+    window.addEventListener('resize', function() { setRailWidth(rail.getBoundingClientRect().width, false); });
+  </script>
+</body>
+</html>

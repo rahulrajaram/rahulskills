@@ -80,6 +80,35 @@ class CodexNormalizationTests(unittest.TestCase):
 
 
 class HeuristicTests(unittest.TestCase):
+    def test_high_candidate_does_not_create_stop_authority(self) -> None:
+        findings = (checker.Finding(
+            "MISSING_PREFLIGHT", "HIGH", "2", "pytest integration", "Review preflight."
+        ),)
+        report = checker.generate_report(findings, (), checker.load_rules())
+        self.assertIn("CANDIDATES", report)
+        self.assertIn("Evidence: pytest integration", report)
+        self.assertIn("Continue authorized work", report)
+        self.assertIn("current authority or safety violation", report)
+        self.assertNotIn("Stop the affected action until", report)
+
+    def test_secret_read_neither_proves_authorization_nor_exempts_assignment(self) -> None:
+        messages = tuple(
+            checker._message("", "assistant", [{"name": "Bash", "input": {"command": command}}])
+            for command in (
+                "kubectl get secret example | base64 -d",
+                "API_KEY=fixture deploy",
+            )
+        )
+        findings = checker.check_credential_usage(messages)
+        self.assertEqual(1, len(findings))
+        self.assertFalse(any(
+            practice.kind == "CREDENTIAL_FROM_SECRET"
+            for practice in checker.identify_good_practices(messages)
+        ))
+        report = checker.generate_report(findings, checker.identify_good_practices(messages), checker.load_rules())
+        self.assertNotIn("Used an authorized secret read", report)
+        self.assertIn("placeholder", report)
+
     def test_destructive_home_target_is_high_severity(self) -> None:
         messages = (
             checker._message(

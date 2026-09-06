@@ -1,6 +1,6 @@
 ---
 name: tui-web-design-orchestrator
-description: "Generate structured design prompt packets for terminal UIs and web UIs from natural-language briefs. Use when the user asks to design/redesign a TUI, web page, landing page, dashboard, or UI flow, or says /tui-web-design-orchestrator."
+description: "Generate structured design prompt packets for terminal UIs and web UIs from natural-language briefs. Use when the user requests a design prompt/packet for a TUI or web UI, or explicitly invokes this skill. A UI implementation request does not by itself select prompt-packet generation."
 argument-hint: "--mode <web-page|web-app|tui-dashboard|tui-wizard> --brief \"<text>\" [--audience \"...\"] [--constraints \"...\"] [--style \"...\"] [--tech \"...\"] [--output markdown|json] [--outfile PATH]"
 ---
 
@@ -22,21 +22,25 @@ Generate production-minded design prompt packets for `web-page`, `web-app`, `tui
 - `--tech "<text>"`: Optional implementation stack override.
 - `--output <markdown|json>`: Optional output format (default: markdown).
 - `--outfile <path>`: Optional path to write output file.
+- `--component TEXT`: Repeat for components derived from the actual brief.
+- `--name TEXT`: Optional explicit project name; otherwise a provisional label.
 
 ## Workflow
 
-1. Validate arguments. Ensure `--mode` and `--brief` are present.
+1. Bind `SKILL_DIR` to this loaded skill directory, validate mode/brief and
+   derive components from the supplied jobs, data and constraints. Pass each as
+   `--component TEXT`; do not copy a fixed preset layout into an unrelated brief.
 2. Run the packet generator script:
 
 ```bash
-python3 ~/.claude/skills/tui-web-design-orchestrator/scripts/design_prompt_packet.py $ARGUMENTS
+python3 "$SKILL_DIR/scripts/design_prompt_packet.py" <selected-arguments>
 ```
 
 3. If `--outfile` is provided, confirm the file path written.
 4. If no `--outfile` is provided, return the generated packet inline.
 5. If the user asks for stronger rationale or benchmarking, pull patterns from:
-- `~/.claude/skills/tui-web-design-orchestrator/references/source-crawl-synthesis.md`
-- `~/.claude/skills/tui-web-design-orchestrator/references/design-prompt-blueprints.md`
+- [source-crawl-synthesis.md](references/source-crawl-synthesis.md)
+- [design-prompt-blueprints.md](references/design-prompt-blueprints.md)
 
 ## Output Contract
 
@@ -76,3 +80,13 @@ A complete packet should include:
 - Preserve all provided constraints in the final packet.
 - Keep terminal modes keyboard-first and width-aware.
 - Always include accessibility checks and explicit state coverage.
+
+## Boundaries and completion
+
+Non-goals: building the UI, selecting new dependencies or inventing a product
+architecture. Must not: present preset panels, pricing, testimonials or invented
+user requirements as brief facts. Use actual project terminology and distinguish
+inferred component choices from constraints. Ask only when a missing material
+product decision prevents a useful packet; routine layout options may be proposed
+as assumptions. Return a packet faithful to the selected brief, with component
+and state coverage tied to it. The packet is a proposal, not an implemented UI.

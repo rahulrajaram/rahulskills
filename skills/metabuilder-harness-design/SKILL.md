@@ -24,8 +24,10 @@ checks are meaningful.
 - Read the target repository's applicable instructions before designing.
 - Honor a user boundary narrower than this workflow. Missing approval or write
   authority produces an explicit design-only handoff, not invented evidence.
-- Treat fresh construction as consequential and use thorough grilling. A
-  requester cannot downgrade it to routine.
+- Formal fresh construction is consequential under the CLI gate. Reuse
+  evidenced grilling coverage and decisions; investigate only missing or
+  changed material issues. Routine inspection and provisional preparation
+  do not themselves cross that gate.
 - Keep facts, assumptions, preferences, unknowns, and decisions distinct.
   Resolve each material unknown or record an owner, impact, and review trigger.
 - Require a named product owner to approve every formal decision and every
@@ -38,6 +40,39 @@ checks are meaningful.
   authority; a Harness Module commits to actions and evidence; a run records
   controller observations. None proves the consumer's final semantic claim by
   itself.
+
+## Authority by phase
+
+- **Analysis:** The user's design or inspection request permits relevant local
+  reads and evidence gathering within existing permissions. Establish missing
+  owners before their decisions are needed; continue independent investigation.
+- **Provisional design:** Prepare findings, candidate briefs, alternatives, and
+  authority-free intent sketches within authorized local output paths. Label
+  unresolved decisions and proposed commitments. These are review materials,
+  not approved modules, receipts, or permission to execute.
+- **Ratification:** Before formal construction, require named product-owner
+  evidence for every formal decision and acceptance of the exact prepared
+  brief by every required approver. Technical evidence can resolve a grilling
+  question but cannot stand in for formal user approval. A speculative model
+  respondent cannot ratify on a human's behalf.
+- **Formal artifact publication:** Finalize the agreed brief and construct,
+  compile, and admit the module/bundle only when the required ratification and
+  artifact-write authority are satisfied. Local publication does not authorize
+  remote publication. Neither a template nor a successful check supplies a grant.
+- **Execution:** Authoring a run, applying effects, provider dispatch, and spend
+  require the corresponding existing grants and controller enforcement. Design
+  acceptance alone does not authorize them. Consumer assessment remains separate
+  from both approval and controller-observed execution.
+
+Reuse an agreed brief and explicit decisions when their approval-relevant
+identity, actors, decisions, effect scope, and grants remain valid. Verify the
+receipt with the current CLI; a changed prepared brief digest needs acceptance
+for that new digest under the controller's rules. Changed approvers, ambiguous
+ownership, stale evidence, or added effects reopen the affected decision.
+Do not restart a settled interview merely because a companion skill is loaded.
+For an unresolved boundary, finish independent authorized preparation, ask for
+the specific missing decision with the concrete artifact/effect in view, and
+hold only dependent work. Silence is not approval.
 
 The emitted brief template contains zero digests as visible placeholders. They
 are structurally valid so the Rust gate can demonstrate the full shape, but
@@ -57,11 +92,12 @@ answer, policy, investigation, or approval record it cites before agreement.
 3. Build a finding ledger with one classification per item: fact, assumption,
    preference, unknown, or decision. Name provenance and an owner. Ask only
    questions that can change scope, risk, success, authority, or design.
-4. Conduct thorough grilling across goals, non-goals, constraints, risks,
+4. Reuse valid answers and conduct the remaining grilling across goals, non-goals, constraints, risks,
    success criteria, actors, material unknowns, effects, failure/recovery, and
    evidence adequacy. Read [references/design-workflow.md](references/design-workflow.md)
    for the exact artifact sequence and approval shape.
-5. Emit and edit the executable candidate:
+5. If no valid agreed brief already covers this design, emit and edit a
+   provisional brief candidate:
 
    ```bash
    metabuilder harness brief template > harness-brief.candidate.json
@@ -70,8 +106,9 @@ answer, policy, investigation, or approval record it cites before agreement.
    metabuilder harness brief inspect --input harness-brief.prepared.json
    ```
 
-   Create the approval request only after every approver reviews the exact
-   prepared brief digest. Finalize to a new file; never overwrite an earlier
+   Prepare the approval request for review; populate approval evidence only
+   after every required approver has accepted the exact prepared brief digest.
+   Reuse existing acceptance of that same digest when still valid. Finalize to a new file; never overwrite an earlier
    candidate or receipt.
 6. Translate the agreed meaning into `defineIntent`: objectives become
    `achieve` obligations, independently testable claims become `establish`
@@ -101,8 +138,9 @@ answer, policy, investigation, or approval record it cites before agreement.
    metabuilder harness check --input harness.bundle.json
    ```
 
-9. Hand the exact agreed brief, intent source, module, bundle, target source
-   identity, limitations, assumptions, and open unsupported effects to
+9. At the authorized stopping point, hand the exact agreed brief, intent source,
+   module, bundle, target source identity, limitations, assumptions, and open
+   unsupported effects to
    `metabuilder-consumer-qualification`. That downstream workflow executes the
    bundle and keeps MetaBuilder observations separate from consumer judgment.
 

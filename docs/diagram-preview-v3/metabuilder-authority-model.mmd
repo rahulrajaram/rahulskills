@@ -1,0 +1,102 @@
+%%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
+flowchart TB
+    entry(["ENTRY · someone submits an ObjectiveRequest"])
+
+    subgraph Legend["Shape is kind · color is status"]
+        legend_actor(["Actor · stadium"])
+        legend_artifact[("Authority-bearing value · cylinder")]
+        legend_runtime[["Enforcing runtime · subroutine"]]
+        legend_decision{"Authority decision · diamond"}
+        legend_note["Standing rule · yellow note"]
+        legend_current["BLUE · current role or mechanism"]
+        legend_proposed["GREEN · proposed typed mechanism"]
+    end
+
+    subgraph HumanAuthority["Human authority plane"]
+        requester(["Requester<br/>sends the objective"])
+        principal(["Principal · authority owner<br/>defines success and reserved decisions"])
+        operator(["Operator<br/>observes and requests permitted intervention"])
+        approver(["Approver<br/>makes a reserved decision"])
+    end
+
+    subgraph ControllerPlane["MetaBuilder controller plane"]
+        controller[["MetaBuilder controller<br/>admits, records, verifies, transitions and stops"]]
+        broker[["Capability broker<br/>intersects intent with the authority ceiling"]]
+        approval_verifier[["PROPOSED · authenticated approval verifier"]]
+        evidence_verifier[["PROPOSED · controller evidence verifier"]]
+    end
+
+    subgraph WorkerPlane["Worker plane"]
+        command_worker(["Current deterministic command adapter"])
+        agent_worker(["MISSING · governed agent adapter"])
+        independent(["MISSING · independent reviewer"])
+    end
+
+    request[("PROPOSED VALUE · ObjectiveRequest<br/>submittedBy, principal, objective, optional delegation")]
+    same{"Requester is principal?"}
+    delegation[("PROPOSED VALUE · DelegationProof")]
+    envelope[("PROPOSED VALUE · AuthorityEnvelopeRef")]
+    intervention[("CURRENT VALUE · bounded intervention request")]
+    attestation[("PROPOSED VALUE · DecisionAttestation")]
+    intent[("CURRENT VALUE · prepared EffectIntent")]
+    grant[("CURRENT VALUE · attenuated capability grant")]
+    claim[("CURRENT VALUE · worker Claim")]
+    observation[("CURRENT VALUE · controller Observation")]
+    record[("PROPOSED VALUE · VerificationRecord")]
+    admitted[("Admitted result or explicit denial")]
+
+    exit(["EXIT · authority preserved, result admitted, or operation refused"])
+
+    entry --> requester
+    requester -.-> request
+    request -.-> same
+    same -.->|yes| principal
+    same -.->|no| delegation
+    principal -.-> delegation
+    delegation -.-> controller
+
+    principal -.-> rel_principal["PRINCIPAL IS NOT THE REQUEST MESSAGE<br/>The principal owns meaning, success, effect ceilings and reserved decisions.<br/>An agent may request work as a delegate but cannot appoint itself principal."] -.-> envelope
+    envelope -.-> controller
+    request -.-> controller
+
+    operator --> intervention
+    intervention --> controller
+    approver -.-> attestation
+    attestation -.-> approval_verifier
+    approval_verifier -.-> controller
+
+    controller --> intent
+    intent --> broker
+    envelope -.-> broker
+    broker --> grant
+    grant --> command_worker
+    grant -.-> agent_worker
+
+    command_worker --> claim
+    agent_worker -.-> claim
+    claim --> rel_claim["SEPARATION OF DUTIES<br/>A worker may report a result but cannot verify itself, widen its grant,<br/>authenticate approval, or transition controller state directly."] --> controller
+    controller --> observation
+    observation -.-> evidence_verifier
+    independent -.-> evidence_verifier
+    evidence_verifier -.-> record
+    record -.-> controller
+    controller --> admitted
+    admitted --> exit
+
+    authority_rule["AUTHORITY MONOTONICITY<br/>Every child grant is equal to or narrower than the ratified envelope.<br/>Unsupported or unauthenticated expansion fails closed."]
+    broker -.-> authority_rule
+
+    classDef current fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#000000,font-weight:bold;
+    classDef proposed fill:#ffffff,stroke:#16a34a,stroke-width:3px,color:#14532d,font-weight:bold;
+    classDef neutral fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#000000;
+    classDef relationship fill:#fef3c7,stroke:#111827,stroke-width:1.5px,color:#000000;
+
+    class requester,principal,operator,approver,controller,broker,command_worker,intervention,intent,grant,claim,observation,legend_current current;
+    class approval_verifier,evidence_verifier,agent_worker,independent,request,delegation,envelope,attestation,record,legend_proposed proposed;
+    class entry,exit,same,admitted,legend_actor,legend_artifact,legend_runtime,legend_decision neutral;
+    class rel_principal,rel_claim,authority_rule,legend_note relationship;
+
+    style Legend fill:#ffffff,stroke:#111827,stroke-width:1.5px
+    style HumanAuthority fill:#ffffff,stroke:#1d4ed8,stroke-width:2px
+    style ControllerPlane fill:#ffffff,stroke:#1d4ed8,stroke-width:2px
+    style WorkerPlane fill:#ffffff,stroke:#64748b,stroke-width:1.5px,stroke-dasharray:6 4

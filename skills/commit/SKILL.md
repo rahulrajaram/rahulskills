@@ -13,9 +13,11 @@ to determine whether it should actually be committed.
 
 A commit request is approval to triage, stage repository-appropriate files, compose a
 conventional commit message, and create the commit without turning the routine
-path into an approval loop. Ask only when the assessment contains REVIEW items,
-ALLOWED overrides, secrets, destructive cleanup, ignore-policy changes, or a
-message/scope decision that materially affects user intent. Do not ask whether
+path into an approval loop. Ask only for unresolved REVIEW items, override scope, secrets handling,
+destructive cleanup, ignore-policy changes, or a
+message/scope decision that materially affects user intent. Reuse explicit file
+selections and valid human overrides; an ALLOWED label alone does not require
+a second confirmation. Do not ask whether
 to use another workflow wrapper unless the user is really requesting history
 cleanup, PR creation, or handoff.
 
@@ -82,8 +84,9 @@ is written in the allow file by the human.
 Apply these defaults when repository policy and history do not establish that a
 file belongs in version control. A tracked file modified by the requested work
 is normally COMMIT; do not untrack it merely because its name matches a generic
-pattern. Contradictions between repository policy and these heuristics are
-REVIEW, not silent SKIP.
+pattern. Explicit repository policy and authorized file selections settle these generic
+heuristics. Only unresolved policy conflicts are REVIEW; do not silently SKIP
+a project-authoritative plan or source document.
 
 **Untracked planning / AI session artifacts**
 - `VISION.md`, `IMPLEMENTATION_PLAN.md`, `PROMPT.md`, `RALPH_PROMPT.md`, `NEXT_SHELL_PROMPT.md`
@@ -111,7 +114,9 @@ REVIEW, not silent SKIP.
 **Note:** Secrets must never receive ALLOWED verdict regardless of what is in
 the allow file. Flag them as SKIP and warn the user explicitly.
 
-**Newly created `.md` files** that are not in this explicit allow-list:
+**Untracked session-only `.md` files**, absent project ownership evidence.
+Ordinary source/reference documentation is COMMIT when selected by the task;
+these familiar names are examples, not an exhaustive allow-list:
 `README.md`, `CHANGELOG.md`, `CHANGES.md`, `LICENSE.md`, `CONTRIBUTING.md`,
 `SECURITY.md`, `CODE_OF_CONDUCT.md`
 
@@ -151,9 +156,9 @@ The user needs to see at a glance that an override is in play.
 
 **Never silently skip a SKIP file.** Name every one so the user can override.
 
-If the table contains REVIEW items, ALLOWED files, secrets, destructive cleanup,
-or an ignore-location choice, ask:
-> Resolve REVIEW/ALLOWED/SKIP decisions before staging. Proceed? (y/n)
+If a material REVIEW, secret-handling, cleanup or ignore-policy decision remains
+unresolved, present that exact choice before dependent staging. Do not ask again
+for already-authorized file selections or a valid human override.
 
 If all staged files are ordinary COMMIT verdicts and all SKIP handling is
 unambiguous, continue without a second approval; the user's commit request is

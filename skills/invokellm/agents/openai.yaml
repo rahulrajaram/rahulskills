@@ -1,4 +1,4 @@
 interface:
   display_name: "Invoke LLM"
   short_description: "Invoke one or more AI CLIs via gptengage; default to gemini, claude, and codex."
-  default_prompt: "Run $invokellm (or /invokellm where supported) through ~/.local/bin/gptengage invoke. Pass --timeout 600 to gptengage itself. If no CLI is specified, consult gemini, claude, and codex with the same prompt."
+  default_prompt: "Run $invokellm (or /invokellm where supported) through the authorized existing gptengage invoke operation. Pass --timeout 600 to gptengage itself. If no CLI is specified, consult gemini, claude, and codex with the same prompt."

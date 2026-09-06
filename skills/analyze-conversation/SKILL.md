@@ -61,7 +61,7 @@ findings, but it must not redefine the shared rule meanings.
 
 1. **Credential Anti-Patterns**
    - Hardcoded passwords/secrets
-   - Using env vars without reading from K8s secrets
+   - Credential assumptions that require contextual review
    - Assumed credentials without verification
 
 2. **Retry Patterns**
@@ -91,7 +91,7 @@ The generated report includes:
 - **Executive Summary**: Top anti-patterns, tool needs, rule violations
 - **Detailed Anti-Pattern Analysis**: Each instance with context and fix
 - **Tool Opportunities**: Commands that should be automated
-- **Universal Rules Violated**: Which shared rules were broken and how often
+- **Rule-related candidates**: Stable shared rule IDs, evidence categories, and review counts
 - **Recommendations**: Priority-ranked action items
 - **Success Metrics**: Comparison with target behavior
 
@@ -113,32 +113,32 @@ The generated report includes:
    - Fix: Run `git status --verbose` or check git daemon logs
 
 2. **Credential Assumption**: 1 instance
-   - Example: Used DATA_PLANE_DB_PASSWORD without reading from K8s secret
-   - Fix: `kubectl get secret postgres-admin -o jsonpath='{.data.password}' | base64 -d`
+   - Example: Emitted a credential-like assignment in assistant text
+   - Fix: Review source, authorization, and exposure without printing or decoding secrets
 
 3. **Tool Blindness**: 5 tools not discovered
-   - myproject-runtime, myproject-db, tool-a, tool-b, tool-c
-   - Impact: 30-50 manual commands could have been avoided
+   - Repeated command sequences that may justify a project-specific helper
+   - Impact: potential automation opportunity; no avoided-command estimate is established
 
 ## Tool Opportunities
 
-- **Repeated 10x**: git status → Tool: myproject-status --git
-- **Repeated 5x**: kubectl get pods → Tool: myproject-status --data-plane
-- **Repeated 5x**: pytest → Tool: myproject-test e2e (with preflight)
+- **Repeated 10x**: git status → Review whether project-specific automation is warranted
+- **Repeated 5x**: kubectl get pods → Review whether project-specific automation is warranted
+- **Repeated 5x**: pytest → Review whether project-specific automation is warranted
 
-## Universal Rules Violated
+## Rule-related candidates
 
-- **Rule 2** (diagnose before retry): 10 violations
-- **Rule 1** (never hardcode creds): 1 violation
-- **Rule 5** (discover tools first): 5 violations
+- **DIAG-002** (diagnose before retry): 10 candidates
+- **DIAG-001** (credential assumption): 1 candidate
+- **DIAG-005** (tool discovery): 5 candidates
 
 ## Recommendations
 
-1. **HIGH**: Implement myproject-preflight (prevents 15+ failed test runs)
-2. **HIGH**: Implement myproject-creds (prevents credential leaks)
-3. **HIGH**: Implement myproject-diag (prevents blind retries)
-4. **MEDIUM**: Create TOOLS.md for tool discovery
-5. **MEDIUM**: Update system prompt with verification protocol
+1. **HIGH**: Review repeated test failures and decide whether a project preflight is warranted
+2. **HIGH**: Review credential handling against the project’s authorized mechanism
+3. **HIGH**: Review retry evidence and add a diagnostic helper only if the project needs one
+4. **MEDIUM**: Consider documenting available tools for discoverability
+5. **MEDIUM**: Consider a verification reminder where the evidence supports it
 ```
 
 ## Implementation
@@ -166,7 +166,10 @@ If `--current` cannot identify a readable transcript, list the newest candidate
 JSONL files under `~/.codex/sessions` without printing their contents and ask the
 user to choose. Do not silently analyze a different session. On malformed or
 unreadable JSONL, report the path and parse/access error; do not emit a partial
-report as if it were complete.
+report as if it were complete. Empty or unsupported input is an explicit
+coverage failure and must not produce a successful no-findings report. A
+conversation ID selects one exact file; never silently analyze a different
+session because it is newer or merely has a similar filename.
 
 ## Benefits
 

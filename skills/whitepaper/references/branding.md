@@ -1,8 +1,10 @@
 # Naming and branding
 
-Choosing and styling a product name for a whitepaper. Learned the hard way.
+Use only when naming or branding is selected. Reuse an existing approved name
+and style; preparing a paragraph or investor document does not itself select
+renaming, domain checks, or new fonts. Examples below are optional design choices.
 
-## Choose a name by theme and allegory, not by dictionary match
+## Explore names when requested
 
 A good name for a decision product is chosen the way "counterpoint" was: by
 **allegory** (the second voice arguing against the first until the resolution
@@ -26,7 +28,9 @@ near-sound-alike, pick from a themed shortlist, or rebrand.
 
 ### Availability/TM/domain sanity check
 
-Before committing a name into a document, run a quick check:
+For a requested new-name selection, perform the authorized preliminary checks
+before recommending adoption, or mark them unverified. These are not legal
+clearance and do not authorize registration or purchase. Relevant checks include:
 - domain availability (e.g., `domain.com`, and `.ai` if it's an AI product),
 - trademark/collision search,
 - prior software category of the same word/phoneme.
@@ -69,8 +73,10 @@ it ("keep it simple"). Solid color is the dependable default.
 
 ## Fonts: embed locally, never depend on runtime Google Fonts
 
-For a PDF you can share, download the font files once and embed them. Body
-font you set even width; brand font set for distinctiveness.
+For a shareable PDF, prefer already-present licensed fonts and embed them.
+If a new font is necessary, prepare its exact source, license, purpose, and local
+path before requesting missing download authorization. Do not fetch fonts merely
+because a branding example lists them.
 
 A start of palette that works on the page, and personal notes:
 - Body: Work Sans, Inter, Figtree are neutral-modern; IBM Plex Sans is
@@ -79,7 +85,7 @@ A start of palette that works on the page, and personal notes:
   (more traditional), Archivo (most striking).
 
 Weights: brand mark regular-to-bold as desired; body uses regular plus bold
-for headings. Always fetch the specific weights a style needs — many Google
+for headings. When a download is authorized, fetch only the weights needed — many Google
 Fonts are variable fonts and serve one file per weight when requested via an
 old-style UA, or serve a variable font when requested with a modern UA.
 

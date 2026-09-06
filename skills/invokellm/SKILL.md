@@ -19,7 +19,8 @@ recipe before calling a backend.
    comma-separated CLI list, or plugin.
 2. Default to `gemini`, `claude`, then `codex` when no selector is present.
    Invoke each separately with the identical prompt and applicable options.
-3. Run only through `~/.local/bin/gptengage invoke`. Default the inner
+3. Resolve the authorized existing `gptengage` executable and run only its
+   `invoke` operation. Default the inner
    `--timeout` to 600 seconds unless the user supplied one.
 4. Label multi-CLI results by backend, inspect failures and malformed output,
    and integrate the results into the user's requested work.

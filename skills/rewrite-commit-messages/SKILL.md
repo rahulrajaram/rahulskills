@@ -6,169 +6,82 @@ argument-hint: "[commit-range]"
 
 # Rewrite Commit Messages
 
-Before mutation, follow
+Before mutation, read and follow
 [`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md).
-This skill adds message-specific transformations only.
+This skill adds message-specific transformations and verification.
 
-Safely rewrite existing git commit messages using `git filter-repo`.
+Rewrite historical messages without changing file content or commit topology.
+For creating a commit use `/commit`; for squashing or reordering use
+`/squash-commits`. For only the latest message, prefer `git commit --amend`
+with the same scope, recovery and content checks.
 
-Use this skill when the user wants to:
-- rename one or more historical commit messages
-- normalize repeated generated messages
-- replace noisy tranche/merge wording with cleaner summaries
-- perform a message-only history rewrite with explicit mappings
+## Preflight and preview
 
-Do **not** use this skill for:
-- squashing or reordering commits
-- changing file contents
-- partial staging or creating a new commit from the working tree
+Inspect HEAD, worktree status, selected refs, upstream tracking and locally
+available `git-filter-repo`. Local tracking evidence can be stale; do not infer
+that shared history is unpushed merely because it is ahead of a tracking ref.
+Follow the shared preflight and create the independently verified backup before
+mutation.
 
-Use `/commit` for new commits and `/squash-commits` for rebase-based history cleanup.
+Collect exact old/new message mappings, including full bodies and trailing
+newlines. Resolve them to full original commit IDs in the reviewed history.
+If asked to propose better wording, prepare replacements from commit evidence
+for review; do not treat vague intent as approval for invented replacements.
+Show original HEAD, selected refs, matched commit IDs/counts, message changes,
+necessary descendant rewrites, signature implications and backup location.
+Proceed on still-valid authorization for that concrete plan; ask only when the
+mapping, affected refs or effect authority remains unresolved.
 
-## Safety model
+## Execute the message-only transformation
 
-This skill rewrites commit SHAs. Treat it as history surgery.
-
-Before making any change:
-1. Record and print the full original `HEAD` SHA.
-2. Confirm the working tree is clean.
-3. Create a backup ref/tag pointing at the original `HEAD`.
-4. Require explicit old→new message mappings.
-5. Prefer rewriting only commit messages; do not modify trees, authors, or dates unless the user explicitly asks.
-
-Always print:
-
-```text
-Original HEAD: <full 40-char SHA>
-To restore:    git reset --hard <full 40-char SHA>
-Backup tag:    pre-filter-repo-backup
-```
-
-## Workflow
-
-### Step 1 — Preflight
-
-Run:
+Use a commit callback so annotated-tag messages are not implicitly rewritten.
+In Bash, use the `rewrite_refs` and `backup_dir` prepared by the shared contract.
+Populate the callback with the reviewed full IDs and exact message bytes
+before executing. The placeholders below are deliberately not real mappings.
 
 ```bash
-git rev-parse HEAD
-git status --porcelain
-git rev-parse --abbrev-ref @{upstream} 2>/dev/null || true
-command -v git-filter-repo
+git filter-repo --force --partial \
+  --preserve-commit-hashes --preserve-commit-encoding \
+  --prune-empty never --prune-degenerate never \
+  --commit-callback '
+rules = {
+    b"FULL_ORIGINAL_COMMIT_ID": (b"EXACT OLD MESSAGE\n", b"EXACT NEW MESSAGE\n"),
+}
+rule = rules.get(commit.original_id)
+if rule is not None:
+    old, new = rule
+    if commit.message != old:
+        raise ValueError("Reviewed message no longer matches")
+    commit.message = new
+' --refs "${rewrite_refs[@]}"
 ```
 
-Rules:
-- If the tree is dirty, stop and ask the user to commit or stash first.
-- If `git-filter-repo` is unavailable, stop and report it.
-- If the branch has pushed commits and the user did not clearly approve rewriting them, warn that a force-push will be required.
+For many rules, keep the reviewed callback in a private file and pass its
+absolute path to `--commit-callback`. Do not interpolate arbitrary message text
+into shell code. Do not add file, author, date or path callbacks. Do not omit
+partial mode or the selected ref array on retries.
 
-### Step 2 — Collect exact rewrite rules
+## Verify and report
 
-Require explicit mappings in this format:
+Preserve the commit map and compare rewritten objects against the independent
+backup, not against an in-repository backup ref that could have moved.
 
-```text
-old: chore: auto-repair merge conflict for release-014
-new: chore: Finalize release-014 runtime merge
-```
+- Every selected old commit maps to exactly one surviving new commit; commit
+  counts and ordered parents correspond through the map. No squashing/pruning.
+- For every mapped commit, `git rev-parse <old>^{tree}` in the recovery repo
+  equals `git rev-parse <new>^{tree}` in the rewritten repo. This proves file
+  names, modes and blob contents are unchanged across historical trees.
+- Read raw commits with `git cat-file commit`: messages equal the approved
+  replacement for targeted IDs and the original bytes for all other commits.
+  Author/committer identities and dates, encoding and other headers remain
+  unchanged except reviewed signature effects and mapped parent IDs.
+- All unselected refs retain their original IDs; selected refs point to the
+  expected mapped objects. Check annotated tags separately if selected.
+- Worktree is clean and relevant verification succeeds. Tree equality is the
+  primary proof of message-only behavior; running a build alone is not.
 
-Rules:
-- Treat `old:` as exact text unless the user explicitly asks for regex behavior.
-- Do not infer replacements.
-- If multiple old messages map to one new message, list each mapping separately.
-- If a mapping is ambiguous, stop and ask.
-
-### Step 3 — Show the rewrite plan
-
-Before running `git filter-repo`, print:
-- original HEAD
-- backup tag name
-- whether the rewrite targets unpushed history only or includes pushed history
-- each `old -> new` mapping
-- the count of matching commits per mapping when feasible
-
-Example:
-
-```text
-Rewrite plan:
-  old: chore: auto-repair merge conflict for release-014
-  new: chore: Finalize release-014 runtime merge
-  matches: 1
-```
-
-Do not proceed without explicit approval.
-
-### Step 4 — Create a backup ref
-
-Create a collision-safe recovery ref before rewriting (do not overwrite an
-existing backup):
-
-```bash
-backup="refs/tags/pre-filter-repo-backup-$(date -u +%Y%m%dT%H%M%SZ)"
-git show-ref --verify --quiet "$backup" && { echo "backup exists" >&2; exit 1; }
-git update-ref "$backup" "$(git rev-parse HEAD)"
-```
-
-### Step 5 — Run git filter-repo in message-only mode
-
-Prefer a message callback that rewrites only exact message matches.
-
-Pattern:
-
-```bash
-git filter-repo --force --message-callback '
-msg = message.decode("utf-8")
-if msg == "OLD MESSAGE":
-    return b"NEW MESSAGE"
-return message
-'
-```
-
-For multiple mappings, use a dictionary in the callback.
-
-Rules:
-- Rewrite only commit messages.
-- Preserve all non-message metadata unless the user explicitly asks otherwise.
-- Keep replacements deterministic and exact.
-- Avoid regex rewrites by default.
-
-### Step 6 — Verify
-
-After the rewrite, run:
-
-```bash
-git log --oneline -N
-git rev-parse HEAD
-git status --porcelain
-```
-
-Also verify that the targeted messages changed and that unrelated messages did not.
-
-If the branch tracks a remote, remind the user that they will need:
-
-```bash
-git push --force-with-lease
-```
-
-Do not push for them unless explicitly asked.
-
-### Step 7 — Summarize recovery information
-
-Always end with:
-
-```text
-Rewrite complete.
-  Original HEAD: <full 40-char SHA>
-  Current HEAD:  <full 40-char SHA>
-  Backup tag:    pre-filter-repo-backup
-  To restore:    git reset --hard <original HEAD SHA>
-```
-
-## Safety guardrails
-
-- Never run with a dirty working tree.
-- Never infer message rewrites from vague intent.
-- Never rewrite authors, timestamps, trees, or paths unless explicitly requested.
-- Never push after the rewrite unless explicitly asked.
-- Prefer exact-string rewrites over regex.
-- If the user wants to change commit structure, use `/squash-commits` instead.
-- If the user wants only the latest commit message changed, prefer `git commit --amend` rather than `git filter-repo`.
+Report original/current HEAD, changed refs and messages, verified invariants,
+and the actual external bundle/recovery path. If verification fails, preserve
+recovery evidence and report the failed property instead of declaring success.
+Explain any remaining separately authorized publication step; do not push as an
+implicit consequence of rewriting locally.

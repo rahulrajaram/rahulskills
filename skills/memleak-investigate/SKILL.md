@@ -34,17 +34,19 @@ cat /proc/<PID>/cgroup
 Sample at a cadence appropriate to the suspected growth while recording workload
 phase. Two minutes is a starting point, not a universal proof window:
 
-```bash
-for i in $(seq 1 12); do
-  test -r /proc/<PID>/status || { echo "process exited" >&2; break; }
-  awk -v at="$(date -Iseconds)" '
-    /^VmRSS:/ {rss=$2} /^RssAnon:/ {anon=$2} /^RssFile:/ {file=$2}
-    /^VmSwap:/ {swap=$2} /^Threads:/ {threads=$2}
-    END {print at "," rss "," anon "," file "," swap "," threads}
-  ' /proc/<PID>/status
-  sleep 10
-done
-```
+Use a sampler that binds `/proc/<PID>/stat` start-time field 22, executable,
+owner and cgroup at entry and checks them **before and after every sample**.
+Read `stat` by splitting after the final `)` (the command name can contain
+spaces/parentheses); start time is offset 19 in the remaining fields beginning
+with state. A readable status file alone does not detect PID reuse. On exit or
+identity change, discard the ambiguous sample and end this series; resolve a
+new process explicitly before starting another. Label this as sampled identity
+checking, not an atomic kernel snapshot.
+
+Record timestamp, workload phase, VmRSS, RssAnon, RssFile, VmSwap and Threads at
+an appropriate interval using the already available runtime. Do not treat a
+missing metric as zero, and do not concatenate samples from a restarted process.
+
 
 `VmHWM` is a historical peak, not evidence that past growth leaked or swapped.
 Repeated RSS/anonymous growth under comparable load suggests retention but can

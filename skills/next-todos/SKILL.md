@@ -38,6 +38,11 @@ behavior.
     afterward.
 
 ## Output contract
+
+When intent is unclear, the focused clarifying question in workflow step 9 is
+the sole exception to the numbered-list-only output contract; otherwise return
+only the numbered list.
+
 - Return only a numbered list.
 - Each item is a full imperative sentence starting with a verb, 30 words or fewer.
 - No fragments, no bare labels, no shorthand — every item must read as a clear directive.

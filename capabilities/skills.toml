@@ -37,12 +37,14 @@ effects = ["readonly", "network-read"]
 mcps = ["figma"]
 effect = "readonly"
 layer = "primitive"
+membership = "optional-design"
 
 [skills.figma-implement-design]
 mcps = ["figma"]
 effect = "local-write"
 layer = "workflow"
 overlaps = ["figma"]
+membership = "optional-design"
 
 [skills.openai-docs]
 optional_mcps = ["openai_docs"]
@@ -92,12 +94,13 @@ layer = "workflow"
 overlaps = ["invokellm"]
 
 [skills.test]
-commands = ["overwatch"]
+optional_commands = ["overwatch"]
 effect = "local-process"
 layer = "workflow"
 
 [skills.markdown-to-pdf]
-commands = ["pandoc", "weasyprint", "pdfinfo"]
+commands = ["pandoc", "weasyprint"]
+optional_commands = ["pdfinfo"]
 effect = "local-write"
 effects = ["local-write"]
 approval_boundaries = ["overwrite-output", "dependency-install"]
@@ -109,12 +112,25 @@ effect = "remote-write"
 layer = "workflow"
 
 [skills.pr-lifecycle]
-commands = ["git", "gh"]
+commands = ["git"]
+optional_commands = ["gh"]
 effect = "remote-write"
 effects = ["local-write", "history-rewrite", "network-read", "remote-write"]
 approval_boundaries = ["version-change", "push", "pr-create"]
 layer = "composer"
 overlaps = ["commit", "squash-commits", "readme-doctor"]
+
+[skills.pr-lifecycle.modes.local-prep]
+effect = "local-write"
+commands = ["git"]
+optional_commands = ["gh"]
+
+[skills.check-antipatterns.modes.source]
+effect = "readonly"
+
+[skills.check-antipatterns.modes.transcript]
+effect = "readonly"
+commands = ["python3"]
 
 [skills.speak]
 commands = ["python3"]
@@ -123,7 +139,6 @@ effects = ["local-process", "audio-output"]
 layer = "workflow"
 
 [skills.check-antipatterns]
-commands = ["python3"]
 effect = "readonly"
 layer = "primitive"
 overlaps = ["analyze-conversation"]
@@ -298,8 +313,9 @@ layer = "workflow"
 overlaps = ["memleak-investigate"]
 
 [skills.tui-web-design-orchestrator]
-effect = "readonly"
+effect = "local-write"
 layer = "workflow"
+membership = "optional-design"
 
 [skills.yore-vocabulary-harvest]
 effect = "local-write"

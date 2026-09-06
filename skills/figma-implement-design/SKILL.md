@@ -23,18 +23,15 @@ This skill provides a structured workflow for translating Figma designs into pro
 
 **Follow these steps in order. Do not skip steps.**
 
-### Step 0: Set up Figma MCP (if not already configured)
+### Step 0: Check Figma access and resolve missing setup
 
-If any MCP call fails because Figma MCP is not connected, pause and set it up:
+Use the existing connection. If a call fails, distinguish unavailable tools or authentication from a wrong node, file-access denial, or transient service error before proposing configuration changes.
 
-1. Add the Figma MCP:
-   - `codex mcp add figma --url https://mcp.figma.com/mcp`
-2. Enable remote MCP client:
-   - Set `[features].rmcp_client = true` in `config.toml` **or** run `codex --enable rmcp_client`
-3. Log in with OAuth:
-   - `codex mcp login figma`
+Design implementation alone does not authorize server registration, client-feature changes, authentication, credential persistence, or a client restart. If those actions are already authorized, carry that authorization forward. Otherwise prepare the exact needed change and ask only for the unresolved action; continue useful repository inspection and other independent preparation meanwhile. Do not invent design details while access is missing.
 
-After successful login, the user will have to restart codex. You should finish your answer and tell them so when they try again they can continue with Step 1.
+For authorized OAuth setup, check the installed client's `codex mcp add --help` and `codex mcp login --help`. Add a missing server with `codex mcp add figma --url https://mcp.figma.com/mcp`, then authenticate with `codex mcp login figma` as needed. Preserve an existing authentication method and organization settings. Do not print credentials or ask the user to paste them into chat.
+
+Verify tool availability and a relevant read call after setup. Reload or restart only when the actual client requires it and that action is authorized; do not end the task solely because an older recipe prescribed a restart. If login or restart requires the user, retain the completed preparation and state the exact remaining step.
 
 ### Step 1: Get Node ID
 

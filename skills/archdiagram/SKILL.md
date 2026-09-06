@@ -6,7 +6,9 @@ argument-hint: "[description] [--type TYPE] [--format FORMAT] [--deep-review] [-
 
 # Architecture Diagram
 
-Generate an architecture diagram based on the current conversation context and/or codebase.
+Generate an architecture diagram based on the current conversation context and/or codebase. The
+selected `--format` controls the returned diagram representation; browser review
+packaging is a separate operation handled by `diagram-review-viewer` when requested.
 
 ## Workflow
 
@@ -130,8 +132,14 @@ digraph {
 ````
 
 If the user requests a format not listed, interpret and produce the closest reasonable output.
+Do not silently switch to Mermaid or an HTML viewer because that format is
+convenient. Preserve the user's selected format, and ask only when the choice
+materially affects the deliverable.
 
-If `--output FILE` is specified, write the diagram source to that file and confirm.
+If `--output FILE` is specified, write the selected diagram representation to
+that file and confirm. Invoke `diagram-review-viewer` separately only when the
+user asks for a browser-review package; that package retains the readable
+Mermaid source and its digest.
 
 ## Type Interpretation
 

@@ -116,6 +116,7 @@ class ConversationData:
     messages: tuple[dict[str, Any], ...]
     event_count: int
     source_format: str
+    coverage: str = "observed"
 
 
 @dataclass(frozen=True)
@@ -131,14 +132,24 @@ class Finding:
 class GoodPractice:
     kind: str
     message_index: int
-    rule: int
+    rule: str
     description: str
 
 
 def load_rules() -> dict[str, Any]:
     """Load the human-facing rule taxonomy."""
     rules_file = Path(__file__).parent / "rules.json"
-    return json.loads(rules_file.read_text(encoding="utf-8"))
+    rules = json.loads(rules_file.read_text(encoding="utf-8"))
+    stable = {item["legacy_id"]: item["id"] for item in load_taxonomy().get("rules", [])}
+    for rule in rules.get("universal_rules", []):
+        if rule.get("id") in stable:
+            rule["stable_id"] = stable[rule["id"]]
+    return rules
+
+
+def load_taxonomy() -> dict[str, Any]:
+    shared = Path(__file__).resolve().parents[2] / "references" / "diagnostic-taxonomy.json"
+    return json.loads(shared.read_text(encoding="utf-8")) if shared.exists() else {"schema_version": 1, "rules": []}
 
 
 def extract_text(content: Any) -> str:
@@ -304,7 +315,7 @@ def normalize_events(events: Sequence[dict[str, Any]]) -> ConversationData:
             for message in [_completed_item_message(event)]
             if message is not None
         )
-        return ConversationData(messages, len(events), "codex-item-completed")
+        return ConversationData(messages, len(events), "codex-item-completed", "observed" if messages else "empty")
 
     if any(event.get("type") == "response_item" for event in events):
         messages = tuple(
@@ -313,12 +324,15 @@ def normalize_events(events: Sequence[dict[str, Any]]) -> ConversationData:
             for message in [_legacy_codex_message(event)]
             if message is not None
         )
-        return ConversationData(messages, len(events), "codex-response-item")
+        return ConversationData(messages, len(events), "codex-response-item", "observed" if messages else "empty")
+
+    if not events:
+        return ConversationData((), 0, "unknown", "empty")
 
     messages = tuple(
         event for event in events if event.get("type") in {"user", "assistant"}
     )
-    return ConversationData(messages, len(events), "claude-message")
+    return ConversationData(messages, len(events), "claude-message", "observed" if messages else "unsupported")
 
 
 def read_conversation(filepath: str | Path) -> ConversationData:
@@ -440,7 +454,7 @@ def check_retry_without_diagnosis(
                         "MEDIUM",
                         f"{first_index}-{second_index}",
                         first,
-                        "Inspect the complete failure evidence before repeating the action.",
+                        "Check whether the repetition follows a failure or is intentional; inspect failure evidence before a blind retry.",
                     )
                 )
     return tuple(findings)
@@ -450,26 +464,21 @@ def check_credential_usage(
     messages: Sequence[dict[str, Any]],
 ) -> tuple[Finding, ...]:
     commands = extract_bash_commands(messages)
-    secret_reads = tuple(
-        index for index, command in commands if "kubectl get secret" in command.lower()
-    )
     findings = []
     for index, command in commands:
         if not _credential_assignment_tokens(command):
             continue
-        has_prior_read = any(
-            0 <= index - secret_index <= 20 for secret_index in secret_reads
-        )
-        if not has_prior_read:
-            findings.append(
-                Finding(
-                    "CREDENTIAL_ASSUMPTION",
-                    "HIGH",
-                    str(index),
-                    "Credential assignment detected (value redacted)",
-                    "Use the authorized secret source and never print the credential value.",
-                )
+        findings.append(
+            Finding(
+                "CREDENTIAL_ASSUMPTION",
+                "HIGH",
+                str(index),
+                "Credential assignment detected (value redacted)",
+                "Check whether this is a placeholder or an authorized credential reference. "
+                "Use the project's authorized source; never print credential values. "
+                "The assignment alone does not establish exposure or lack of authorization.",
             )
+        )
     return tuple(findings)
 
 
@@ -506,7 +515,7 @@ def check_preflight_missing(
                     "HIGH",
                     str(index),
                     command,
-                    "Verify the relevant services and dependencies before the integration run.",
+                    "Check whether this run needs service preflight and whether it occurred outside the visible window.",
                 )
             )
     return tuple(findings)
@@ -733,8 +742,9 @@ def check_destructive_command_safety(
                     str(index),
                     f"{operation}: {' '.join(targets) or 'target not recoverable from command'}",
                     (
-                        "Resolve the exact target, prove its expected identity and containment, "
-                        "reject roots/symlinks, and prefer a recoverable move or backup."
+                        "Check prior authorization and guards for the exact target, its identity, containment, "
+                        "and recovery, including root and symlink risks. Prefer recoverable actions where feasible. "
+                        "The command alone does not establish that guards are absent."
                     ),
                 )
             )
@@ -748,23 +758,13 @@ def identify_good_practices(
     practices = []
 
     for index, command in commands:
-        lowered = command.lower()
-        if "kubectl get secret" in lowered and "base64 -d" in lowered:
-            practices.append(
-                GoodPractice(
-                    "CREDENTIAL_FROM_SECRET",
-                    index,
-                    1,
-                    "Used an authorized secret read instead of hardcoding.",
-                )
-            )
         if is_diagnostic_command(command):
             practices.append(
                 GoodPractice(
                     "DIAGNOSTIC_BEFORE_RETRY",
                     index,
-                    2,
-                    "Ran a diagnostic command before deciding on another action.",
+                    "DIAG-002",
+                    "Ran a diagnostic command; its relevance to a retry needs review.",
                 )
             )
 
@@ -778,8 +778,8 @@ def identify_good_practices(
                 GoodPractice(
                     "SCOPE_CONFIRMATION",
                     index,
-                    3,
-                    "Made an authority or scope boundary explicit.",
+                    "DIAG-003",
+                    "Mentioned an authority or scope boundary; applicability needs review.",
                 )
             )
 
@@ -798,10 +798,14 @@ def generate_report(
     good_practices: Sequence[GoodPractice],
     rules: dict[str, Any],
 ) -> str:
-    lines = ["Analyzing current conversation for anti-patterns...", ""]
+    lines = [
+        "Analyzing current conversation for anti-patterns...", "",
+        "Heuristic candidates require review against the full conversation and active instructions. "
+        "Severity indicates review priority, not proof of a violation or authority to stop.", "",
+    ]
 
     if findings:
-        lines.extend((f"WARNINGS ({len(findings)} found):", ""))
+        lines.extend((f"CANDIDATES ({len(findings)} found):", ""))
         for number, finding in enumerate(
             sorted(findings, key=lambda item: SEVERITY_ORDER.get(item.severity, 3)),
             1,
@@ -816,20 +820,21 @@ def generate_report(
                 if len(safe_evidence) > 160:
                     safe_evidence = safe_evidence[:157] + "..."
                 lines.append(f"   - Evidence: {safe_evidence}")
-            lines.append(f"   - Correction: {finding.suggestion}")
+            lines.append(f"   - Review: {finding.suggestion}")
             lines.append("")
     else:
         lines.extend(("No heuristic warnings found.", ""))
 
     unique_practices = {practice.kind: practice for practice in good_practices}
     if unique_practices:
-        lines.extend((f"GOOD PRACTICES ({len(unique_practices)} observed):", ""))
+        lines.extend((f"OBSERVED PRACTICES ({len(unique_practices)} observed):", ""))
         for number, practice in enumerate(unique_practices.values(), 1):
             rule = next(
                 (
                     item
                     for item in rules.get("universal_rules", [])
                     if item.get("id") == practice.rule
+                    or item.get("stable_id") == practice.rule
                 ),
                 None,
             )
@@ -842,24 +847,15 @@ def generate_report(
                 lines.append(f"   - Related rule {practice.rule}: {rule['rule']}")
             lines.append("")
 
-    severities = {finding.severity for finding in findings}
     lines.append("COURSE CORRECTION:")
-    if "HIGH" in severities:
-        lines.append(
-            "  - Stop the affected action until the high-severity finding is resolved."
-        )
-    elif "MEDIUM" in severities:
-        lines.append(
-            "  - Correct or explicitly adjudicate medium-severity findings before continuing."
-        )
-    elif findings:
-        lines.append(
-            "  - Low-severity findings do not automatically block continued work."
-        )
-    else:
-        lines.append(
-            "  - No transcript-level correction is required by these heuristics."
-        )
+    lines.append(
+        "  - Review the cited evidence, including prior authorization, normal test cycles, "
+        "and checks outside the visible window. Continue authorized work."
+    )
+    lines.append(
+        "  - If evidence establishes a current authority or safety violation, pause the "
+        "affected action under that applicable boundary; a HIGH label alone does not require a stop."
+    )
     lines.append(
         f"  - Heuristic signal score: {heuristic_signal_score(findings)}% "
         f"across {len(IMPLEMENTED_CHECKS)} implemented checks"
@@ -903,8 +899,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     print(
         f"Loaded {data.event_count} events as {len(data.messages)} normalized "
-        f"messages ({data.source_format})."
+        f"messages ({data.source_format}; coverage={data.coverage})."
     )
+    if data.coverage != "observed":
+        print("No successful analysis: transcript coverage is " + data.coverage + "; select a supported readable transcript.")
+        return 2
     findings, good_practices = analyze(data, args.lookback)
     print()
     print(generate_report(findings, good_practices, load_rules()))

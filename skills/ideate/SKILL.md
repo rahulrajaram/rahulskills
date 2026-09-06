@@ -16,7 +16,8 @@ recipe before calling a backend.
 
 1. Parse the seed, creativity, depth, backend, selection, output, and timeout
    options using the operation recipe.
-2. Run only through `~/.local/bin/gptengage ideate`. Keep the default sigma 1,
+2. Resolve the authorized existing `gptengage` executable and run only its
+   `ideate` operation. Keep the default sigma 1,
    depth 2, and Claude backend unless the user supplied alternatives.
 3. Capture the full tree, validate JSON output when requested, and distinguish
    backend failure from partial tree generation.

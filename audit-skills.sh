@@ -116,6 +116,7 @@ for name, entry in sorted(skills.items()):
     effect = entry.get("effect")
     layer = entry.get("layer")
     commands = entry.get("commands", [])
+    optional_commands = entry.get("optional_commands", [])
     if not isinstance(effect, str) or not effect.strip():
         problems.append(f"skills.{name}: missing non-empty effect")
     if layer not in allowed_layers:
@@ -125,6 +126,10 @@ for name, entry in sorted(skills.items()):
         isinstance(command, str) and command for command in commands
     ):
         problems.append(f"skills.{name}: commands must be a list of non-empty strings")
+    if not isinstance(optional_commands, list) or not all(
+        isinstance(command, str) and command for command in optional_commands
+    ):
+        problems.append(f"skills.{name}: optional_commands must be a list of non-empty strings")
 
 scoped_bash = re.compile(r"Bash\(([^:(),]+):\*\)")
 prohibited_preapprovals = {"curl", "rm"}
@@ -140,7 +145,13 @@ for overlay in sorted(overlay_dir.glob("*.yml")):
         problems.append(
             f"{overlay}: unsafe preapproved command(s): {', '.join(prohibited)}"
         )
-    undeclared = sorted(granted - set(entry.get("commands", [])))
+    declared_commands = set(entry.get("commands", []))
+    declared_commands.update(entry.get("optional_commands", []))
+    for mode in entry.get("modes", {}).values():
+        if isinstance(mode, dict):
+            declared_commands.update(mode.get("commands", []))
+            declared_commands.update(mode.get("optional_commands", []))
+    undeclared = sorted(granted - declared_commands)
     if undeclared:
         problems.append(
             f"{overlay}: scoped Bash command(s) absent from catalog: "

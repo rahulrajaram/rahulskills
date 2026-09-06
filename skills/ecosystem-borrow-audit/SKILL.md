@@ -9,7 +9,21 @@ argument-hint: "[scope-root] [--sigma LIST] [--cli claude|codex|gemini]"
 All gptengage calls follow
 [`../../references/gptengage-invocation.md`](../../references/gptengage-invocation.md).
 
-Run a repeatable ecosystem audit across `${WORKSPACE_ROOT:-$HOME/Documents}` and produce an evidence-backed backlog of borrowable components, missed opportunities, and ideation-driven follow-ups.
+## Intent and applicability
+
+Produce a repository-evidenced backlog for the supplied ecosystem scope. Generic
+inferred ecosystem/borrowing analysis defaults to evidence-only. A bare explicit
+`/ecosystem-borrow-audit` preserves the full historical workflow, including
+`0.25, 0.5, 1, 1.5` ideation, unless the user selects evidence-only. Explicit
+external ideation follows the shared invocation authority/data contract.
+
+## Non-goals and must not
+
+Do not widen a named-repository scope to the whole workspace, install tooling,
+invoke a second paid call for formatting, or present model ideas as source facts.
+Required investigation and local report preparation remain autonomous. Resolve
+only material scope/provider/data/spend decisions left unsettled; reuse grants.
+
 
 ## Inputs
 
@@ -23,9 +37,11 @@ Extract from user request:
 ## Workflow
 
 1. Normalize paths and scope.
-- Verify listings path exists; correct typo if user wrote `Documetns`.
-- Enumerate all depth-1 git repos under `$WORKSPACE_ROOT` (a directory
-  qualifies ONLY if it contains `.git`).
+- Use supplied paths and validate them. A missing optional listings file does
+  not block repository inspection. Do not silently repair an ambiguous path.
+- Enumerate repositories within the selected scope/depth. Use `git -C PATH
+  rev-parse --show-toplevel` and compare resolved roots to recognize ordinary
+  repositories and linked worktrees without counting arbitrary nested folders.
 - Build unified catalog: listings entries + git repos. Listings entries that
   are not git repos are contextual only: never scanned, scored, or ranked.
 
@@ -61,19 +77,36 @@ Extract from user request:
 - Rank by impact, effort, risk, and dependency ordering.
 - Include explicit next actions and validation checks.
 
-6. Run ideate sweeps independently per sigma.
-- Check availability first:
+6. Only in selected external-ideation mode, run sweeps independently per sigma.
+- Resolve the existing `gptengage` command and verify relevant help. Choose a
+  unique private artifact directory before execution. Do not use a shared fixed
+  `/tmp/ecosystem_audit` directory or embed arbitrary seed text in shell code.
+- For each distinct selected sigma, invoke **once** with `--output json`, the
+  selected CLI/depth and per-invocation timeout. Capture stdout, stderr and exit
+  status separately. For example, bind reviewed values before executing:
+
 ```bash
-timeout 120 ~/.local/bin/gptengage status 2>&1
+if "$GPTENGAGE" ideate "$SEED" --sigma "$SIG" --depth "$DEPTH" \
+    --output json --cli "$CLI" --timeout "$CALL_TIMEOUT" \
+    > "$RUN_DIR/$INDEX.json" 2> "$RUN_DIR/$INDEX.stderr"; then
+  status=0
+else
+  status=$?
+fi
+printf '%s\n' "$status" > "$RUN_DIR/$INDEX.exit"
 ```
-- Run each sigma independently and save both JSON and text output:
-```bash
-SEED="<user-seed>"
-for SIG in 0.25 0.5 1 1.5; do
-  timeout 600 ~/.local/bin/gptengage ideate "$SEED" --sigma "$SIG" --depth 2 --output json --cli <CLI> --timeout 300 2>&1 | tee "/tmp/ecosystem_audit/ideate_sigma_${SIG}_json.out"
-  timeout 600 ~/.local/bin/gptengage ideate "$SEED" --sigma "$SIG" --depth 2 --output text --cli <CLI> --timeout 300 2>&1 | tee "/tmp/ecosystem_audit/ideate_sigma_${SIG}_text.out"
-done
-```
+
+- Increment a safe numeric `INDEX` per selected sigma and record the sigma/file
+  mapping. Validate successful stdout as one JSON document. Render that saved
+  result locally into readable Markdown/text; never invoke another model just
+  to obtain the same run's alternate format. Preserve failed outputs as failure
+  evidence, not valid ideas. Even exit zero may contain partial expansions:
+  inspect stderr/coverage and report missing branches.
+- A per-call timeout is not a total sweep deadline. Account for sequential levels,
+  concurrent waves and cleanup when setting an outer supervisor deadline; omit
+  an arbitrary shorter outer timeout if no reliable total bound is known. If an
+  explicit total deadline is required, use supervision that terminates children
+  and records interruption. Do not silently substitute a backend after failure.
 
 7. Merge ideation with repo-grounded findings.
 - Deduplicate themes.
@@ -89,17 +122,14 @@ Return:
 1. Coverage summary (counts + scope)
 2. Ranked backlog (impact/effort/risk)
 3. Missed previously section
-4. Ideate summary by sigma
+4. Ideate summary by sigma when selected, otherwise evidence-only mode
 5. Artifact paths to raw scans and ideate outputs
 
 ## Guardrails
 
 - Keep analysis evidence-backed with file paths and commands.
-- Git-only rule: any directory without `.git` is EXCLUDED from tier-1/tier-2
-  scanning, scoring, and ranking, even if it appears in listings.txt. Include
-  such entries as contextual only (never score them).
-- Verify at the end: every catalog entry must pass `[ -d "$d/.git" ]`; report
-  the assertion result (e.g. `133 git repos, 0 missing-git entries`).
+- Verify scoped repository identity with Git, including `.git` files used by
+  worktrees; report nonrepository listings as contextual and all skipped coverage.
 - If `gptengage` fails, report error and suggest:
 ```bash
 ~/.local/bin/gptengage status

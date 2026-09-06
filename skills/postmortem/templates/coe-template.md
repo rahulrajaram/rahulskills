@@ -21,9 +21,9 @@
 | HH:MM:SS | [First indication of problem] |
 | HH:MM:SS | [Detection/Alert triggered] |
 | HH:MM:SS | [Investigation started] |
-| HH:MM:SS | [Root cause identified] |
-| HH:MM:SS | [Mitigation applied] |
-| HH:MM:SS | [Service restored] |
+| [Time or unknown] | [Supported cause identified, if observed] |
+| [Time or unknown] | [Mitigation applied, if observed] |
+| [Time or unknown] | [Service restored, if observed] |
 | HH:MM:SS | [Post-incident review] |
 
 ---
@@ -33,23 +33,10 @@
 ### Problem 1: [Primary Problem Statement]
 
 **Why did [symptom] happen?**
-→ [Answer 1]
+→ [Supported explanation, evidence source, or explicit unknown]
 
-**Why did [Answer 1] happen?**
-→ [Answer 2]
-
-**Why did [Answer 2] happen?**
-→ [Answer 3]
-
-**Why did [Answer 3] happen?**
-→ [Answer 4]
-
-**Why did [Answer 4] happen?**
-→ [Answer 5 - ROOT CAUSE]
-
-### Problem 2: [Secondary Problem Statement] (if applicable)
-
-[Repeat 5-whys structure]
+[Continue or branch only while evidence supports a useful causal link. No fixed
+number of whys and no required process cause. Distinguish hypotheses from causes.]
 
 ---
 
@@ -78,10 +65,10 @@
 
 ## Action Items
 
-### Immediate (P0) - Completed
+### Immediate (P0) - Proposed or observed status
 | # | Action | Owner | Status |
 |---|--------|-------|--------|
-| AI-1 | [Immediate fix applied] | [Name] | ✅ Done |
+| AI-1 | [Proposed action or observed mitigation] | [Name] | [Planned/Unknown; Done only with execution evidence] |
 
 ### Short-term (P1) - This Sprint
 | # | Action | Owner | Status |

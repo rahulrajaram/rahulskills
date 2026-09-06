@@ -34,7 +34,8 @@ inspect than the original code.
    editing.
 5. Make one coherent transformation at a time.
 6. Run the narrowest reliable tests after each transformation.
-7. Run the subsystem's broader verification once focused tests pass.
+7. Run broader verification only for changed risk, missing coverage, a failure,
+   or an existing required gate; passing a focused test alone does not trigger it.
 
 ## Clean-code vetoes
 

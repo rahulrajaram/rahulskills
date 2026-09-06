@@ -16,13 +16,30 @@ This skill is guidance only. Rust admission, the compiled bundle, and the run
 journal remain authority.
 
 When this repository-local skill is unavailable, emit the same installed guide
-with `metabuilder harness qualification guide`.
+with `metabuilder qualify guide`.
 
 Use the installed `metabuilder` CLI for every governed operation. MetaBuilder
 does not currently expose an MCP server, and this qualification does not
 require one. Do not substitute an uncommitted development binary for the
 installed consumer build unless the MetaBuilder maintainer has explicitly
 admitted and identified those exact bytes.
+
+## Entry and authority
+
+Select inspection or execution from the user's request. An inspection request
+permits relevant reads and assessment of existing artifacts; it does not select
+a fresh run. Reuse the handed-off executable identity, help/guide evidence,
+exact agreed brief, approvals, and grants when still valid. Recheck changed
+inputs or constraints, and preserve named-owner ratification for any changed
+formal design. Do not repeat a settled interview or approval merely because
+qualification is a separate skill.
+
+Before run authoring or effect application, verify that existing authority
+covers the concrete artifacts, run root, processes, bounds, and effects. Brief
+acceptance and a valid bundle establish design/admission facts, not these
+execution grants. If a grant or consequential decision is missing, prepare the
+concrete request and continue independent inspection; hold the dependent action.
+A model's assessment or a passing report cannot supply human ratification.
 
 ## Contract boundary
 
@@ -159,12 +176,15 @@ the target.
 
 ## Run the qualification
 
-Use the installed binary:
+For an execution request with the required grants, use the installed binary.
+Reuse an unchanged admitted bundle from the handoff; compile/check below only
+when that evidence needs establishing or refreshing. Reuse current CLI/guide
+verification rather than rerunning it solely for the phase change:
 
 ```bash
 command -v metabuilder
 metabuilder --help
-metabuilder harness qualification guide
+metabuilder qualify guide
 RUN_ROOT=/absolute/path/outside/the/repository/consumer-run
 metabuilder harness compile \
   --input metabuilder.consumer.json > metabuilder.bundle.json
@@ -219,7 +239,7 @@ Prepare the exact attestation subject after the run reaches the boundary being
 assessed:
 
 ```bash
-metabuilder harness qualification prepare \
+metabuilder qualify prepare \
   --bundle metabuilder.bundle.json \
   --run-root "$RUN_ROOT" \
   > metabuilder.qualification-preparation.json
@@ -229,7 +249,7 @@ Emit the attestation template, then copy the preparation's
 `subject.subject_digest` into every requirement entry:
 
 ```bash
-metabuilder harness qualification template \
+metabuilder qualify template \
   --kind attestations > metabuilder.attestations.json
 ```
 
@@ -241,12 +261,12 @@ evidence. Actor labels are content-bound but unauthenticated.
 Create and verify the MetaBuilder-owned report:
 
 ```bash
-metabuilder harness qualification report \
+metabuilder qualify report \
   --bundle metabuilder.bundle.json \
   --run-root "$RUN_ROOT" \
   --attestations metabuilder.attestations.json \
   > metabuilder.report.json
-metabuilder harness qualification check \
+metabuilder qualify check \
   --bundle metabuilder.bundle.json \
   --run-root "$RUN_ROOT" \
   --attestations metabuilder.attestations.json \
