@@ -6,7 +6,9 @@ argument-hint: "[package-path]"
 
 # Python Package Decomposition — Structural Split Methodology
 
-You are performing a comprehensive structural decomposition of a Python package into multiple independent projects. Work through each phase sequentially, producing reports and awaiting user confirmation before modifying code.
+You are performing a comprehensive structural decomposition of a Python package into multiple independent projects. Work through the phases using existing decisions and proportionate evidence.
+Resolve target boundaries/public APIs/distribution/dependency changes before their
+dependent edits; do not request confirmation again at every phase.
 
 ## Setup
 
@@ -69,7 +71,8 @@ Write to `./package-decomposition/phase0-dependency-model.md`:
 - All circular chains are identified.
 - Runtime couplings are inventoried with file:line references.
 
-**Present the Phase 0 report to the user and ask for confirmation before proceeding.**
+Present the dependency findings and continue preparing the target design; ask
+only for material unresolved scope or access choices.
 
 ---
 
@@ -127,7 +130,8 @@ Write to `./package-decomposition/phase1-target-architecture.md`:
 - Public APIs are explicitly defined.
 - All runtime couplings have a migration strategy.
 
-**Present the Phase 1 report to the user and ask for confirmation before proceeding.**
+Present concrete target boundaries, compatibility and dependency effects. Proceed
+with still-valid approval; ask only for unresolved consequential choices.
 
 ---
 
@@ -162,7 +166,8 @@ Write to `./package-decomposition/phase1-target-architecture.md`:
    - Each future project's tests should only import from public APIs + test utils.
 
 ### Hard Constraints
-- Tests MUST pass after every individual refactoring step.
+- Verify each coherent refactoring slice with focused checks. Preserve the
+  per-project isolation and combined integration gates before final completion.
 - No behavioral changes — refactoring only.
 - Do not move files between directories yet (that is Phase 3).
 - Commit after each logical step with a descriptive message.
@@ -195,7 +200,8 @@ Write to `./package-decomposition/phase2-refactoring-log.md`:
        tests/
        README.md
      ```
-   - Use modern pyproject.toml (no setup.py).
+   - Preserve the supported packaging backend/layout unless a reviewed migration
+     selects a change; the layout above is an example, not a backend mandate.
    - Pin sibling project dependencies appropriately.
 
 2. **Move files preserving git history**
@@ -213,8 +219,9 @@ Write to `./package-decomposition/phase2-refactoring-log.md`:
    - Update any path-based configuration files.
 
 ### Hard Constraints
-- Use `git mv` for ALL file moves (preserves history).
-- Never copy-and-delete (loses git history).
+- Prefer `git mv` for tracked moves and retain a source/destination map. Git
+  recognizes renames from snapshots; `git mv` alone does not guarantee history
+  continuity, and copy/delete staging does not inherently erase history.
 - String-based module paths are just as critical as import statements.
 - Each project must be independently installable.
 
@@ -231,7 +238,8 @@ Write to `./package-decomposition/phase3-split-log.md`:
 - String path updates.
 - Entry point migrations.
 
-**Ask user to review the split before proceeding to verification.**
+Verify the authorized split before presenting it for review; verification is not
+a new approval boundary unless it needs new access or dependency installation.
 
 ---
 
@@ -241,8 +249,9 @@ Write to `./package-decomposition/phase3-split-log.md`:
 
 Creating environments is local state and installing declared dependencies can
 download packages and execute build hooks. First show the exact environment
-paths, package sources, and install commands; obtain explicit approval before
-creating environments or installing/removing dependencies. Until approved, run
+paths, package sources, and install commands; reuse valid approval for the concrete dependency/source changes; ask for
+unresolved installation/removal authority. Creating an isolated local environment
+without downloading dependencies may proceed within existing local authority. Until approved, run
 only checks supported by already-present environments and report the gap.
 
 ### Steps
@@ -290,7 +299,10 @@ Write to `./package-decomposition/phase4-verification-report.md`:
 - **Be methodical.** Each phase builds on the previous one. Do not skip phases.
 - **Be conservative.** When in doubt, do less and ask the user.
 - **Preserve git history.** Use `git mv`, never copy-delete.
-- **Tests are the safety net.** Run tests after every change in Phases 2-4.
+- **Tests are the safety net.** Run focused checks per coherent slice in Phases
+  2-4, and the required isolation/integration checks before completion.
 - **Reports first, changes second.** Always produce the analysis report before making modifications.
-- **Gate on user confirmation.** Never proceed from Phase 0 to 1 to 2 to 3 without user approval of the previous phase's output.
+- **Gate consequential restructuring.** Do not perform Phase 3 file moves or
+  public distribution changes until the relevant design and authority choices
+  are settled; routine analysis and verification may continue autonomously.
 - **Handle edge cases:** namespace packages, compiled extensions (.so/.pyd), generated code, vendored dependencies.

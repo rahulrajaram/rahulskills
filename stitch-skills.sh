@@ -5,6 +5,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_DIR="$ROOT_DIR/skills"
 OVERLAYS_DIR="$ROOT_DIR/overlays"
 BUILD_DIR="$ROOT_DIR/build"
+ISOLATED_OUTPUT=0
+SELECTION_ARGS=()
+REMOVAL_ARGS=()
+SELECTOR="$ROOT_DIR/scripts/skill_profiles.py"
+CODEX_ROOT="$HOME/.codex"
+CLAUDE_ROOT="$HOME/.claude"
 
 CODEX_INSTALL="$HOME/.codex/skills"
 CLAUDE_SKILLS_INSTALL="$HOME/.claude/skills"
@@ -128,14 +134,28 @@ replace_installed_skill() {
 
 usage() {
     cat <<'USAGE'
-Usage: stitch-skills.sh <command>
+Usage: stitch-skills.sh <command> [options]
 
 Commands:
-  repo-layout   Validate skills/ and overlays/ directories exist
-  assemble      Build assembled output in build/ from skills/ + overlays/
-  install       Assemble, then copy build/ output to install locations
-  check         Freshly assemble, then compare against installed output
+  repo-layout   Validate canonical source layout
+  assemble      Build selected skills; --output requires a fresh destination
+  preview       Read-only install migration preview using isolated assembly
+  install       Assemble and apply selected additions/owned updates
+  check         Compare selected assembly with installed skills
   all           repo-layout + install + check
+
+Options:
+  --profile core|design|all   Select a profile (repeatable; default core)
+  --skill NAME               Add an individual skill (alone selects only it)
+  --output PATH              Assemble into a new isolated path, never replace it
+  --codex-root PATH          Codex runtime root (default ~/.codex)
+  --claude-root PATH         Claude runtime root (default ~/.claude)
+  --remove NAME              Explicitly remove an unselected owned skill
+
+Core excludes Figma and the UI prompt generator. Profile drift never removes
+installed copies. Preview lists additions, updates, retained entries, requested
+removals and ownership conflicts. User-managed/modified copies are preserved.
+
 USAGE
     exit 1
 }
@@ -263,6 +283,7 @@ assemble_skills_into() {
 
     local skill_dir skill_name manifest cli overlay_file
     local fm body merged
+    mkdir -p "$output_root/codex/skills" "$output_root/claude/skills"
 
     for skill_dir in "$SKILLS_DIR"/*/; do
         [[ -d "$skill_dir" ]] || continue
@@ -277,6 +298,9 @@ assemble_skills_into() {
         body="$(extract_body "$manifest")"
 
         for cli in "${CLIS[@]}"; do
+            local selection
+            if [[ "$cli" == "codex" ]]; then selection="$CODEX_SELECTION"; else selection="$CLAUDE_SELECTION"; fi
+            [[ $'\n'"$selection"$'\n' == *$'\n'"$skill_name"$'\n'* ]] || continue
             if is_runtime_excluded "$cli" "$skill_name"; then
                 echo "  SKIP [$cli] runtime-owned conflict: $skill_name"
                 continue
@@ -343,6 +367,22 @@ assemble_skills() {
     local stage backup_root
 
     ensure_repo_layout
+    if [[ "$ISOLATED_OUTPUT" -eq 1 ]]; then
+        if [[ -e "$BUILD_DIR" || -L "$BUILD_DIR" ]]; then
+            printf 'ERROR: isolated output must not already exist: %s\n' "$BUILD_DIR" >&2
+            return 1
+        fi
+        [[ -d "$(dirname "$BUILD_DIR")" ]] || {
+            printf 'ERROR: isolated output parent must exist\n' >&2; return 1;
+        }
+        # Canonical parent prevents writes through a redirected final path.
+        BUILD_DIR="$(realpath -e "$(dirname "$BUILD_DIR")")/$(basename "$BUILD_DIR")"
+        stage="$(mktemp -d "$(dirname "$BUILD_DIR")/.skills-stage.XXXXXX")"
+        assemble_skills_into "$stage"
+        mv -T -n -- "$stage" "$BUILD_DIR"
+        [[ ! -e "$stage" ]] || { printf 'ERROR: output appeared during assembly\n' >&2; return 1; }
+        return
+    fi
     assert_exact_build_target
     stage="$(mktemp -d "$ROOT_DIR/.build-stage.XXXXXX")"
     # Invoke directly so `set -e` remains effective inside the function. A
@@ -363,57 +403,33 @@ assemble_skills() {
     echo "Published assembled output: $BUILD_DIR"
 }
 
+migration_for_runtime() {
+    local operation="$1" runtime="$2" destination="$3"
+    shift 3
+    python3 "$SELECTOR" "$operation" --root "$ROOT_DIR" --runtime "$runtime" \
+        --source "$BUILD_DIR/$runtime" --destination "$destination" \
+        "${SELECTION_ARGS[@]}" "${REMOVAL_ARGS[@]}" "$@"
+}
+
 install_skills() {
-    ensure_repo_layout
     assemble_skills
+    # Check both ownership boundaries before changing either runtime.
+    migration_for_runtime preview codex "$CODEX_ROOT" --require-safe
+    migration_for_runtime preview claude "$CLAUDE_ROOT" --require-safe
+    migration_for_runtime apply codex "$CODEX_ROOT"
+    migration_for_runtime apply claude "$CLAUDE_ROOT"
+}
 
-    echo ""
-    echo "Installing from assembled output ..."
-
-    local skill_name installed=0 codex_backup_root claude_backup_root
-
-    # Codex: replace managed skills with backups; leave others untouched.
-    # NOT ~/.agents/skills: pi scans that global dir and would report a
-    # duplicate-name collision for every codex copy.
-    assert_install_root "$CODEX_INSTALL" "$HOME/.codex/skills" "Codex"
-    mkdir -p "$CODEX_INSTALL"
-    codex_backup_root="$(
-        new_backup_root "$(dirname "$CODEX_INSTALL")/skill-backups" codex
-    )"
-    for skill_dir in "$BUILD_DIR/codex/skills"/*/; do
-        [[ -d "$skill_dir" ]] || continue
-        skill_name="$(basename "$skill_dir")"
-        replace_installed_skill \
-            "$skill_dir" "$CODEX_INSTALL" "$codex_backup_root" "$skill_name"
-        installed=$((installed + 1))
-    done
-    echo "  Codex: $installed skills -> $CODEX_INSTALL"
-    if [[ -d "$BUILD_DIR/codex/references" ]]; then
-        mkdir -p "$(dirname "$CODEX_INSTALL")/references"
-        cp -a "$BUILD_DIR/codex/references/." "$(dirname "$CODEX_INSTALL")/references/"
+preview_install() {
+    if [[ "$ISOLATED_OUTPUT" -eq 0 ]]; then
+        local preview_root
+        preview_root="$(mktemp -d "${TMPDIR:-/tmp}/rahulskills-preview.XXXXXX")"
+        BUILD_DIR="$preview_root/output"
+        ISOLATED_OUTPUT=1
     fi
-
-    # Claude: replace managed skills with backups; leave others untouched.
-    assert_install_root "$CLAUDE_SKILLS_INSTALL" "$HOME/.claude/skills" "Claude"
-    mkdir -p "$CLAUDE_SKILLS_INSTALL"
-    claude_backup_root="$(
-        new_backup_root "$(dirname "$CLAUDE_SKILLS_INSTALL")/skill-backups" claude
-    )"
-    installed=0
-    for skill_dir in "$BUILD_DIR/claude/skills"/*/; do
-        [[ -d "$skill_dir" ]] || continue
-        skill_name="$(basename "$skill_dir")"
-        replace_installed_skill \
-            "$skill_dir" "$CLAUDE_SKILLS_INSTALL" "$claude_backup_root" "$skill_name"
-        installed=$((installed + 1))
-    done
-    echo "  Claude skills: $installed skills -> $CLAUDE_SKILLS_INSTALL"
-    if [[ -d "$BUILD_DIR/claude/references" ]]; then
-        mkdir -p "$(dirname "$CLAUDE_SKILLS_INSTALL")/references"
-        cp -a "$BUILD_DIR/claude/references/." "$(dirname "$CLAUDE_SKILLS_INSTALL")/references/"
-    fi
-
-    echo "Done."
+    assemble_skills
+    migration_for_runtime preview codex "$CODEX_ROOT"
+    migration_for_runtime preview claude "$CLAUDE_ROOT"
 }
 
 check_sync() {
@@ -460,16 +476,41 @@ check_sync() {
 
 main() {
     [[ $# -lt 1 ]] && usage
-
-    case "$1" in
+    local command="$1"
+    shift
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --profile|--skill)
+                [[ $# -ge 2 ]] || usage
+                SELECTION_ARGS+=("$1" "$2"); shift 2 ;;
+            --remove)
+                [[ $# -ge 2 ]] || usage
+                REMOVAL_ARGS+=("$1" "$2"); shift 2 ;;
+            --output)
+                [[ $# -ge 2 ]] || usage
+                BUILD_DIR="$2"; ISOLATED_OUTPUT=1; shift 2 ;;
+            --codex-root)
+                [[ $# -ge 2 ]] || usage
+                CODEX_ROOT="$2"; CODEX_INSTALL="$2/skills"; shift 2 ;;
+            --claude-root)
+                [[ $# -ge 2 ]] || usage
+                CLAUDE_ROOT="$2"; CLAUDE_SKILLS_INSTALL="$2/skills"; shift 2 ;;
+            *) usage ;;
+        esac
+    done
+    CODEX_SELECTION="$(python3 "$SELECTOR" select --root "$ROOT_DIR" --runtime codex "${SELECTION_ARGS[@]}")"
+    CLAUDE_SELECTION="$(python3 "$SELECTOR" select --root "$ROOT_DIR" --runtime claude "${SELECTION_ARGS[@]}")"
+    case "$command" in
         repo-layout) ensure_repo_layout ;;
-        assemble)    assemble_skills ;;
-        install)     install_skills ;;
-        check)       check_sync ;;
+        assemble) assemble_skills ;;
+        preview) preview_install ;;
+        install) install_skills ;;
+        check) check_sync ;;
         all)
             ensure_repo_layout
             install_skills
-            check_sync
+            # Isolated output is already fresh; do not rebuild over it.
+            if [[ "$ISOLATED_OUTPUT" -eq 0 ]]; then check_sync; fi
             ;;
         *) usage ;;
     esac

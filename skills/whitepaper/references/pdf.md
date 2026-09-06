@@ -5,28 +5,40 @@ pandoc + weasyprint and locally embedded fonts.
 
 ## Commands
 
-Check tools: `pandoc`, `weasyprint`, `pdfinfo`.
+Check the tools actually used: `pandoc`, `weasyprint`, `pdfinfo`, and
+`pdffonts`; check `dot` or `pdftoppm` only when their optional paths are selected.
+Missing tools do not authorize installation. Report the unavailable step and
+finish independent source/style preparation.
 
-Download fonts (modern UA returns variable fonts; specific weights per weight
-via an old-style UA). Put font files in a `fonts/` dir next to the `.css`.
+Resolve CSS from the explicit stylesheet or project-declared document style;
+do not assume a generic `resume.css` is appropriate. Reuse existing local fonts.
+New font downloads need the relevant source/path authority; see `branding.md`
+only if font selection is part of the request. Honor the requested page size and
+length; a paragraph or investor audience alone does not select PDF generation.
+
+For regeneration, reuse existing output-replacement authority. Render to a new
+temporary PDF beside the destination, verify it, then replace the authorized
+output. Ask only when replacement authority is unresolved; do not overwrite
+unrelated files or claim that rendering succeeded from command launch alone.
 
 Build:
 
 ```bash
-pandoc whitepaper.md -o whitepaper.pdf \
+pandoc whitepaper.md -o whitepaper.preview.pdf \
   --pdf-engine=weasyprint --css style.css --metadata title=""
 ```
 
 `--metadata title=""` suppresses pandoc fabricating a title from the file
 name (weasyprint shows a benign "nonempty title" warning; harmless).
 
-Verify: `pdfinfo whitepaper.pdf | grep Pages`, and
-`pdffonts whitepaper.pdf` to confirm the expected fonts are embedded (no
+Verify: `pdfinfo whitepaper.preview.pdf`, and
+`pdffonts whitepaper.preview.pdf` to confirm the expected fonts are embedded (no
 DejaVu fallback beyond a stray glyph count).
 
 ## The stylesheet essentials
 
-- `@page { size: A4; margin: ...; }` plus a footer page counter.
+- `@page` with the selected paper size and margins; add a footer page counter
+  when appropriate.
 - `@font-face` for every weight/family with `src: url('fonts/…')`.
 - A `.brand` span for the product name, `.tld` for the domain (so name and
   `.ai` can be styled independently). **Let the CSS drive styling**, not the
@@ -49,8 +61,8 @@ DejaVu fallback beyond a stray glyph count).
 - **WeasyPrint warns** about `text-rendering: optimizeLegibility`, `@media
   (max-width:…)`, and `overflow-x: auto` from pandoc's default stylesheet —
   these are benign. Don't chase them.
-- **Tables:** the repo's default stripe/header styling change the page count
-  by ~10%; check pagination after adding CSS.
+- **Tables:** check pagination and clipping after applying the selected CSS;
+  do not assume a fixed percentage change from another project.
 
 ## Diagrams
 
@@ -59,6 +71,7 @@ sharp PDF. Keep labels short; name edges on the arrows where possible.
 
 ## Open / deliver
 
-Open the PDF in the default viewer with `xdg-open`. Report page count and the
+Open the PDF with `xdg-open` when opening is requested and the tool is available.
+After verification, replace the authorized output. Report page count and the
 output path. Keep the `.md` and `.css` next to the `.pdf` so it stays
 editable.

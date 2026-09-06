@@ -6,164 +6,122 @@ argument-hint: "<term> [<term>...]"
 
 # Reference Cleaner
 
-Before history mutation, follow
+Before history mutation, read and follow
 [`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md).
-This skill adds sanitization rules; the shared approval, backup, verification,
-and rollback contract is authoritative.
+The shared scope, independent backup and recovery contract applies to every
+filter-repo invocation below.
 
-Remove all references to blocklisted terms from a git repository's source files, commit messages, and file history. Designed for sanitizing repos before open-sourcing or publishing.
+Remove agreed terms from current files or selected reachable history. Establish
+which outcome the user requested: current-only cleanup does not promise
+historical sanitization. A full historical cleanup must cover retained files'
+old blobs as well as deleted paths and complete commit messages.
 
-## When to Use
+## Scan and prepare the transformation
 
-- Before pushing a private repo to a public remote
-- When renaming a project and cleaning up old name references
-- When removing references to internal tools, orchestrators, or services
-- When scrubbing vendor/partner names from commit history
+Obtain the blocklist and any whitelist. Treat terms as literal strings unless
+regex was requested; specify case sensitivity, byte/text encoding and the
+whitelist's context rules. Escape regex metacharacters when using literal terms.
+Do not silently narrow full history scope to the current branch or current tree.
+Bind the selected refs as described in the shared contract.
 
-## Inputs
+Scan tracked current paths/content using NUL-delimited filenames or structured
+Git plumbing. Inspect full commit messages, historical paths, and blob contents
+reachable from **each selected ref**, including old versions of files still
+present today. `git log --name-only` does not inspect file content. Report
+binary, LFS, submodule and encoding limitations during preparation.
 
-The user provides a **blocklist** of terms to remove. Each term can be:
-- A simple string (e.g., `ralph`, `acme`)
-- A pattern (e.g., `ACME-\d+` for tracking IDs)
+Prepare a concrete table of DELETE, EDIT, RENAME and historical purge/replacement
+operations, with exact paths, replacement rules, whitelist exceptions and
+message before/after examples. Deleting a current file does not select its
+entire history for purging. Path purges must include reviewed historical names;
+Git does not automatically follow renames for filtering.
 
-Optionally, the user provides a **whitelist** of terms that look similar but should be preserved (e.g., `sw4rm` is OK, `acme` is not).
+Carry existing valid approval for the selected plan into execution. If scope,
+transformations or authority are unresolved, finish the preview and ask about
+that decision before its dependent mutation. Local source edits, commits,
+history rewriting and publication have distinct effects; perform the effects
+covered by the user's request and existing authorization.
 
-## Workflow
+## Current files
 
-### Step 0: Record State
+Apply approved edits, deletions and renames. Whitelisted occurrences stay intact.
+Rename code identifiers coherently and run relevant build/tests. If committing
+these edits is in scope, commit only the intended changes before rewriting;
+otherwise leave the reviewed current-only result or resolve how to obtain the
+clean worktree required for history mutation. Do not auto-stash unrelated work.
 
-```bash
-ORIGINAL_HEAD=$(git rev-parse HEAD)
-echo "Original HEAD: $ORIGINAL_HEAD"
-echo "To restore: git reset --hard $ORIGINAL_HEAD"
-```
+## Historical content, paths and messages
 
-### Step 1: Scan Source Files
-
-For each blocklisted term, search all tracked files:
-
-```bash
-git ls-files | xargs grep -li '<term>' 2>/dev/null
-```
-
-Categorize matches into:
-- **DELETE**: Files that are entirely about the blocklisted project (config files, orchestration artifacts, docs dedicated to the tool)
-- **EDIT**: Files where the term appears in comments, identifiers, or strings but the file itself is needed
-- **RENAME**: Files or directories whose names contain the blocklisted term
-
-Present a table:
-
-```
-| Action | Path                        | Term    | Context                          |
-|--------|-----------------------------|---------|----------------------------------|
-| DELETE | .agent/tranches.toml        | acme   | Orchestration config file        |
-| EDIT   | src/rest.rs                 | ACME   | Comment references (ACME-58)     |
-| RENAME | bin/acme-lint-tranches.sh   | acme   | Script name contains term        |
-```
-
-### Step 2: Scan Commit Messages
+Prepare and independently verify the external backup before history mutation.
+For retained historical text files, use reviewed `--replace-text` rules or a
+blob callback. A source edit at HEAD cannot replace those historical blobs.
+The following Bash template combines the selected operations in one pass to
+avoid losing intermediate mapping evidence. Bind `rewrite_refs` from the
+reviewed scope and prepare the referenced files first. Omit options for effects
+that are not selected; the paths shown are placeholders, not a purge policy.
 
 ```bash
-git log --format="%H %s" | grep -iE '<term1>|<term2>|...'
+replacement_file="$backup_dir/reviewed-replacements.txt"
+message_callback="$backup_dir/reviewed-message-callback.py"
+git filter-repo --force --partial \
+  --preserve-commit-hashes --preserve-commit-encoding \
+  --prune-empty never --prune-degenerate never \
+  --replace-text "$replacement_file" \
+  --commit-callback "$message_callback" \
+  --invert-paths --path 'REVIEWED/PURGED/PATH' \
+  --refs "${rewrite_refs[@]}"
 ```
 
-Present commits that need message rewrites.
+For a simple literal rule the replacement file can contain
+`literal:BLOCKED_TEXT==>REVIEWED_REPLACEMENT`. Inspect filter-repo's expression
+syntax before representing terms that contain delimiters or newlines. Literal
+replacement is case-sensitive; explicit variants or reviewed regex rules are
+needed for a case-insensitive policy. The commit callback operates on
+`commit.message`; use exact reviewed transformations and preserve other metadata.
+If selected annotated-tag messages also contain terms, handle and verify those
+explicitly rather than implying that a commit callback covers them.
 
-### Step 3: Confirm
+A global replacement is unsuitable when an occurrence is whitelisted by file
+or context. Use a transformation that can honor that context (for example,
+reviewed file-specific processing); do not apply a blanket replacement and
+claim whitelist support. Binary contents, encodings and external LFS/submodule
+payloads require an explicit supported treatment. Keep unresolved matches
+visible; do not silently delete them or claim they were sanitized.
 
-Ask the user to approve the plan. Show:
-- Files to delete (count)
-- Files to edit (count, with preview of changes)
-- Commit messages to rewrite (count, with before/after)
-- Files to purge from history via filter-repo
+## Verify the actual reachable content
 
-### Step 4: Clean Source Files
+Verify against the independent originals and preserve the commit map. Scan
+**the selected refs**, not `--all`: private originals and unselected refs are
+intentionally retained. To enumerate actual historical contents, use this
+procedure in Python or equivalent structured tooling:
 
-1. `git rm` files marked for deletion
-2. For EDIT files, strip references using pattern replacement:
-   - Strip `(TERM-XX)` from comments
-   - Strip `TERM-XX: ` prefixes from comments
-   - Rename identifiers (e.g., `<blocked>_haake_import_v1` -> `haake_import_v1`)
-   - Remove blocklisted entries from .gitignore/.dockerignore
-3. Run the project's test suite to verify nothing broke
-4. Commit the changes
+1. Obtain unique commits with `git rev-list <selected-ref>...`.
+2. For each commit, read `git ls-tree -r -z --full-tree <commit>` and split on
+   NUL, then split each record once at TAB. Check the raw path against the
+   agreed term/whitelist policy. This handles spaces and newlines in filenames.
+3. For each entry whose type is `blob`, read bytes with `git cat-file blob <oid>`
+   and check the full contents. Cache by blob ID, but apply path-dependent
+   whitelist rules at each occurrence. This checks retained files at every
+   historical version, not only their latest content. Include symlink blobs.
+4. Read each raw commit with `git cat-file commit <oid>` and scan its entire
+   message after the first blank line. Inspect selected annotated-tag names and
+   messages separately. Record gitlink entries (submodules) and LFS pointers
+   as coverage limits unless their external contents were also checked.
+5. Compare intended transformations against original paths/blobs/messages;
+   ensure whitelist matches and unrelated content are preserved. Check parent
+   mappings and commit counts, all unselected ref IDs, and clean worktree state.
+   Run relevant build/tests on the resulting current files.
 
-### Step 5: Rewrite Commit Messages
+A nonmatching search is evidence only if traversal completed successfully. A
+read/decode error, unsupported binary or absent external payload is incomplete
+coverage, not “zero matches.” A byte-level scan can detect literal byte terms
+in binary blobs, but does not establish absence in compressed/encoded payloads.
+Report the term semantics, selected refs, commits/blobs checked, residual matches,
+whitelist exceptions and coverage limitations. Claim full selected-history
+sanitization only when those checks support it. Current-file tests alone cannot.
 
-Use `git-filter-repo --message-callback` with a Python callback that:
-- Replaces known full-message patterns with clean versions
-- Strips `TERM-XX` references via regex
-- Strips standalone occurrences of blocklisted terms
-
-```bash
-git-filter-repo --message-callback '
-import re
-m = message.decode("utf-8")
-# ... replacements ...
-return m.encode("utf-8")
-' --force
-```
-
-### Step 6: Purge Files from History
-
-Use `git-filter-repo --invert-paths` to remove deleted files from all historical commits:
-
-```bash
-git-filter-repo --invert-paths \
-  --path-glob '.agent/*' \
-  --path 'agent.toml' \
-  ... \
-  --force
-```
-
-### Step 7: Verify
-
-1. Search all tracked files for blocklisted terms: `git ls-files | xargs grep -liE '<terms>'`
-2. Search all commit messages: `git log --format="%B" | grep -iE '<terms>'`
-3. Search file paths in history: `git log --all --diff-filter=ACDMR --name-only --format="" | grep -iE '<terms>'`
-4. Run the test suite
-5. Report results
-
-## Safety Guardrails
-
-- **Never auto-execute**: Always present the full plan and wait for approval
-- **Record original HEAD**: Print the full SHA at start and end for recovery
-- **Backup ref**: Create a collision-safe backup ref before any destructive
-  operation, as required by the shared history-rewrite contract.
-- **Test after each phase**: Run tests after source edits and after history rewrites
-- **Dirty tree check**: Refuse to start if `git status --porcelain` shows uncommitted changes
-- **Remote tracking check**: Warn if branch tracks a remote (force push will be needed)
-- **Whitelist support**: Never touch terms on the whitelist even if they match patterns
-
-## Edge Cases
-
-- **Identifiers in code**: If a blocklisted term is part of a variable name (e.g., `acme_config`), rename the identifier. Verify with `cargo check` / `npm run build` / equivalent.
-- **Binary files**: Flag binary files containing the term but do not attempt to edit them. Suggest deletion or manual review.
-- **Test fixtures**: If test data contains blocklisted terms (e.g., project IDs in test JSON), rename them to generic values.
-- **README/docs**: If docs reference blocklisted tools, rewrite the sections to be generic or delete them if they're tool-specific.
-
-## Example Session
-
-```
-User: /reference-cleaner
-
-Claude: What terms should I remove from this repository?
-
-User: termA, termB, termC, TERMA
-
-Claude:
-Original HEAD: a1b2c3d4...
-To restore: git reset --hard a1b2c3d4...
-
-Scanning tracked files for: termA, termB, termC, TERMA
-
-Found references in 36 files:
-- DELETE: 25 files (orchestration configs, scripts, docs)
-- EDIT: 11 files (source comments, identifiers, .gitignore)
-
-Found references in 8 commit messages.
-
-[Table of changes...]
-
-Approve this plan? [Approve / Cancel]
-```
+Report original/current HEAD, changed refs, transformation evidence and actual
+backup/recovery paths. Explain that original private backups, unselected refs,
+reflogs, remote copies and caches are outside a selected-reachability claim.
+Retain recovery evidence. Publication and permanent erasure require authority
+covering those effects; do not add cleanup or force-push commands implicitly.

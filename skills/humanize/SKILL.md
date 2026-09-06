@@ -13,6 +13,19 @@ gravity from the system's internal concepts to the reader's world.
 Humanization is not decoration and is not simplification at any cost. Do not
 make the writing warmer by making it less accurate.
 
+## Scope and authority
+
+Adapt the supplied claims for their audience; original business-case authorship
+belongs to `whitepaper`, while `clear-writing` defaults to preserving the draft's
+working structure. A user-selected light edit or exact wording/structure always
+outranks this skill's recomposition default.
+
+Do not select research, new promises, publication, or file changes beyond the
+requested artifact. Necessary source inspection and audience-oriented reordering
+remain autonomous. Reuse settled source/audience choices; ask only about a
+material unresolved meaning, promise, or audience decision after preparing the
+available alternatives. Keep independent rewriting moving within known bounds.
+
 ## Resolve the source and audience
 
 Use the source in this order:
@@ -108,10 +121,12 @@ the first three elements.
 Lead with what the reader can see, know, choose, or rely on. Introduce the
 mechanism only when it explains the promise or supports a decision.
 
-Examples:
+Examples are conditional translations, not evidence of product capabilities.
+Use one only when the source establishes its added actors and concrete meaning;
+otherwise retain a narrower explanation. For example:
 
-- “Evidence precedes authorization” becomes “See why a change is safe to move
-  forward before deciding to release it.”
+- “Evidence precedes authorization” becomes “Review the evidence before
+  authorizing the action.”
 - “Bounded and revocable autonomy” becomes “You decide what the system may do,
   how far it may go, and when it must stop.”
 - “Failure classes remain distinct” becomes “When something goes wrong, know

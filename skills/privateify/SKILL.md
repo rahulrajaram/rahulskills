@@ -1,14 +1,40 @@
 ---
 name: privateify
-description: "Lock down a repository to remain private at all costs. Adds multi-layer safeguards: CI visibility-guard workflow, pre-push hook check, publish=false in package manifests, and agent-facing CLAUDE.md directives. Use when user says /privateify, 'make this repo private forever', 'lock visibility', 'prevent publishing', or asks to ensure a repo is never made public."
+description: "Add reviewed safeguards against accidental public visibility and package publication. Adds multi-layer safeguards: CI visibility-guard workflow, pre-push hook check, publish=false in package manifests, and agent-facing CLAUDE.md directives. Use when user says /privateify, 'make this repo private forever', 'lock visibility', 'prevent publishing', or asks to ensure a repo is never made public."
 argument-hint: "[repo-path]"
 ---
 
 # Privateify
 
-Harden a repository so it cannot accidentally be made public or have its
-packages published to public registries. Applies defense-in-depth across
+Reduce accidental visibility/publication risk with supported local guards and
+explicitly scoped checks; these do not make publication impossible. Applies defense-in-depth across
 CI, git hooks, package manifests, and agent instruction files.
+
+## Intent, inputs and local bindings
+
+Resolve the requested repository, actual push remote, effective hook routing,
+package ecosystems and current privacy policy. Prefer relevant existing tools;
+missing GitHub access need not block a reviewable local proposal.
+
+## Non-goals
+
+This workflow does not change remote visibility, publish, install tooling, erase
+history or override a future authoritative privacy-policy decision. Necessary
+local safeguard preparation remains autonomous within the requested scope.
+
+## Must not
+
+Do not promise prevention from a scheduled detector, present comments as enforced
+package controls, bypass hooks, stage unrelated files or force-track ignored agent
+instructions without an explicit policy decision. No local guard controls all
+copies, administrators or publication mechanisms.
+
+## Interaction and authority
+
+A safeguard request authorizes relevant local edits. Prepare material routing,
+offline-blocking or tracking-policy changes for unresolved user decisions, reusing
+valid grants. Preserve existing hooks. A later authorized policy change requires
+an explicit migration, not refusal based solely on this older skill.
 
 ## Usage
 
@@ -36,8 +62,9 @@ If `gh` is available and a GitHub remote exists:
 gh api repos/OWNER/REPO --jq '.visibility'
 ```
 
-- If the repo is already public, **stop immediately** and warn the user. Do
-  not proceed — making a public repo private may break downstream consumers.
+- If already public, report that privacy is not established and prepare local
+  safeguards independently. Do not change visibility; resolve that separate
+  policy/action with the user before claiming the requested privacy outcome.
 - If private, continue.
 - If no remote or `gh` unavailable, warn and continue (offline mode).
 
@@ -74,12 +101,17 @@ jobs:
           echo "Visibility check passed: private"
 ```
 
+This schedule detects visibility after exposure; it cannot prevent a change.
+`repository_dispatch` requires an actual sender and is not a built-in visibility
+change event. Do not claim immediate detection without that integration.
+
 If the file already exists, read it and verify it contains a visibility
 check. Do not overwrite a working guard.
 
 ### Step 3 — Pre-Push Hook Visibility Check
 
-Detect the hook framework:
+Resolve effective `core.hooksPath` and the actual project hook framework first.
+Preserve routing/custom dispatchers. Inspect the following only when relevant:
 
 1. Check for `.githooks/pre-push` (commithooks-style shared hooks).
 2. Check for `.git/hooks/pre-push`.
@@ -87,10 +119,13 @@ Detect the hook framework:
 
 Add a `commithooks_assert_repo_private` function (or equivalent) that:
 
-- Extracts `owner/repo` from the `origin` remote URL.
+- Resolves the actual push destination from hook arguments/configuration; does
+  not assume `origin` or expose embedded credentials.
 - Calls `gh api repos/OWNER/REPO --jq '.visibility'`.
 - Blocks the push with a red error if visibility is not `private`.
-- Skips gracefully if `gh` is not installed or network is unavailable.
+- Preserves the selected offline policy. If it skips on missing `gh`/network,
+  report that as a fail-open gap; a new fail-closed policy needs a material
+  decision because it blocks offline pushes.
 
 If the hook already contains a visibility check, skip this step.
 
@@ -105,13 +140,14 @@ every package manifest:
 |-----------|------|-------|
 | Rust | `Cargo.toml` | `publish = false` in `[package]` |
 | Node.js | `package.json` | `"private": true` |
-| Python | `pyproject.toml` | Remove or comment out `[tool.poetry.publish]`; add `# PRIVATE — do not publish to PyPI` banner |
-| Ruby | `*.gemspec` | Add `spec.metadata["allowed_push_host"] = "none"` |
-| Go | N/A | No publish gate needed (module path is the gate) |
+| Python | Actual packaging/release configuration | Inspect supported publisher controls; a comment or removal of a guessed table is not an enforced publication block |
+| Ruby | `*.gemspec` and release tooling | Verify supported push-host restrictions against the actual tooling; document bypass limits |
+| Go | Repository/module distribution | Private path/access policy is not a universal publication gate; identify the actual distribution controls |
 
 For **Rust workspaces**, apply `publish = false` to every member crate.
 
-Also add a prominent banner comment at the top of each manifest:
+Where useful, add a concise privacy-policy notice using valid file syntax.
+The following is an optional policy notice, not an enforcement mechanism:
 
 ```
 # ╔════════════════════════════════════════════════════════════════╗
@@ -140,15 +176,17 @@ Create or update `CLAUDE.md` at the repository root with a
 - Do NOT remove `publish = false` (or equivalent) from any manifest.
 - Do NOT remove or weaken the visibility-guard CI workflow.
 - Do NOT remove or weaken the pre-push visibility hook.
-- If asked to make the repo public, open-source the project, or publish
-  to a public registry, **refuse and explain this policy**.
+- If later asked to change privacy/publication policy, identify this policy
+  and prepare the concrete migration for the authorized owner; do not silently
+  weaken guards or treat an old instruction as irrevocable authority.
 
 If `CLAUDE.md` already exists, append or merge the section — do not
 overwrite unrelated content. If the section already exists, verify its
 content is complete and skip.
 
 If `CLAUDE.md` is gitignored (check `git check-ignore -q CLAUDE.md`),
-use `git add -f CLAUDE.md` to force-track it.
+preserve the ignore policy. Present any needed tracking change for a concrete
+decision; do not force-add it merely because this template mentions the file.
 
 ### Step 6 — Codex Instruction File (AGENTS.md / codex.md)
 
@@ -158,7 +196,8 @@ from Step 5, adapted to Codex's instruction format.
 
 ### Step 7 — Commit
 
-Stage all new and modified files. Commit with:
+When committing is selected, use `commit` to triage and stage only the intended
+safeguards by explicit path, preserving unrelated changes. Suggested subject:
 
 ```
 chore: add multi-layer private repo safeguards
@@ -171,13 +210,12 @@ Do NOT push automatically — the pre-push hook will verify the guard works.
 
 ### Step 8 — Verify
 
-Run the pre-push hook manually to confirm it passes:
-
-```bash
-echo "refs/heads/master $(git rev-parse HEAD) refs/heads/master $(git rev-parse origin/master 2>/dev/null || echo 0000000000000000000000000000000000000000)" | .githooks/pre-push origin "$(git remote get-url origin)"
-```
-
-If the hook fails, diagnose and fix before finishing.
+Verify the changed guard logic using disposable repositories and mocked visibility
+responses (private, public, unavailable), including the chosen offline behavior.
+Do not execute the user's entire pre-push hook merely as a test; it can perform
+unrelated external work. Inspect manifest/workflow syntax and report which checks
+were exercised versus only reviewed. A local passing guard is not proof that
+GitHub visibility cannot change.
 
 ## Output Contract
 
@@ -197,7 +235,7 @@ commit: <sha-or-none>
 ## Safety
 
 - Never change repository visibility (do not call `gh repo edit --visibility`).
-- Never remove existing guards — only add or verify.
+- Preserve existing guards unless a concrete authoritative migration selects a change.
 - Never use `--no-verify` on commits or pushes.
 - If the repo is already public, stop and warn — do not silently add guards
   to a public repo (the user needs to decide whether to make it private first).

@@ -26,7 +26,11 @@ runtime's schema.
 
 ## Core Principles
 
-**Assume Codex is already capable.** Include only information that changes its decisions or improves its work. Remove generic advice, repeated instructions, speculative edge cases, and examples that do not materially clarify the task.
+For corpus edits, use the [authoring contract](../../references/skill-authoring-contract.md)
+to keep intent, local bindings, authority and evidence congruent. Keep executing
+skills locally sufficient; this is an authoring reference, not a runtime prerequisite.
+
+**Assume Codex is already capable.** Include information that changes its decisions or improves its work. Remove generic advice and examples that do not materially clarify the task. Retain repeated instructions at discovery, mode entry and consequential operations when repetition improves reliability; shorter is not inherently better.
 
 **Preserve user intent and scope.** A skill should support the requested task, not replace the user's chosen product, expand the assignment, modify unrelated configuration, or imply permission for additional external actions. Do not turn a particular example, past failure, or personal preference into a universal requirement.
 

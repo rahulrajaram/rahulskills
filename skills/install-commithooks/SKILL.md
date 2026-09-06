@@ -31,7 +31,7 @@ Abort if any of these fail:
 3. **No active rebase/merge**: No `.git/rebase-merge`, `.git/rebase-apply`, or `.git/MERGE_HEAD`.
 
 Report but do not abort:
-- Current `core.hooksPath` value (will be unset during install).
+- Effective `core.hooksPath` value and origin (`git config --show-origin --get core.hooksPath`). Preserve it, including inherited configuration; installation must skip until an explicit routing migration is authorized.
 - Existing hooks in `.githooks/` or `scripts/git-hooks/`.
 
 ## Installation Steps
@@ -43,75 +43,28 @@ Show:
 - Existing hooks in `.git/hooks/`, `.githooks/`, `scripts/git-hooks/`
 - Resolved commithooks source path
 
-### Step 2: Copy Dispatchers into `.git/hooks/`
+### Steps 2–4: Install Without Replacing Existing Hook Routing
 
-For each hook (`pre-commit`, `commit-msg`, `pre-push`, `post-checkout`, `post-merge`):
+Use the Python installer in Step 6 for the initial installation as well as
+recurring setup. Set `COMMITHOOKS_DIR` to the resolved source path. Running the
+same installer prevents a later setup from undoing initial conflict checks.
+For Rust or Node setup, preserve these checks in any native equivalent.
 
-- **Conflict**: hook exists AND differs from the default `.sample` file — skip with warning.
-- **No conflict**: copy from source, `chmod +x`.
+- If effective `core.hooksPath` is configured, preserve it and skip installation.
+  Report its origin and value; do not unset local, worktree, global, or inherited
+  configuration. A routing change requires an explicitly authorized migration.
+- Preserve existing dispatchers, including symlinks. Only an absent hook, a
+  regular file identical to the source, or a regular file identical to its
+  `.sample` is eligible. Any conflict skips the whole installation before
+  copying libraries, since a custom dispatcher may depend on the existing lib.
+- Preserve symlinked hook directories and skip installation. Never follow them
+  to write outside the intended Git directory.
+- Stage library replacement and retain the prior library in a recoverable
+  backup; restore it if publication fails.
 
-```bash
-for hook in pre-commit commit-msg pre-push post-checkout post-merge; do
-  src="$SOURCE/$hook"
-  dst="$GIT_DIR/hooks/$hook"
-  [ -f "$src" ] || continue
-  if [ -f "$dst" ] && [ "$(cat "$dst")" != "$(cat "$dst.sample" 2>/dev/null || true)" ]; then
-    echo "[skip] $hook (existing custom hook)"
-    continue
-  fi
-  cp "$src" "$dst" || { echo "Failed to copy $hook" >&2; exit 1; }
-  chmod +x "$dst" || { echo "Failed to make $hook executable" >&2; exit 1; }
-  echo "[ok]   $hook"
-done
-```
-
-### Step 3: Copy Library into `.git/lib/`
-
-```bash
-(
-git_dir_real="$(realpath -e -- "$GIT_DIR")" || exit 1
-target="$git_dir_real/lib"
-
-[[ -d "$git_dir_real" && "$git_dir_real" != "/" && ! -L "$GIT_DIR" ]] || exit 1
-[[ "$(realpath -e -- "$(dirname -- "$target")")" == "$git_dir_real" ]] || exit 1
-[[ -f "$SOURCE/lib/common.sh" ]] || { echo "Missing source lib/common.sh" >&2; exit 1; }
-
-stage="$(mktemp -d "$git_dir_real/.lib-stage.XXXXXX")" || exit 1
-cp -a "$SOURCE/lib/." "$stage/" || {
-  echo "Copy failed; staged tree retained at $stage" >&2
-  exit 1
-}
-
-backup=""
-if [[ -e "$target" || -L "$target" ]]; then
-  mkdir -p "$git_dir_real/commithooks-backups" || exit 1
-  backup_root="$(mktemp -d "$git_dir_real/commithooks-backups/lib.XXXXXX")" || exit 1
-  backup="$backup_root/lib"
-  mv -T -- "$target" "$backup" || { echo "Backup failed; live library preserved" >&2; exit 1; }
-fi
-
-if ! mv -T -- "$stage" "$target"; then
-  if [[ -n "$backup" && ! -e "$target" && ! -L "$target" ]]; then
-    mv -T -- "$backup" "$target" || echo "Restore failed; prior library retained at $backup" >&2
-  fi
-  echo "Install failed; staged tree retained at $stage" >&2
-  exit 1
-fi
-)
-```
-
-The exact target must be proven even though `.git/lib/` is an untracked
-namespace. Never use a nonempty-variable check as the only guard for recursive
-deletion. Stage the replacement, move the prior tree to a recoverable backup,
-and restore it if publication fails.
-
-The example uses GNU `realpath` and `mv -T` so publication cannot nest the
-stage inside an existing target directory. Every failure exits the transaction
-explicitly; do not rely on the calling shell's `set -e` setting.
-
-### Step 4: Unset `core.hooksPath`
-
-If set, unset it. We use `.git/hooks/` directly.
+If initial installation skips, report the conflict and resolve any migration
+with the user before scaffolding hooks or wiring setup. Ordinary installation
+permission does not authorize replacement of custom hooks or hook routing.
 
 ### Step 5: Scaffold Repo-Local Hook Stubs
 
@@ -194,6 +147,7 @@ Create a `setup_hooks.py` module inside the package and add a console script ent
 from __future__ import annotations
 
 import os
+import stat
 import shutil
 import subprocess
 import tempfile
@@ -203,7 +157,7 @@ from pathlib import Path
 
 def main() -> None:
     commithooks = Path(os.environ.get("COMMITHOOKS_DIR", Path.home() / "Documents" / "commithooks"))
-    if not (commithooks / "lib").is_dir():
+    if not (commithooks / "lib" / "common.sh").is_file():
         print(f"Commithooks not found at {commithooks} (skipping)")
         return
 
@@ -212,17 +166,50 @@ def main() -> None:
         print("Not in a git repository (skipping)")
         return
 
+    routing = subprocess.run(
+        ["git", "config", "--show-origin", "--get", "core.hooksPath"],
+        capture_output=True, text=True,
+    )
+    if routing.returncode == 0:
+        print(f"Preserving core.hooksPath: {routing.stdout.strip()} (skipping)")
+        return
+    if routing.returncode != 1:
+        raise RuntimeError(routing.stderr.strip() or "Cannot inspect core.hooksPath")
+
     git_dir = Path(result.stdout.strip()).resolve()
     if git_dir == Path("/") or not git_dir.is_dir():
         raise RuntimeError(f"Unsafe git directory: {git_dir}")
 
+    if any((git_dir / name).exists() for name in
+           ("rebase-merge", "rebase-apply", "MERGE_HEAD")):
+        raise RuntimeError("Rebase or merge in progress")
+
     hooks_dir = git_dir / "hooks"
-    hooks_dir.mkdir(exist_ok=True)
+    if hooks_dir.is_symlink() or (hooks_dir.exists() and not hooks_dir.is_dir()):
+        print(f"Preserving custom hooks directory: {hooks_dir} (skipping)")
+        return
+
+    def regular_file(path: Path) -> bool:
+        return path.exists() and stat.S_ISREG(path.lstat().st_mode)
+
+    copies = []
     for hook in ("pre-commit", "commit-msg", "pre-push", "post-checkout", "post-merge"):
         src = commithooks / hook
-        if src.exists():
-            shutil.copy2(src, hooks_dir / hook)
-            (hooks_dir / hook).chmod(0o755)
+        if not regular_file(src):
+            continue
+        dst = hooks_dir / hook
+        sample = hooks_dir / f"{hook}.sample"
+        if dst.exists() or dst.is_symlink():
+            if regular_file(dst) and dst.read_bytes() == src.read_bytes():
+                continue  # Preserve existing contents and permissions.
+            if not (regular_file(dst) and regular_file(sample)
+                    and dst.read_bytes() == sample.read_bytes()):
+                print(f"Preserving custom dispatcher: {dst} (skipping installation)")
+                return
+        copies.append((src, dst))
+    if not any(regular_file(commithooks / hook) for hook in
+               ("pre-commit", "commit-msg", "pre-push", "post-checkout", "post-merge")):
+        raise RuntimeError("Source contains no regular dispatcher hooks")
 
     lib_dst = git_dir / "lib"
     if lib_dst.parent.resolve() != git_dir:
@@ -233,7 +220,7 @@ def main() -> None:
 
     backup = None
     if lib_dst.exists() or lib_dst.is_symlink():
-        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
         backup = git_dir / "commithooks-backups" / stamp / "lib"
         backup.parent.mkdir(parents=True, exist_ok=False)
         lib_dst.rename(backup)
@@ -246,7 +233,16 @@ def main() -> None:
         print(f"Install failed; staged tree retained at {stage}")
         raise
 
+    hooks_dir.mkdir(exist_ok=True)
+    for src, dst in copies:
+        shutil.copy2(src, dst)
+        dst.chmod(0o755)
+
     print(f"Commithooks installed from {commithooks}")
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 2. Add to `[project.scripts]` in `pyproject.toml`:
@@ -259,12 +255,15 @@ Contributors run `pip install -e .` then `<project-name>-setup-hooks`.
 
 #### Rust projects (`Cargo.toml`)
 
-Add a `build.rs` that runs the copy, or add a `xtask` subcommand.
+Add an `xtask` subcommand or use the existing setup path. Apply the same
+preflight, preservation, and library transaction as the Python installer;
+plain copy commands are insufficient.
 
 #### Node projects (`package.json`)
 
 Create a checked `scripts/install-commithooks` program that performs the same
-resolve, validate, stage, backup, publish, and rollback transaction as Step 3.
+routing and dispatcher conflict checks and library transaction as the Python
+installer. Preserve any existing `prepare` command when wiring this program.
 Then make `prepare` invoke that program:
 
 ```json
@@ -284,10 +283,16 @@ visible.
 
 ### Step 8: Verify
 
-```bash
-ls -la "$GIT_DIR/hooks/pre-commit"
-ls "$GIT_DIR/lib/"
-```
+Inspect the installed files and compare the effective `core.hooksPath` before
+and after setup. Report skipped installation accurately; file existence alone
+does not prove that Git uses these dispatchers.
+
+Verify actual dispatch only in a disposable Git repository: install from the
+reviewed source, write an executable `.githooks/pre-commit` containing only a
+harmless marker write, and use Git to trigger that hook. Repeat setup and check
+that dispatch still writes the marker. In separate fixtures, verify custom
+hooks and local/inherited `core.hooksPath` survive initial and recurring setup.
+Never execute the user's existing hooks just to verify installation.
 
 ### Step 9: Summary
 
@@ -295,7 +300,7 @@ ls "$GIT_DIR/lib/"
 Commithooks Installation Summary
 ─────────────────────────────────
 Source:     <path>
-Method:     Copy into .git/ (no core.hooksPath)
+Method:     Copy into .git/ or skipped with existing routing preserved
 
 Dispatchers (.git/hooks/):
   pre-commit    [ok/skip]
@@ -324,8 +329,9 @@ Next steps:
 
 | Scenario | Behavior |
 |----------|----------|
-| Dispatchers already installed | Skip individual hooks, refresh lib/ |
-| core.hooksPath is set | Unset it, switch to .git/hooks/ method |
+| Matching dispatchers already installed | Preserve dispatchers; stage and back up library refresh |
+| Custom dispatcher or symlink | Preserve it and skip installation before library changes |
+| core.hooksPath is set | Preserve configuration and skip; migration needs explicit authorization |
 | Symlinked hooks in .githooks/ | Treat as existing, do not overwrite |
 | GitHub clone needed | Clone to `$COMMITHOOKS_DIR` after user approval |
 | Not in a git repo | Clear error, do not git init |

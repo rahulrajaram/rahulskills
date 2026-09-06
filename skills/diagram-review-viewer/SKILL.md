@@ -6,11 +6,10 @@ argument-hint: "[diagram file or design brief] [--type state|flowchart|...] [--o
 
 # Diagram Review Viewer
 
-Produce two artifacts per diagram: the Mermaid source (`.mmd`) and an HTML
-review viewer (`.html`) that renders it with an already-installed local Mermaid
-runtime and a full interaction surface. The viewer's CSS and JavaScript are
-provided; do not hand-write new viewer plumbing — substitute content into the
-template.
+Produce a Mermaid source (`.mmd`) for every requested Mermaid diagram. Produce
+an HTML review viewer (`.html`) only when browser review or viewer packaging is
+requested. The viewer renders with an already-installed local Mermaid runtime;
+it is a review package, not a diagram format or a renderer service.
 
 ## Inputs to gather first
 
@@ -57,9 +56,10 @@ template.
   Passive or record-keeping compartments get dashed borders
   (`style X fill:transparent,stroke:#64748b,stroke-width:1.8px,
   stroke-dasharray:6 4`) while authoritative ones stay solid.
-- Keep source free of the literal substring `</script>` (it is embedded in
-  HTML) and of backslashes (they complicate embedding); assert both before
-  substituting into the template.
+- Embed Mermaid source as JSON in the template's application/json script
+  element. The builder must JSON-escape `<` and preserve backslashes so valid
+  Mermaid escapes remain valid. Assert the decoded embedded value equals the
+  exact source bytes before treating packaging as successful.
 - Mermaid is hand-authored here: never generate diagram *meaning* from a
   tool; you are the designer. Structure it deliberately: group related
   states/components, label every transition with its trigger, use notes for
@@ -70,8 +70,10 @@ template.
   distinction.
 ## Generate the viewer
 
-Use `assets/template.html`. Substitute every token (plain string replace,
-no regex needed):
+Use `scripts/build_viewer.py` with `assets/template.html`; the builder performs
+context-safe one-pass substitution, validates placeholder completeness, and
+checks the exact source digest. Do not hand-assemble HTML when the builder is
+available. Its template bindings are:
 
 | Token | Content |
 | --- | --- |
@@ -80,9 +82,9 @@ no regex needed):
 | `{{REVISION_LINE}}` | e.g. `Revision 2 · corrected after review · pending review` |
 | `{{BADGE}}` | `v1 · <digest8>…<digest6>` |
 | `{{DIAGRAM_ARIA}}` | aria-label for the diagram host |
-| `{{MERMAID_SOURCE}}` | full `.mmd` contents (raw) |
-| `{{RENDER_ID}}` | unique render id (kebab-case, per viewer) |
-| `{{STORAGE_KEY}}` | localStorage key for rail width (unique per viewer) |
+| `{{MERMAID_SOURCE_JSON}}` | full `.mmd` contents encoded as JSON for a script element |
+| `{{RENDER_ID_JSON}}` | unique render id encoded as a JavaScript string |
+| `{{STORAGE_KEY_JSON}}` | localStorage key encoded as a JavaScript string |
 | `{{RAIL_CONTENT}}` | the `<aside>` inner HTML (use the classes below) |
 | `{{MERMAJS_PATH}}` | URI for an already-installed `mermaid.min.js`; resolve it in the current environment and never encode a username or machine-specific path in tracked source |
 
@@ -102,9 +104,10 @@ Rail section vocabulary (keep these classes):
 - Write both files into one versioned directory, e.g.
   `<project>/<design-dir>/diagram-preview-v<N>/`. Prefer the current
   project's own directory over unrelated repos.
-- If the target repo must stay clean for source-identity binding, add the
-  design directory name to the repo's `.git/info/exclude` and say so in your
-  report.
+- If the target repo must stay clean for source-identity binding (e.g.
+  MetaBuilder), prefer an authorized artifact path outside the repository. Use
+  `.git/info/exclude` only when that ignore-policy mutation is explicitly
+  selected or already covered by project policy, and report it.
 - Never commit viewer files unless asked; they are review artifacts.
 - Report to the user: both file paths, the digest, the single question the
   viewer answers, and what the evidence boundary excludes.
@@ -112,9 +115,12 @@ Rail section vocabulary (keep these classes):
 ## Limitations
 
 - Rendering requires a browser and a resolvable `mermaid.min.js`. The viewer
-  does not bundle that runtime and will not work without it.
-- The template assumes one diagram per viewer. For multi-projection bundles,
-  create one viewer per projection or extend the template deliberately.
+  does not bundle that runtime. A local file URI can support an offline review
+  only when the referenced runtime remains available at that path; the HTML is
+  not self-contained merely because it was built without a network request.
+- The template assumes one diagram per viewer. For multi-projection bundles
+  (MetaBuilder `diagrams preview` style), create one viewer per projection or
+  extend the template deliberately.
 - The template's evidence boundary does not make a draft artifact
-  gate-bound; that requires a governed publication pipeline over an agreed
-  brief.
+  gate-bound; gate-bound bundles come only from MetaBuilder's
+  `harness diagrams` machinery over an agreed brief.

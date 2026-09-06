@@ -1,0 +1,207 @@
+%%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
+flowchart TB
+    subgraph Legend["How to read this diagram"]
+        legend_major["Major skill"]
+        legend_minor["Minor or specialized skill"]
+        legend_redundant["Consolidation or removal candidate"]
+        legend_improve["Needs meaningful improvement"]
+        legend_missing["Missing future component"]
+        legend_relation["Relationship note: explains what passes between skills,<br/>what is already strong, and what is still missing"]
+        legend_edge_types["Relationship types:<br/>invokes · routes-to · borrows-rule · consumes-artifact · overlaps · proposed-adapter"]
+    end
+
+    subgraph Intent["Intent, governance, planning, and diagrams"]
+        frame["frame-goals-constraints"]
+        grill_alias["grill-me"]
+        grilling["grilling"]
+        charter["define-operating-charter"]
+        dag["objective-to-dag-decomposition"]
+        todos["next-todos"]
+        arch["archdiagram"]
+        diagram_viewer["diagram-review-viewer"]
+        tui["tui-web-design-orchestrator"]
+    end
+
+    subgraph Governed["Long-horizon orchestration and execution"]
+        metabuilder["metabuilder"]
+        autonomy["autonomy-loop"]
+        execution["autonomous-execution-contract"]
+        handoff["handoff"]
+    end
+
+    subgraph Future["Missing composition infrastructure"]
+        contracts["Skill Contract Registry"]
+        binding["Callable Execution Binding"]
+        recipes["Harness Recipe and Pack Composer"]
+        provenance["Typed Artifact and Provenance Envelope"]
+        authority["Ratified Authority Envelope"]
+        resolver["Resolver and Compatibility Checker"]
+        lockfile["Resolution Lock"]
+        composition_linter["Composition Linter"]
+        approval["Authenticated Approval Verifier"]
+        verification["Controller Verification Record"]
+        agent_adapter["Governed Agent Claim Adapter"]
+        learning_adapter["Retrospective and Learning Adapter"]
+        diagram_adapter["Shared Diagram Contract Adapter"]
+    end
+
+    subgraph Deliberation["Model deliberation and ecosystem discovery"]
+        invoke["invokellm"]
+        debate["debate"]
+        ideate["ideate"]
+        ecosystem["ecosystem-borrow-audit"]
+    end
+
+    subgraph Build["Design and implementation"]
+        figma["figma"]
+        figma_impl["figma-implement-design"]
+        clean["clean-code-refine"]
+        fp["fp-refine"]
+        severe["pythonpackagesevere"]
+        skill_creator["skill-creator"]
+    end
+
+    subgraph Evidence["Verification, diagnosis, and learning"]
+        tests["test"]
+        live_check["check-antipatterns"]
+        conversation["analyze-conversation"]
+        postmortem["postmortem"]
+        system_memory["system-memory-audit"]
+        memleak["memleak-investigate"]
+        pi_defects["pi-defects-harvester"]
+    end
+
+    subgraph Communication["Writing and delivery"]
+        clear["clear-writing"]
+        humanize["humanize"]
+        whitepaper["whitepaper"]
+        pdf["markdown-to-pdf"]
+        columns["max-columns"]
+        speak["speak"]
+        readme["readme-doctor"]
+    end
+
+    subgraph Git["Repository safety and release"]
+        git_status["git-status-report"]
+        commit["commit"]
+        squash["squash-commits"]
+        rewrite["rewrite-commit-messages"]
+        cleaner["reference-cleaner"]
+        privateify["privateify"]
+        hooks["install-commithooks"]
+        pr["pr-lifecycle"]
+        topics["repo-topics"]
+    end
+
+    subgraph Domain["Specialized data pipeline"]
+        yore_harvest["yore-vocabulary-harvest"]
+        yore_filter["yore-vocabulary-llm-filter"]
+    end
+
+    grill_alias --> rel_alias["ALIAS · CONSOLIDATE IMPLEMENTATION, PRESERVE TRIGGER<br/>grill-me adds no behavior of its own, but its public entry point may still aid discovery."] --> grilling
+    frame -.-> rel_frame_grill["PROPOSED-ADAPTER<br/>The thesis supplies goals, bets, actors and constraints; today they are copied as prose<br/>without a shared typed decision artifact."] -.-> grilling
+    grilling -.-> rel_grill_charter["PROPOSED-ADAPTER<br/>Resolved unknowns should inform authority, but no exact approval and provenance port exists."] -.-> charter
+    frame --> rel_frame_dag["CONSUMES-ARTIFACT · ESTABLISHED<br/>The DAG skill is an explicit handoff from the product thesis.<br/>A versioned thesis artifact and preservation check are still missing."] --> dag
+    charter -.-> rel_charter_loop["PROPOSED-ADAPTER<br/>The charter defines budgets, effects and stop rules, but autonomy-loop has no machine-readable charter input."] -.-> autonomy
+    dag --> rel_dag_loop["CONSUMES-ARTIFACT · ESTABLISHED<br/>Autonomy-loop uses the DAG for epic orientation and task ranking;<br/>the JSON still lacks a versioned compatibility contract."] --> autonomy
+    todos -.-> rel_todos_loop["BORROWS-RULE<br/>Autonomy-loop borrows the one-sentence task-writing discipline.<br/>This is a useful narrow primitive, not evidence that the whole skill is invoked."] -.-> autonomy
+
+    grilling --> rel_grill_debate["INVOKES<br/>Grilling can invoke debate when materially different positions remain;<br/>the synthesis is still prose rather than evidence bound to the questioned decision."] --> debate
+    grilling -.-> rel_grill_mb["PROPOSED-ADAPTER<br/>MetaBuilder expects a thoroughly grilled brief, but this package has no typed adapter into its receipt schema."] -.-> metabuilder
+    arch -.-> rel_arch_viewer["OVERLAPS<br/>Both skills can author Mermaid meaning; the viewer also packages browser review UX.<br/>A digest-preserving package-existing-source mode is needed before treating this as a pipeline."] -.-> diagram_viewer
+    diagram_viewer -.-> rel_viewer_mb["PROPOSED-ADAPTER<br/>A viewer is reviewable but not gate authority; only MetaBuilder can bind acceptance to an agreed brief."] -.-> diagram_adapter
+    diagram_adapter -.-> rel_diagram_mb["PROPOSED-ADAPTER<br/>The adapter must preserve viewpoint, digest, omissions and approval without re-authoring meaning."] -.-> metabuilder
+    tui -.-> rel_tui_recipe["PROPOSED-ADAPTER<br/>The design packet is not executable; a recipe must name implementation, assets, accessibility and verification stages."] -.-> recipes
+
+    git_status --> rel_status_loop["CONSUMES-ARTIFACT<br/>Repository identity and dirty-tree state should be a bound loop input rather than a procedural observation."] --> autonomy
+    autonomy --> rel_loop_exec["INVOKES · STRONGEST CURRENT COMPOSITION<br/>The loop hands one bounded objective, stops, proof, Git policy, resources and delegation to the executor."] --> execution
+    autonomy --> rel_loop_test["INVOKES<br/>Autonomy-loop explicitly routes substantial verification through the test skill;<br/>the result still lacks a common typed acceptance envelope."] --> tests
+    execution -.-> rel_exec_test["BORROWS-RULE<br/>The executor requires focused checks and proof targets but does not itself invoke the test skill."] -.-> tests
+    autonomy --> rel_loop_commit["INVOKES<br/>The loop may checkpoint a coherent verified slice, but no typed change-set binds task, tests and committed tree."] --> commit
+    autonomy --> rel_loop_handoff["INVOKES<br/>The loop uses handoff at long-run boundaries; the handoff does not serialize the composition graph."] --> handoff
+    handoff --> rel_handoff_commit["INVOKES<br/>Handoff write mode explicitly commits before continuation state, although the result remains Markdown."] --> commit
+    metabuilder -.-> rel_mb_loop["PROPOSED-ADAPTER<br/>MetaBuilder supplies governed runtime mechanics while autonomy-loop supplies strategic judgment;<br/>no callable execution binding safely joins them yet."] -.-> autonomy
+
+    skill_creator -.-> rel_creator_contract["PROPOSED-ADAPTER<br/>Skill-creator should generate callable phase contracts alongside SKILL.md."] -.-> contracts
+    contracts -.-> rel_contract_binding["PROPOSED-ADAPTER<br/>Typed metadata is insufficient: every callable phase must name the exact adapter that implements it."] -.-> binding
+    contracts -.-> rel_contract_lint["PROPOSED-ADAPTER<br/>A linter must reject missing ports, operations, authority, recovery and nonexistent references."] -.-> composition_linter
+    composition_linter -.-> rel_lint_recipe["PROPOSED-ADAPTER<br/>Recipes must additionally prove required roles and producer-to-consumer assignability."] -.-> recipes
+    binding -.-> recipes
+    provenance -.-> rel_provenance_recipe["PROPOSED-ADAPTER<br/>Handoffs need immutable typed artifacts with exact producer provenance and epistemic class."] -.-> recipes
+    recipes -.-> rel_recipe_resolver["PROPOSED-ADAPTER<br/>Recipes select roles and alternatives; the resolver checks nominal types, direction, cardinality and scoped operations."] -.-> resolver
+    authority -.-> rel_authority_resolver["PROPOSED-ADAPTER<br/>A ratified authority envelope is an input ceiling that resolution may only attenuate;<br/>a repository contract cannot grant authority to itself."] -.-> resolver
+    resolver -.-> rel_resolver_lock["PROPOSED-ADAPTER<br/>Resolution and compatibility produce the lock; digests identify the result but do not define assignability."] -.-> lockfile
+    lockfile -.-> rel_lock_mb["PROPOSED-ADAPTER<br/>Compilation consumes exact bindings, adapter chain, runtime profile, policy and compiler identity."] -.-> metabuilder
+    approval -.-> rel_approval_authority["PROPOSED-ADAPTER<br/>Authenticated actor, scope, digest, expiry and revocation must be verified before authority expansion."] -.-> authority
+    metabuilder -.-> rel_mb_verification["PROPOSED-ADAPTER<br/>Skills declare evidence requirements; only the controller may emit a VerificationRecord from observed checks."] -.-> verification
+    agent_adapter -.-> rel_agent_exec["PROPOSED-ADAPTER<br/>Model dispatch must be prepared with exact route and hard limits; output remains a claim and is never blind-replayed."] -.-> execution
+
+    invoke -.-> rel_invoke_debate["OVERLAPS<br/>Invokellm and debate share GPTEngage transport but lack one provenance, usage and cost receipt."] -.-> debate
+    invoke -.-> rel_invoke_ideate["OVERLAPS<br/>Invokellm queries models while ideate produces branches; the tree is not typed for selection or replay."] -.-> ideate
+    ecosystem --> rel_ecosystem_ideate["INVOKES<br/>The ecosystem audit grounds evidence before ideation sweeps, but does not emit a reusable backlog contract."] --> ideate
+
+    figma -.-> rel_figma_impl["OVERLAPS · OWNERSHIP DECISION NEEDED<br/>Both skills fetch design context, implement code and validate parity.<br/>Narrow figma to a read-only producer or consolidate the workflows."] -.-> figma_impl
+    figma_impl -.-> rel_impl_clean["PROPOSED-ADAPTER<br/>Quality review needs a change-set carrying Figma nodes, screenshots, deviations and verification requirements."] -.-> clean
+    clean --> rel_clean_fp["ROUTES-TO<br/>Clean-code review invokes FP refinement only when dataflow or state design benefits."] --> fp
+    fp --> rel_fp_clean["ROUTES-TO<br/>FP refinement yields back when idiom, simplicity, function size or complexity suffers."] --> clean
+    severe -.-> rel_severe_test["BORROWS-RULE<br/>Package splitting runs tests procedurally; a typed result should cover installs, units and cross-package integration."] -.-> tests
+
+    live_check --> rel_live_conversation["ROUTES-TO<br/>Live checking handles current corrections; completed sessions route to retrospective analysis."] --> conversation
+    pi_defects -.-> rel_pi_conversation["PROPOSED-ADAPTER<br/>The Pi digest cannot enter conversation analysis through a declared input contract."] -.-> conversation
+    conversation -.-> rel_conversation_postmortem["PROPOSED-ADAPTER<br/>No promotion rule turns a supported process finding into an incident while preserving evidence."] -.-> postmortem
+    postmortem -.-> rel_post_learning["PROPOSED-ADAPTER<br/>Accepted corrective actions should inform recipes without making learning self-authorizing."] -.-> learning_adapter
+    metabuilder -.-> rel_mb_learning["PROPOSED-ADAPTER<br/>MetaBuilder retrospectives and package conversation, incident and friction formats remain separate islands."] -.-> learning_adapter
+    learning_adapter -.-> rel_learning_loop["PROPOSED-ADAPTER<br/>Learning may propose a bounded objective or revision, but must return through human and controller authority."] -.-> autonomy
+    system_memory --> rel_memory_leak["ROUTES-TO<br/>A system-wide audit routes a named process with longitudinal growth to memleak investigation."] --> memleak
+
+    frame --> rel_frame_human["CONSUMES-ARTIFACT<br/>Humanize explicitly treats the product thesis as source of truth while changing audience language."] --> humanize
+    humanize -.-> rel_human_clear["OVERLAPS<br/>Humanize reorganizes for an audience; clear-writing edits prose quality.<br/>Expected ordering and semantic preservation are not shared as a contract."] -.-> clear
+    clear -.-> rel_clear_columns["BORROWS-RULE<br/>Column width is a useful pure formatting constraint and may compose as an option or narrow primitive."] -.-> columns
+    humanize -.-> rel_human_speak["CONSUMES-ARTIFACT<br/>Natural prose can feed speech, but pronunciation, chunking, voice and completion evidence remain caller conventions."] -.-> speak
+    whitepaper -.-> rel_whitepaper_pdf["OVERLAPS<br/>Whitepaper owns branded PDF production while markdown-to-pdf is generic; selection should prevent duplicate conversion."] -.-> pdf
+
+    commit --> rel_commit_squash["ROUTES-TO<br/>Commit routes history cleanup to squash-commits; the rewrite plan is not a typed prerequisite."] --> squash
+    rewrite --> rel_rewrite_squash["ROUTES-TO<br/>Message rewriting and structural squashing are distinct but need one history-surgery plan format."] --> squash
+    cleaner -.-> rel_cleaner_commit["PROPOSED-ADAPTER<br/>Destructive cleanup scope and proof should be bound into the committed change-set."] -.-> commit
+    privateify -.-> rel_private_commit["CONSUMES-ARTIFACT<br/>A typed privacy policy would let later release workflows prove safeguards remain active."] -.-> commit
+    hooks -.-> rel_hooks_commit["CONSUMES-ARTIFACT<br/>No portable receipt records installed hooks, source revision and setup path before commit."] -.-> commit
+    commit --> rel_pr_bundle["INVOKES<br/>PR lifecycle requires a clean commit set, safe squash and README/help validation before remote approval."] --> pr
+    squash --> rel_pr_bundle
+    readme --> rel_pr_bundle
+    topics -.-> rel_topics_pr["PROPOSED-ADAPTER<br/>Topic changes are a separate remote effect and need their own approval inside a release recipe."] -.-> pr
+
+    yore_harvest --> rel_yore["CONSUMES-ARTIFACT<br/>Harvest produces candidates; the LLM filter classifies them and presents a gated merge.<br/>The pair is strong, though its schemas remain local."] --> yore_filter
+
+    classDef major fill:#ffffff,stroke:#1d4ed8,stroke-width:4px,color:#000000,font-weight:bold;
+    classDef minor fill:#ffffff,stroke:#64748b,stroke-width:1.5px,color:#000000;
+    classDef redundant fill:#ffffff,stroke:#dc2626,stroke-width:3px,color:#7f1d1d,font-weight:bold;
+    classDef improveMajor fill:#ffffff,stroke:#f97316,stroke-width:4px,color:#7c2d12,font-weight:bold;
+    classDef improveMinor fill:#ffffff,stroke:#f97316,stroke-width:2.5px,color:#7c2d12;
+    classDef missing fill:#ffffff,stroke:#16a34a,stroke-width:3px,color:#14532d,font-weight:bold;
+    classDef relationship fill:#fef3c7,stroke:#111827,stroke-width:1.5px,color:#000000;
+
+    class legend_major major;
+    class legend_minor minor;
+    class legend_redundant redundant;
+    class legend_improve improveMajor;
+    class legend_missing missing;
+    class legend_relation,legend_edge_types relationship;
+
+    class grilling,commit,pr major;
+    class frame,charter,dag,metabuilder,autonomy,execution,handoff,skill_creator,tests improveMajor;
+    class arch,diagram_viewer,tui,ecosystem,figma,figma_impl,clean,fp,conversation,postmortem,pi_defects,humanize,clear,topics improveMinor;
+    class grill_alias redundant;
+    class contracts,binding,recipes,provenance,authority,resolver,lockfile,composition_linter,approval,verification,agent_adapter,learning_adapter,diagram_adapter missing;
+    class todos,columns,invoke,debate,ideate,severe,live_check,system_memory,memleak,whitepaper,pdf,speak,readme,git_status,squash,rewrite,cleaner,privateify,hooks,yore_harvest,yore_filter minor;
+    class rel_alias,rel_frame_grill,rel_grill_charter,rel_frame_dag,rel_charter_loop,rel_dag_loop,rel_todos_loop,rel_grill_debate,rel_grill_mb,rel_arch_viewer,rel_viewer_mb,rel_diagram_mb,rel_tui_recipe,rel_status_loop,rel_loop_exec,rel_loop_test,rel_exec_test,rel_loop_commit,rel_loop_handoff,rel_handoff_commit,rel_mb_loop,rel_creator_contract,rel_contract_binding,rel_contract_lint,rel_lint_recipe,rel_provenance_recipe,rel_recipe_resolver,rel_authority_resolver,rel_resolver_lock,rel_lock_mb,rel_approval_authority,rel_mb_verification,rel_agent_exec,rel_invoke_debate,rel_invoke_ideate,rel_ecosystem_ideate,rel_figma_impl,rel_impl_clean,rel_clean_fp,rel_fp_clean,rel_severe_test,rel_live_conversation,rel_pi_conversation,rel_conversation_postmortem,rel_post_learning,rel_mb_learning,rel_learning_loop,rel_memory_leak,rel_frame_human,rel_human_clear,rel_clear_columns,rel_human_speak,rel_whitepaper_pdf,rel_commit_squash,rel_rewrite_squash,rel_cleaner_commit,rel_private_commit,rel_hooks_commit,rel_pr_bundle,rel_topics_pr,rel_yore relationship;
+
+    style Legend fill:#ffffff,stroke:#111827,stroke-width:1.5px
+    style Intent fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Governed fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Future fill:#ffffff,stroke:#16a34a,stroke-width:2px,stroke-dasharray:6 4
+    style Deliberation fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Build fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Evidence fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Communication fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Git fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px
+    style Domain fill:#ffffff,stroke:#94a3b8,stroke-width:1.5px

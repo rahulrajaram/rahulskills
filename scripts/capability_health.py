@@ -21,7 +21,7 @@ def load_manifest(path: Path) -> dict[str, object]:
 
 
 def evaluate(
-    manifest: dict[str, object], loaded_mcps: set[str]
+    manifest: dict[str, object], loaded_mcps: set[str], selected_modes: dict[str, str] | None = None
 ) -> dict[str, object]:
     results: dict[str, object] = {}
     skills = manifest.get("skills", {})
@@ -29,11 +29,19 @@ def evaluate(
         raise ValueError("manifest 'skills' must be a table")
     for name, raw in sorted(skills.items()):
         config = raw if isinstance(raw, dict) else {}
+        selected_mode = (selected_modes or {}).get(name)
+        if selected_mode:
+            mode = config.get("modes", {}).get(selected_mode)
+            if isinstance(mode, dict):
+                config = {**config, **mode}
         commands = [str(item) for item in config.get("commands", [])]
+        required_commands = [str(item) for item in config.get("required_commands", commands)]
+        optional_commands = [str(item) for item in config.get("optional_commands", [])]
         mcps = [str(item) for item in config.get("mcps", [])]
         optional_mcps = [str(item) for item in config.get("optional_mcps", [])]
         platforms = [str(item).lower() for item in config.get("platforms", [])]
-        missing_commands = [command for command in commands if shutil.which(command) is None]
+        missing_commands = [command for command in required_commands if shutil.which(command) is None]
+        missing_optional_commands = [command for command in optional_commands if shutil.which(command) is None]
         missing_mcps = [mcp for mcp in mcps if mcp not in loaded_mcps]
         missing_optional_mcps = [mcp for mcp in optional_mcps if mcp not in loaded_mcps]
         current_platform = platform.system().lower()
@@ -41,15 +49,20 @@ def evaluate(
         results[name] = {
             "available": not missing_commands and not missing_mcps and not missing_platforms,
             "missing_commands": missing_commands,
+            "required_commands": required_commands,
+            "optional_commands": optional_commands,
+            "missing_optional_commands": missing_optional_commands,
             "missing_mcps": missing_mcps,
             "missing_optional_mcps": missing_optional_mcps,
             "missing_platforms": missing_platforms,
-            "degraded": bool(missing_optional_mcps),
+            "degraded": bool(missing_optional_commands or missing_optional_mcps),
             "effect": config.get("effect", "unknown"),
             "effects": config.get("effects", [config.get("effect", "unknown")]),
             "approval_boundaries": config.get("approval_boundaries", []),
             "layer": config.get("layer", "workflow"),
             "overlaps": config.get("overlaps", []),
+            "modes": config.get("modes", {}),
+            "selected_mode": selected_mode,
         }
     mcp_results = {
         name: {
@@ -92,9 +105,11 @@ def main() -> int:
     parser.add_argument("--mcp", action="append", default=[])
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--strict", action="store_true")
+    parser.add_argument("--mode", action="append", default=[], metavar="SKILL=MODE")
     args = parser.parse_args()
     env_mcps = os.environ.get("LOADED_MCP_NAMESPACES", "").split(",")
-    report = evaluate(load_manifest(args.manifest), set(args.mcp) | set(filter(None, env_mcps)))
+    modes = dict(item.split("=", 1) for item in args.mode if "=" in item)
+    report = evaluate(load_manifest(args.manifest), set(args.mcp) | set(filter(None, env_mcps)), modes)
     report["undeclared_source_skills"] = undeclared_source_skills(
         load_manifest(args.manifest), REPO / "skills"
     )

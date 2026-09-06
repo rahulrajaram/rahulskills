@@ -1,0 +1,151 @@
+%%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
+flowchart TB
+    principal(["HUMAN PRINCIPAL · supplies original authority and reserved decisions"])
+    delegation[/"TARGET INPUT · StandingDelegation"/]
+    entry[/"ENTRY VALUE · ObjectiveRequest<br/>requester, principal, objective, delegation reference"/]
+
+    subgraph Orchestrator["PROCESS 1 · ORCHESTRATOR · prepare one authorized objective"]
+        direction TB
+        authorize["TARGET FUNCTION · authorizeRequest"]
+        authorized[/"TARGET VALUE · AuthorizedRequest"/]
+        frame["TARGET CALLABLE PHASE · frame goals and constraints"]
+        thesis[/"TARGET VALUE · verified ProductThesis"/]
+        grill["TARGET CALLABLE PHASE · grill material unknowns"]
+        decisions[/"TARGET VALUE · verified DecisionRecord"/]
+        classify{"TARGET DECISION · routine under delegation or reserved?"}
+        delegated_ratify["TARGET AUTHORITY GATE · delegated ratifier"]
+        human_request[/"MESSAGE · exact reserved decision packet"/]
+        ratified[/"TARGET VALUE · RatificationProof plus accepted DecisionRecord"/]
+        decompose["TARGET CALLABLE PHASE · decompose objective"]
+        dag[/"TARGET VALUE · verified finite ExecutionDag"/]
+        derive["TARGET FUNCTION · derive attenuated envelope"]
+        prepared[/"TARGET VALUE · PreparedObjective<br/>thesis, decisions, DAG, authority"/]
+    end
+
+    subgraph MetaBuilder["PROCESS 2 · METABUILDER · resolve, compile, admit, and verify"]
+        direction TB
+        catalog[/"TARGET INPUT · ContractCatalog<br/>contracts plus exact execution bindings"/]
+        recipe[/"TARGET INPUT · RecipeSpec<br/>required roles and completeness rules"/]
+        resolve["TARGET PURE FUNCTION · resolve compatible graph"]
+        resolved_graph[/"TARGET VALUE · ResolvedGraph"/]
+        lock_fn["TARGET PURE FUNCTION · create resolution lock"]
+        lock[/"TARGET VALUE · ResolutionLock"/]
+        compile[["INSTALLED · compile exact HarnessBundle"]]
+        bundle[/"INSTALLED VALUE · content-addressed HarnessBundle"/]
+        admit[["INSTALLED · re-admit bundle and effect catalog"]]
+        admitted[/"INSTALLED VALUE · AdmittedBundle"/]
+        observe[["INSTALLED · controller observes effect boundary"]]
+        observation[/"INSTALLED VALUE · Observation"/]
+        verify["TARGET FUNCTION · verify named checks"]
+        record[/"TARGET VALUE · VerificationRecord"/]
+        qualify["TARGET FUNCTION · report assurance dimensions separately"]
+        outcome[/"VALUE · FinalOutcome<br/>accepted, rejected, Unknown, or bounded stop"/]
+    end
+
+    subgraph Harness["PROCESS 3 · HARNESS · execute the admitted finite graph"]
+        direction LR
+        run[["INSTALLED · run admitted local effect"]]
+        protocol[["COMMITTED SOURCE · bounded offline MCP or agent effect"]]
+        claim[/"MESSAGE · worker Claim"/]
+    end
+
+    subgraph Target["PROCESS 4 · TARGET PROGRAM · exact governed values and tools"]
+        direction LR
+        source_value[/"VALUE · exact source or isolated candidate"/]
+        target_tool[["PROCESS · admitted build, test, or run against exact source"]]
+        target_output[/"VALUE · produced files and raw result"/]
+    end
+
+    principal_decision[/"MESSAGE · authenticated principal decision for the exact reserved packet"/]
+    exit(["EXIT · qualified result or explicit bounded stop"])
+
+    principal --> delegation
+    entry --> authorize
+    delegation --> authorize
+    authorize --> authorized
+    authorized --> frame
+    frame --> thesis
+    thesis --> grill
+    grill --> decisions
+    decisions --> classify
+    classify -->|routine and delegated| delegated_ratify
+    classify -->|reserved or unknown| human_request
+    human_request --> principal_decision
+    principal --> principal_decision
+    principal_decision --> ratified
+    delegated_ratify --> ratified
+    ratified --> decompose
+    thesis --> decompose
+    decompose --> dag
+    authorized --> derive
+    delegation --> derive
+    ratified --> derive
+    dag --> derive
+    derive --> prepared
+
+    prepared --> resolve
+    catalog --> resolve
+    recipe --> resolve
+    resolve --> resolved_graph
+    resolved_graph --> lock_fn
+    lock_fn --> lock
+    lock --> compile
+    compile --> bundle
+    bundle --> admit
+    admit --> admitted
+    admitted --> run
+    admitted -.-> protocol
+    source_value --> target_tool
+    run --> target_tool
+    protocol -.-> target_tool
+    target_tool --> target_output
+    target_output --> claim
+    claim --> observe
+    observe --> observation
+    observation --> verify
+    verify --> record
+    record --> qualify
+    qualify --> outcome
+    outcome --> exit
+
+    phase_rule["CALLABLE-PHASE RULE · execute, receive a claim, verify independently, then admit the value"]
+    fanout_rule["DATAFLOW RULE · this is a dependency graph; authorized request, thesis, and ratification each have multiple consumers"]
+    authority_rule["AUTHORITY RULE · resolution and every effect may narrow the envelope but can never widen it"]
+    program_rule["TYPE RULE · target source is an immutable value; only an admitted tool invocation is an effect"]
+    claim_rule["EVIDENCE RULE · producer output is a claim until MetaBuilder observes and verifies it"]
+    frame -.-> phase_rule
+    decompose -.-> phase_rule
+    thesis -.-> fanout_rule
+    prepared -.-> authority_rule
+    source_value -.-> program_rule
+    claim -.-> claim_rule
+
+    classDef actor fill:#ffffff,stroke:#0f172a,stroke-width:3px,color:#0f172a
+    classDef process fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef data fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef message fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef state fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef blocked fill:#ffffff,stroke:#991b1b,stroke-width:3px,color:#7f1d1d
+    classDef decision fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef artifact fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef note fill:#ffffff,stroke:#475569,stroke-width:1.7px,stroke-dasharray:7 5,color:#334155,font-size:13px
+    classDef installed fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#0f172a
+    classDef source fill:#ffffff,stroke:#7c3aed,stroke-width:3px,color:#4c1d95
+    classDef target fill:#ffffff,stroke:#16a34a,stroke-width:3px,stroke-dasharray:6 4,color:#14532d
+    classDef reserved fill:#ffffff,stroke:#f97316,stroke-width:3px,color:#7c2d12
+
+    class principal actor,reserved
+    class entry,delegation,authorized,thesis,decisions,ratified,dag,prepared,catalog,recipe,resolved_graph,lock,bundle,admitted,observation,record,outcome,source_value,target_output artifact
+    class human_request,principal_decision,claim message
+    class authorize,frame,grill,delegated_ratify,decompose,derive,resolve,lock_fn,verify,qualify target
+    class classify decision,target
+    class compile,admit,observe,run,target_tool process,installed
+    class protocol process,source
+    class bundle,admitted,observation installed
+    class exit actor
+    class phase_rule,fanout_rule,authority_rule,program_rule,claim_rule note
+
+    style Orchestrator fill:transparent,stroke:#0f172a,stroke-width:2.5px
+    style MetaBuilder fill:transparent,stroke:#1d4ed8,stroke-width:2.5px
+    style Harness fill:transparent,stroke:#7c3aed,stroke-width:2.2px
+    style Target fill:transparent,stroke:#64748b,stroke-width:1.8px,stroke-dasharray:6 4

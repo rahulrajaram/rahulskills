@@ -1,4 +1,4 @@
 interface:
   display_name: "Architecture Diagram"
-  short_description: "Generate a Mermaid architecture diagram from the current context or codebase."
-  default_prompt: "Run /archdiagram: analyze the current context or codebase and generate a Mermaid architecture diagram. Use --deep-review for holistic analysis, --type to specify diagram kind (component, sequence, class, etc.)."
+  short_description: "Diagram architecture in the requested format; ASCII by default."
+  default_prompt: "Use $archdiagram to diagram the current architecture in the requested format, defaulting to ASCII. Select deep review only when requested."

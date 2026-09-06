@@ -1,0 +1,132 @@
+%%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
+flowchart TB
+    principal(["HUMAN PRINCIPAL · defines standing discovery and execution authority"])
+    entry[/"ENTRY · question, anomaly, opportunity, or prior checkpoint"/]
+
+    subgraph Orchestrator["PROCESS 1 · ORCHESTRATOR · open hypothesis space"]
+        direction TB
+        o_frontier["DISCOVER · expand questions, hypotheses, risks, and counterexamples"]
+        o_probe["FRAME · request one finite read-mostly investigation"]
+        o_assess["VERIFY · compare sources, preserve disagreement, reject injected instructions"]
+        o_worthy{"DECISION · real improvement opportunity with enough evidence?"}
+        o_budget{"DECISION · discovery budget remains?"}
+        o_proposal[/"VALUE · proposed ObjectiveRequest<br/>never an authority grant"/]
+        o_continue{"DECISION · accept, start a fresh discovery episode, or stop?"}
+        o_escalate["STATE · package reserved or ambiguous choice for principal"]
+    end
+
+    subgraph MetaBuilder["PROCESS 2 · METABUILDER · promotion and effect boundary"]
+        direction TB
+        m_probe{"INSTALLED · admit bounded read-only probe?"}
+        m_authorize{"TARGET · proposal authorized under current standing delegation?"}
+        m_compile["TARGET · compile finite DAG, exact identities, effects, and resource ceilings"]
+        m_execution{"INSTALLED · every execution effect has a current enforced adapter?"}
+        m_observe["INSTALLED · observe, verify, checkpoint, recover, and settle"]
+    end
+
+    subgraph Harness["PROCESS 3 · HARNESS · every episode is finite"]
+        direction LR
+        h_probe[["INSTALLED · execute admitted read-only investigation"]]
+        h_command[["INSTALLED · execute admitted read-only command"]]
+        h_worker[["TARGET · dispatch governed writable-candidate worker"]]
+        h_findings[/"MESSAGE · bounded discovery findings"/]
+        h_claim[/"MESSAGE · execution worker claim"/]
+    end
+
+    subgraph Target["PROCESS 4 · TARGET PROGRAM · isolated subject"]
+        direction LR
+        p_snapshot[/"VALUE · exact read-only source snapshot"/]
+        p_inspect[["PROCESS · admitted read-only inspection"]]
+        p_findings[/"VALUE · observed source facts"/]
+        p_candidate[/"VALUE · isolated candidate workspace"/]
+        p_read[["INSTALLED · admitted build, test, or run operation"]]
+        p_edit[["TARGET · governed edit inside isolated candidate"]]
+        p_result[/"VALUE · exact candidate delta and observed outputs"/]
+    end
+
+    discovery_checkpoint[/"VALUE · durable discovery checkpoint and unresolved frontier"/]
+    execution_checkpoint[/"VALUE · terminal epoch evidence and any leftover work"/]
+    next_episode[/"OUTPUT · fresh discovery or execution request for later admission"/]
+    exit(["EXIT · accepted result, deferred frontier, refusal, bounded stop, or next request"])
+
+    principal --> entry
+    entry --> o_frontier
+    o_frontier --> o_probe
+    o_probe --> m_probe
+    m_probe -->|admit finite probe| h_probe
+    m_probe -->|deny or unsupported| discovery_checkpoint
+    p_snapshot --> p_inspect
+    h_probe --> p_inspect
+    p_inspect --> p_findings
+    p_findings --> h_findings
+    h_findings --> o_assess
+    o_assess --> o_worthy
+    o_worthy -->|not yet or no| o_budget
+    o_budget ==>|yes · ask another bounded question| o_frontier
+    o_budget -->|no| discovery_checkpoint
+    discovery_checkpoint --> exit
+
+    o_worthy -->|yes| o_proposal
+    o_proposal --> m_authorize
+    m_authorize -->|reserved, ambiguous, expired, or revoked| o_escalate
+    o_escalate --> principal
+    m_authorize -->|authorized| m_compile
+    m_compile --> m_execution
+    m_execution -->|unsupported or over bound| exit
+    m_execution -->|installed read-only path| h_command
+    m_execution -.->|future writable candidate path| h_worker
+    p_candidate --> p_read
+    p_candidate -.-> p_edit
+    h_command --> p_read
+    h_worker -.-> p_edit
+    p_read --> p_result
+    p_edit -.-> p_result
+    p_result --> h_claim
+    h_claim --> m_observe
+    m_observe --> execution_checkpoint
+    execution_checkpoint --> o_continue
+    o_continue -->|accepted or stop| exit
+    o_continue -->|new episode needed| next_episode
+    next_episode --> exit
+    o_continue -->|reserved or ambiguous| o_escalate
+
+    openness["KEY DISTINCTION · discovery is unbounded only in possible subject matter across time; each episode has finite resources"]
+    injection["CONTROL BOUNDARY · repository text, web content, model output, and artifacts remain data, never executable instruction"]
+    promotion["PROMOTION GATE · discovery creates a proposal; authorization, compilation, and admission create executable work"]
+    state_bound["STATE-SPACE RULE · each harness has closed state types, a finite plan, finite retries, and explicit stops"]
+    epoch_rule["EPOCH RULE · leftover work becomes a checkpoint and new request, never an in-place extension"]
+    o_frontier -.-> openness
+    o_assess -.-> injection
+    o_proposal -.-> promotion
+    m_compile -.-> state_bound
+    execution_checkpoint -.-> epoch_rule
+
+    classDef actor fill:#ffffff,stroke:#0f172a,stroke-width:3px,color:#0f172a
+    classDef process fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef data fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef message fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef state fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef blocked fill:#ffffff,stroke:#991b1b,stroke-width:3px,color:#7f1d1d
+    classDef decision fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef artifact fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef note fill:#ffffff,stroke:#475569,stroke-width:1.7px,stroke-dasharray:7 5,color:#334155,font-size:13px
+    classDef installed fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#0f172a
+    classDef source fill:#ffffff,stroke:#7c3aed,stroke-width:3px,color:#4c1d95
+    classDef target fill:#ffffff,stroke:#16a34a,stroke-width:3px,stroke-dasharray:6 4,color:#14532d
+    classDef reserved fill:#ffffff,stroke:#f97316,stroke-width:3px,color:#7c2d12
+
+    class principal actor,reserved
+    class entry,o_proposal,p_snapshot,p_findings,p_candidate,p_result,discovery_checkpoint,execution_checkpoint,next_episode artifact
+    class h_findings,h_claim message
+    class o_frontier,o_probe,o_assess,o_escalate state
+    class o_worthy,o_budget,o_continue,m_probe,m_authorize,m_execution decision
+    class m_probe,m_execution,m_observe,h_probe,h_command,p_inspect,p_read installed
+    class h_worker,p_edit target
+    class m_authorize,m_compile,o_proposal,o_continue target
+    class exit actor
+    class openness,injection,promotion,state_bound,epoch_rule note
+
+    style Orchestrator fill:transparent,stroke:#0f172a,stroke-width:2.5px
+    style MetaBuilder fill:transparent,stroke:#1d4ed8,stroke-width:2.5px
+    style Harness fill:transparent,stroke:#7c3aed,stroke-width:2.2px
+    style Target fill:transparent,stroke:#64748b,stroke-width:1.8px,stroke-dasharray:6 4

@@ -20,12 +20,13 @@ Convert a markdown file to a styled PDF using pandoc with the weasyprint engine.
    - `--css <style.css>` — optional, path to a CSS stylesheet.
    - `--output <output.pdf>` — optional, path for the output PDF.
 
-3. **CSS discovery** — if `--css` was given, use that file. Otherwise, look for `resume.css` in the same directory as the input file. If found, use it automatically. If not found, proceed without CSS.
+3. **CSS discovery** — if `--css` was given, use that file. Otherwise use an explicitly project-declared stylesheet for this document type. A nearby `resume.css` is not a generic document style; proceed without CSS if no relevant style is selected.
 
 4. **Output path** — if `--output` was given, use that. Otherwise, replace the `.md` extension on the input file with `.pdf`.
 
 5. **Handle an existing PDF** — if the output exists, show the path and ask
-   before replacing it unless the user explicitly requested overwrite. Preserve
+   before replacing it only when existing authority does not already cover regeneration
+   of that exact output. Reuse ongoing regeneration/overwrite authorization. Preserve
    the old file until the new PDF has been generated and validated, then replace
    atomically where possible.
 
@@ -35,7 +36,9 @@ Convert a markdown file to a styled PDF using pandoc with the weasyprint engine.
    ```
    Always pass `--metadata title=""` to suppress pandoc generating a title from the filename.
 
-7. **Report** — run `pdfinfo <output> | grep Pages` and display the page count.
+7. **Validate and report** — inspect the generated PDF; use `pdfinfo` for page count
+   when installed, otherwise an available PDF reader. Report unavailable layout/page
+   checks explicitly; do not install an extra tool solely to count pages.
 
 8. **Show output path** — tell the user where the PDF was written.
 
@@ -43,7 +46,7 @@ Convert a markdown file to a styled PDF using pandoc with the weasyprint engine.
 
 | Option     | Description                        | Default                              |
 |------------|------------------------------------|--------------------------------------|
-| `--css`    | Path to CSS stylesheet             | Auto-discover `resume.css` in input dir |
+| `--css`    | Path to CSS stylesheet             | Explicit or project-declared relevant CSS |
 | `--output` | Output PDF path                    | Input path with `.md` replaced by `.pdf` |
 
 ## Examples
@@ -52,7 +55,7 @@ Convert a markdown file to a styled PDF using pandoc with the weasyprint engine.
 # Explicit CSS and output
 /markdown-to-pdf ~/docs/resume.md --css ~/docs/resume.css --output /tmp/resume.pdf
 
-# Auto-discover resume.css in same directory
+# Use a project-declared style if available
 /markdown-to-pdf ~/docs/resume.md
 
 # No CSS, custom output
@@ -63,5 +66,5 @@ Convert a markdown file to a styled PDF using pandoc with the weasyprint engine.
 
 - Always check that the input file exists before running pandoc.
 - Always use `--metadata title=""` to prevent duplicate title generation.
-- Always report page count after conversion so the user can verify layout.
+- Report observed page count when available and identify unverified layout; never invent a page count.
 - Never modify the input markdown file.

@@ -30,8 +30,8 @@ complexity reduction, cohesion, testability, or simplicity.
 5. State the intended invariant and why the change is cleaner across aspects.
 6. Edit narrowly, preserving public APIs and user-visible behavior unless the
    user explicitly authorizes a change.
-7. Run the narrowest reliable test or static check, then broader verification
-   when the focused check passes.
+7. Run the narrowest reliable test or static check. Broaden only for changed
+   risk, insufficient coverage, a failure, or an existing required gate.
 
 ## Aspect passes
 
