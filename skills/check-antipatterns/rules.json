@@ -2,27 +2,31 @@
   "universal_rules": [
     {
       "id": 1,
+      "stable_id": "DIAG-001",
       "rule": "NEVER hardcode credentials",
       "keywords": ["PASSWORD", "SECRET", "KEY", "TOKEN", "CREDENTIAL"],
-      "detection": "Message contains security keywords without kubectl get secret",
+      "detection": "Credential assignment detected; source, placeholder status, authorization, and exposure require contextual review",
       "severity": "HIGH"
     },
     {
       "id": 2,
-      "rule": "ALWAYS diagnose before retry",
+      "stable_id": "DIAG-002",
+      "rule": "Diagnose failures before blind retries; preserve useful repetition",
       "keywords": ["retry", "again"],
-      "detection": "Same command run 2+ times without diagnostic commands",
+      "detection": "Repeated action without visible diagnosis is a candidate; intentional repetition and test cycles are not violations",
       "severity": "HIGH"
     },
     {
       "id": 3,
-      "rule": "STOP and ASK when scope expands",
+      "stable_id": "DIAG-003",
+      "rule": "Confirm authorization for material scope changes",
       "keywords": ["also create", "also build", "also implement", "additionally"],
-      "detection": "Creating new files/services not in original request",
+      "detection": "Scope language is a candidate for contextual review; new files or services may be necessary to already-authorized work",
       "severity": "MEDIUM"
     },
     {
       "id": 4,
+      "stable_id": "DIAG-004",
       "rule": "VERIFY entire dependency chain",
       "keywords": ["integration", "e2e", "test"],
       "detection": "Running integration tests without preflight checks",
@@ -30,6 +34,7 @@
     },
     {
       "id": 5,
+      "stable_id": "DIAG-005",
       "rule": "DISCOVER tools before reinventing",
       "keywords": ["script", "tool", "command"],
       "detection": "Never checked for existing tools in conversation",
@@ -37,6 +42,7 @@
     },
     {
       "id": 6,
+      "stable_id": "DIAG-006",
       "rule": "External values MUST be verified",
       "keywords": ["ip", "url", "endpoint"],
       "detection": "Using IP addresses/URLs without verification",
@@ -107,10 +113,12 @@
     },
     {
       "id": 16,
+      "stable_id": "DIAG-016",
       "rule": "Destructive targets require exact identity and containment checks",
       "keywords": ["rm -rf", "find -delete", "git clean", "reset --hard", "rmtree"],
-      "detection": "A destructive command appears without independently verified target identity, containment, and recovery",
+      "detection": "Destructive command detected; inspect prior authorization, target checks, and recovery rather than inferring missing guards",
       "severity": "HIGH"
     }
-  ]
+  ],
+  "interpretation": "Review heuristics, not independent authority. Confirm candidates against active instructions and prior authorization; absence of a keyword does not prove a missing check."
 }

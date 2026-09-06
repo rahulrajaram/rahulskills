@@ -1,143 +1,93 @@
 ---
 name: readme-doctor
-description: "Build and validate project README and CLI help text. Ensures README accuracy against code, CLI help-text congruence across all commands, and correct usage examples. Use when user says /readme-doctor, 'update readme', 'fix help text', 'documentation audit', or asks to validate CLI documentation."
-argument-hint: ""
+description: "Correct or audit README and CLI help against actual project behavior. Use for narrow documentation/help fixes or an explicitly requested full documentation audit; preserve the requested scope."
+argument-hint: "[section, command, or full audit]"
 ---
 
 # README Doctor
 
-Two responsibilities: (1) build a comprehensive, accurate README and (2) validate that all CLI help text is correct and congruent.
+## Intent and applicability
 
-## When to Use
+Make the selected documentation accurate and understandable. A request to fix one
+README section or command's help selects that scope. A full audit or rebuild
+selects broader discovery; a bare invocation uses the current task/diff to choose
+a useful bounded scope, or asks if materially different outcomes remain plausible.
 
-- After significant feature work to update the README
-- Before releases to ensure documentation accuracy
-- When CLI commands or arguments change
-- When user asks to audit or fix documentation
+## Inputs and local bindings
 
-## Part 1: README Generation
+Read the existing document and relevant code before editing. Identify the actual
+language, CLI framework, build/run command, configuration sources and audience.
+Use an existing binary or the project's supported local invocation. Rust/clap,
+Axum, protobuf, MCP and Haake-specific files matter only when present and relevant.
+A project can intentionally use different domain terms for distinct concepts;
+map their meaning before standardizing wording.
 
-### Content Requirements
+## Non-goals
 
-A complete README MUST contain these sections in order:
+A narrow correction does not select a full README, all-command audit, API redesign,
+new feature, tool installation or release. Requested supporting source/help edits
+remain in scope when they preserve behavior. A full README needs only the sections
+that serve this project and reader, not every possible interface.
 
-1. **Title + one-line description**
-2. **What is this?** — 2-3 paragraph explanation of the project, its purpose, and who it's for
-3. **Features** — bullet list of capabilities
-4. **Installation** — building from source, cargo install, Docker
-5. **Quick Start** — minimal steps to get running (init → serve → use)
-6. **CLI Reference** — every command and subcommand with actual `--help` output
-7. **AI Agent Integration** — MCP setup for Claude Code, Codex, and other MCP clients
-8. **gRPC API** — service definition, key RPCs, connection examples
-9. **REST API** — route overview, example curl commands
-10. **Configuration** — environment variables, `.haake.yml` format
-11. **Architecture** — system diagram, key concepts explained
-12. **Security** — auth, TLS, rate limiting, input validation
-13. **Examples** — runnable code examples
-14. **License**
+## Must not
 
-### Accuracy Rules
+Do not invent features, usage results, configuration names or guarantees. Do not
+rename flags, change defaults or public API merely to make help text uniform.
+Do not claim execution validation from source inspection alone. Preserve user
+structure/wording requirements and unrelated documentation.
 
-- **Every CLI example MUST be verified** against actual `--help` output. Run `cargo run --offline -- <cmd> --help` and compare.
-- **Flag names, defaults, and descriptions** must match what clap actually produces.
-- **gRPC RPCs** must match the proto file exactly.
-- **REST routes** must match the Axum router in rest.rs.
-- **MCP tools** must match the tool definitions in mcp.rs.
-- **Environment variables** must match what the code actually reads (check with `grep -r "HAAKE_" src/`).
-- **No aspirational features** — only document what actually works.
+## Interaction and authority
 
-### Style Rules
+A request to fix documentation authorizes relevant local edits without first-use
+confirmation. Resolve ordinary wording/format choices autonomously. Prepare and
+ask about an unresolved behavior/API or scope change; continue independent
+corrections. Reuse a parent's selected scope and still-valid decisions.
 
-- Use active voice
-- Prefer concrete examples over abstract descriptions
-- Keep sentences concise
-- Use consistent formatting throughout
-- Code blocks must specify the language (bash, rust, yaml, etc.)
-- No emojis unless the user requests them
-- Use backtick formatting for CLI commands, flags, env vars, file paths
+## Procedure
 
-## Part 2: CLI Help-Text Audit
+### Select and gather
 
-### What to Check
+For a narrow fix, inspect the relevant section/command and neighboring context.
+For a full audit, enumerate public commands and supported interfaces, then inspect
+their help, source and configuration definitions. Avoid starting services or
+executing side-effecting examples just to document them. Use safe help commands
+and available source evidence; identify blocked runtime checks explicitly.
 
-For every command and subcommand:
+### Correct help and documentation together
 
-1. **Run `<binary> <cmd> --help`** and capture the output
-2. **Verify congruence** across all commands:
-   - Consistent terminology (e.g., "Agent name" vs "Agent or scope name" — pick one)
-   - Consistent flag naming patterns (e.g., `-y/--yes` for skip confirmation everywhere)
-   - Consistent default value formatting
-   - No superfluous or confusing syntax in usage lines
-3. **Verify correctness against code**:
-   - Every `#[arg]` attribute matches the help output
-   - Default values shown in help match actual defaults in code
-   - Descriptions are accurate and not misleading
-   - Possible values listed are complete and correct
-4. **Flag for issues**:
-   - Missing descriptions
-   - Inconsistent capitalization
-   - Arguments that exist in code but don't appear in help
-   - Help text that references removed features
-   - Duplicate or conflicting short flags
+Compare exact flag names, accepted values, required inputs, defaults and examples
+with behavior. Verify changed CLI examples against the actual relevant `--help`
+and implementation. Framework-specific checks apply only to that framework:
+clap attributes for clap, routers for the detected web framework, proto schemas
+for gRPC, actual tool definitions for MCP, actual reads for environment variables.
 
-### Congruence Report Format
+Align terms for the same concept; retain justified distinctions and compatibility
+aliases. Missing descriptions, misleading defaults, conflicting flags and obsolete
+features are findings. A hidden compatibility command is not necessarily missing
+documentation, and a repeated version/help flag is not inherently a defect.
 
-```
-CLI Help-Text Audit Report
-==========================
+For full README work, adapt sections to the project: purpose/audience, supported
+features, installation, quick start, usage/configuration, examples, security,
+architecture and license where useful. Link a large CLI/API reference rather than
+pasting every help screen. Include AI integration, gRPC, REST or Docker only when
+supported and relevant. Clearly separate planned capabilities if documenting a
+roadmap was requested.
 
-Commands scanned: N
-Issues found: N
+Use active voice, concrete examples and language-labeled code blocks. Keep commands,
+identifiers, uncertainty and facts intact; no stylistic cleanup that strengthens
+claims. Do not replace an existing README without first reading it.
 
-INCONSISTENCIES:
-  [WARN] `haake query` uses "Agent name" but `haake memory insert` uses
-         "Agent or scope name" — should be consistent
-  [FIX]  `haake memory insert --type` should be `--memory-type` to match
-         other commands
+### Verify the changed surface
 
-MISSING:
-  [MISS] `haake serve` does not document HAAKE_REST_PORT env var
+Recheck affected help and examples, relevant links and syntax. Reuse unchanged
+help evidence within the same task; rerun all commands only for a full audit or
+shared change that can affect them all. Use the narrowest reliable project check
+for source/help-definition changes; broaden for a failure or actual coverage gap.
 
-INCORRECT:
-  [ERR]  `haake import --type` default shown as "working" but code
-         defaults to "semantic"
+## Completion and evidence
 
-SUPERFLUOUS:
-  [TRIM] `haake memory insert` shows "-V, --version" which is noise
-         for a subcommand
-```
-
-## Workflow
-
-### Step 1: Gather
-
-- Read current README.md
-- Run `<binary> --help` and all subcommand `--help`
-- Read proto files, rest.rs routes, mcp.rs tool definitions
-- Read Cargo.toml for version and metadata
-- Grep for env vars: `grep -rn "HAAKE_\|SW4RM_" src/`
-
-### Step 2: Audit Help Text
-
-- Run Part 2 checks
-- Produce the congruence report
-- Fix any issues found in the clap definitions (with user approval)
-
-### Step 3: Write README
-
-- Generate the full README following Part 1 structure
-- Every CLI example must use exact flag names from `--help` output
-- Present a diff summary to the user before writing
-
-### Step 4: Validate
-
-- Re-run all `--help` commands and verify README matches
-- Check all internal links resolve
-- Verify code examples are syntactically valid
-
-## Safety
-
-- Always read existing README before overwriting
-- Present changes for approval on first use
-- Do not modify clap definitions without asking
-- Do not add features to README that don't exist in code
+Summarize what changed, the sections/commands inspected, observed checks and
+remaining uncertainty. For a full audit, group actionable inconsistencies,
+missing content and incorrect examples with source locations. State what was
+not inspected; do not label an incomplete audit comprehensive. No fixed report
+format is required unless the user or a consumer selects one.

@@ -5,7 +5,8 @@ MetaBuilder program. Repository policy and the CLI remain authoritative.
 
 ## 1. Establish the frame
 
-Record these before solutioning:
+Recover these from existing context before formal construction; missing actors
+or decisions need not block independent analysis or provisional drafts:
 
 | Item | Required content |
 | --- | --- |
@@ -49,12 +50,13 @@ Classify each material statement:
 | Decision | Choice that fixes product or technical behavior | Exact approval evidence |
 
 Resolve technical questions with evidence when possible. Route genuine product
-choices to the product owner. Fresh generation cannot continue with a material
-open unknown; an owned assumption is acceptable only when its impact and
-revisit trigger are explicit.
+choices to the product owner. Formal fresh generation cannot continue with a
+material open unknown. Provisional design may expose it for review; an owned
+assumption is acceptable only when its impact and revisit trigger are explicit.
 
 ## 4. Grill and prepare the brief
 
+Reuse still-valid answers and explicit decisions before asking new questions.
 The grilling record must cover goals, constraints, risks, success criteria,
 actors, and material unknowns. Include non-goals, effect boundaries, negative
 behavior, recovery, and evidence adequacy when they affect the design.
@@ -79,8 +81,10 @@ metabuilder harness brief inspect --input harness-brief.prepared.json \
 ```
 
 The inspection returns `brief_digest` and structural gate refusals. Resolve all
-refusals, then ask each `agreement_required` actor to review that exact digest.
-Create an approval request shaped as:
+refusals before formal agreement. Reuse approval only for the exact digest and
+still-valid actors, decisions, effects, and grants; otherwise ask each affected
+`agreement_required` actor to accept the new prepared digest. Prepare a request
+for review, but populate its evidence only from actual approval records:
 
 ```json
 {
@@ -96,7 +100,8 @@ Create an approval request shaped as:
 }
 ```
 
-Finalize and verify:
+After named-owner decision ratification, all required exact-digest acceptances,
+and authorization for these local artifact writes, finalize and verify:
 
 ```bash
 metabuilder harness brief finalize \
@@ -135,7 +140,8 @@ authority-free state.
 
 ## 6. Commit to an executable module
 
-For a hand-authored consumer module, begin with
+After formal ratification and within construction/write authority, begin a
+hand-authored consumer module with
 `metabuilder qualify template --kind module`. Preserve the agreed meaning while
 adding implementation commitments:
 
@@ -160,6 +166,9 @@ For each action, record required reads, writes, process execution, toolchains,
 network, credentials, external state, and irreversible effects. Compare those
 requirements with the controller's admitted ceiling. Refuse any mismatch.
 
-After `harness compile` and `harness check` both succeed, hand the artifacts to
+Compilation/checking do not authorize a run. Carry the verified CLI identity,
+relevant help/guide evidence, exact approvals, and effect grants into the handoff;
+recheck changed bindings rather than repeating settled discovery. After
+`harness compile` and `harness check` both succeed, hand the artifacts to
 `metabuilder-consumer-qualification`. Preserve limitations and untested
 conditions; do not translate structural validity into production readiness.

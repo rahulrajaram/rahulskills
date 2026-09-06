@@ -1,4 +1,4 @@
 interface:
   display_name: "Markdown to PDF"
   short_description: "Convert markdown to PDF via pandoc + weasyprint."
-  default_prompt: "Run /markdown-to-pdf: convert the given markdown file to a one-page PDF using pandoc and weasyprint."
+  default_prompt: "Use $markdown-to-pdf to convert the given Markdown to PDF with the requested stylesheet and output path, preserving content without an implicit page limit."

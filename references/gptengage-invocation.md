@@ -18,7 +18,8 @@ selected operation recipe.
 
 ## Effects and persistence
 
-- Backend processes are read-only by default. Pass `--write` only for explicit
+- Adapters request read-only access by default; configured flags are not proof
+  of sandbox enforcement. Pass `--write` only for explicit
   workspace-write intent; it does not authorize git, remote, deployment, or
   other actions beyond the user's request.
 - Named sessions persist full conversation turns under
@@ -29,8 +30,9 @@ selected operation recipe.
 
 ## Execution and results
 
-- Use `~/.local/bin/gptengage`; do not bypass it by calling child AI CLIs
-  directly.
+- Resolve the authorized existing `gptengage` executable; do not bypass it by
+  calling child AI CLIs directly or silently replace the installed binary.
+  Source changes do not establish installed capability: inspect selected help.
 - Pass timeouts to gptengage itself. An optional outer watchdog is secondary and
   must exceed the inner timeout or the expected full orchestration duration.
 - Capture exit status and stderr. Distinguish unavailable backend,
@@ -38,3 +40,21 @@ selected operation recipe.
   denial when evidence permits.
 - Validate structured output before use and record backend/model identity when
   exposed. Model output never independently authorizes local or remote writes.
+
+## Observable identity and bounded linear runtime
+
+When supported by the selected binary, `invoke --output json` exposes requested
+model, process outcome, optional backend facts and capability provenance. Preserve
+unknowns: successful transport does not prove model completion, selected model
+identity, usage or enforced access. Do not claim cross-model comparison when the
+resolved identity is unobserved. Unsupported explicit model routing must fail;
+never silently drop the user's selection.
+
+The explicitly selected `grill` runtime persists private role instructions,
+prompts and reports under a new user-selected run directory. Disclose that
+persistence and the selected recipients before unresolved authorization. It bounds
+direct alternating calls and per-call time, not nested tool/model expenditure or
+hard tokens. Public status excludes private control data mechanically; opt-in
+model-authored dialogue can echo private input and requires review before sharing.
+No installed support, semantic validation, automatic resume or replay should be
+assumed from the skill's description alone.

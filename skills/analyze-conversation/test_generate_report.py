@@ -17,6 +17,46 @@ def write_jsonl(path: Path, events: list[dict]) -> None:
 
 
 class CodexNormalizationTests(unittest.TestCase):
+    def test_candidates_preserve_authority_and_redact_before_excerpting(self) -> None:
+        # Userinfo crosses the 80-character command and 300-character context
+        # limits; redacting only the final report would miss the truncated @.
+        secret = "userinfo-sensitive-" + "z" * 400
+        command = "deploy https://user:" + secret + "@host.invalid"
+        text = 'password="fixture"; let me also add the requested tests. https://user:' + secret + '@host.invalid'
+        events = [
+            {"type": "user", "message": {"content": "Implement the fix and all necessary tests; continue autonomously."}},
+            {"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}},
+            *[
+                {"type": "assistant", "message": {"content": [{"name": "Bash", "input": {"command": command}}]}}
+                for _ in range(3)
+            ],
+        ]
+        with tempfile.TemporaryDirectory() as raw_dir:
+            root = Path(raw_dir)
+            transcript = root / "candidates.jsonl"
+            write_jsonl(transcript, events)
+            with patch.dict("os.environ", {"HOME": str(root)}):
+                output = Path(generate_report.generate_markdown_report(transcript))
+            report = output.read_text(encoding="utf-8")
+        self.assertIn("Heuristic Candidates", report)
+        self.assertIn("prior authorization", report)
+        self.assertIn("current authority or safety violation", report)
+        self.assertIn("Continue necessary authorized work", report)
+        self.assertIn("Evidence:", report)
+        self.assertNotIn("userinfo-sensitive", report)
+        self.assertIn("[REDACTED]", report)
+        for unsupported in (
+            "Universal Rules Violated", "Always read from K8s secrets",
+            "base64 -d", "without asking user", "Stop and ask before expanding",
+            "Build metrics dashboard", "Would have prevented",
+        ):
+            self.assertNotIn(unsupported, report)
+
+    def test_environment_credential_reference_does_not_require_kubernetes(self) -> None:
+        from patterns import find_credential_antipatterns
+        messages = [{"type": "assistant", "message": {"content": "export DB_PASSWORD=$APP_PASSWORD"}}]
+        self.assertEqual([], find_credential_antipatterns(messages))
+
     def test_report_redacts_transcript_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as raw_dir:
             root = Path(raw_dir)

@@ -16,10 +16,11 @@ git status --short
 git log --oneline -n 10
 ```
 
-If the repository contains `scripts/build_handoff_snapshot.py`, also run:
+Resolve `SKILL_DIR` to the loaded handoff skill directory. For a useful structured
+snapshot, run the bundled helper (not a guessed target-repository script):
 
 ```bash
-python scripts/build_handoff_snapshot.py --repo .
+python3 "$SKILL_DIR/scripts/build_handoff_snapshot.py" --repo .
 ```
 
 If multiple repositories or worktrees could own the handoff, resolve that real
@@ -27,7 +28,8 @@ ambiguity before committing.
 
 ## 2. Reconcile canonical plan documents
 
-Look for `IMPLEMENTATION_PLAN.md` and `PROMPT.md` at the repository root first.
+Update only canonical plans relevant to the current handoff. Look for
+`IMPLEMENTATION_PLAN.md` and `PROMPT.md` at the repository root first.
 If absent there, search for the canonical files the project treats as primary.
 
 - Mark work complete only when it is actually done.
@@ -35,7 +37,8 @@ If absent there, search for the canonical files the project treats as primary.
 - Remove stale claims that imply unfinished work is complete.
 - Do not invent completed work.
 
-If neither document exists, skip this step and record their absence.
+If neither relevant document exists, skip; do not create or reconcile unrelated
+plans just to write a handoff.
 
 ## 3. Commit the coherent workspace
 
@@ -70,9 +73,12 @@ with exact facts. Write the result to `<REPO_ROOT>/NEXT_SHELL_PROMPT.md` only
 after the coherent workspace commit so it records the actual final HEAD.
 
 Replace an existing untracked artifact atomically and do not print it to
-stdout. If the file is tracked, treat it as project-owned state and ask before
-replacing it. Keep the resulting artifact untracked and never add it to the
-index, `.gitignore`, or `.git/info/exclude` as a side effect of this workflow.
+stdout. If the file is tracked, preserve its project-owned status and honor existing
+update authority; ask only if replacement scope is unresolved. A new session
+artifact stays untracked by default. Never untrack an authoritative document or
+change ignore rules as a side effect. Existing explicit artifact/commit choices
+remain valid; record the actual resulting state rather than forcing an untracked
+layout.
 
 ## 6. Verify and report
 

@@ -11,6 +11,21 @@ decompose a product or project, build an issue tree, create a work breakdown
 structure, convert an objective into a DAG, or turn vague intent into actionable
 implementation and verification work.
 
+## Inputs, scope, and authority
+
+Bind the requested objective, existing decisions, constraints, acceptance
+criteria, and any project-native task/queue format from available evidence.
+Reuse a supplied plan rather than assuming the work starts from nothing.
+Decomposition does not by itself select implementation, queue writes, external
+research, or a new governance workflow. Necessary local inspection and routine
+planning choices remain autonomous within the request.
+
+Prepare a provisional plan and concrete alternatives before asking about a
+material unresolved scope, authority, public behavior, or irreversible choice.
+Hold only the dependent decision/work; reuse still-valid user answers. Do not
+invent requirements, evidence, estimates presented as measurements, or approval
+from a graph. Mark inferred priorities and unknown dependencies explicitly.
+
 ## Purpose
 
 Transform a root objective into:
@@ -85,7 +100,10 @@ as tasks. Do not disguise uncertainty as implementation work.
 
 ## Output contract
 
-Return these four sections.
+For a full decomposition or an explicit/automated JSON consumer, return these
+four sections and preserve the structured contract below. For a requested quick
+overview, use the compact mode instead; do not impose JSON unless requested or
+required by the consuming workflow.
 
 ### 1. Objective Summary
 
@@ -147,6 +165,24 @@ Return valid JSON in a fenced `json` block:
 }
 ```
 
+The example above is a shape template: choose one actual enum value per field
+and emit only actual nodes and references in the result.
+
+`nodes[].depends_on` is the canonical execution prerequisite representation:
+for node A, entry B means A waits for B. Keep `edges` for compatibility, with
+exactly one `{"from":"A","to":"B","type":"depends_on"}` projection for each
+canonical entry and no extra dependency projections. Reject missing IDs,
+duplicate IDs/edges, self-dependencies, and cycles. `parent_id` and `refines`
+express reasoning containment (child to parent), not execution precedence.
+Other typed relations explain evidence/artifact relationships; they cannot hide
+scheduling prerequisites. A real blocking prerequisite belongs in `depends_on`
+even when also annotated as `blocks` (blocker to blocked node).
+
+Execution dependencies are always acyclic. Represent iteration as a single
+bounded task with its iteration limit, exit condition, and verification stated
+in its description/acceptance criteria, or describe feedback separately from
+the execution graph. Do not add a dependency back-edge and call it a DAG.
+
 Use stable, readable node IDs such as `graph.schema`, `api.graph_read`, or
 `frontend.graph_view`. Do not use opaque sequential IDs unless the objective has
 no natural namespace.
@@ -162,7 +198,9 @@ Group the DAG into phases. Include:
 - the next 3 to 7 executable actions.
 
 If the active project uses a queueing system and the user asks to enqueue
-work, route through that mechanism only after the decomposition is accepted.
+work, prepare the exact queue changes and use the applicable existing authority.
+Reuse an accepted decomposition when still valid; ask only about unresolved
+material scope or queue-write authority before the dependent write.
 
 ## Quality checks
 
@@ -171,7 +209,9 @@ Before returning the result, validate:
 1. No sibling group mixes wildly different abstraction levels.
 2. Every major capability has at least one verification path.
 3. Every implementation task has acceptance criteria.
-4. The DAG has no cycles unless explicitly marked as an iterative feedback loop.
+4. Execution prerequisites are acyclic, all IDs resolve, and dependency edges
+   exactly match the canonical `depends_on` projection. Iteration is bounded
+   inside a node or recorded separately from execution dependencies.
 5. The first vertical slice is small enough to build quickly.
 6. Open questions are separated from tasks.
 7. Risks are not disguised as implementation tasks.
@@ -183,6 +223,8 @@ is intentional, call it out briefly.
 
 ## Compact mode
 
-When the user asks for a quick view, keep the JSON DAG small and include only
-the highest-value nodes. Still preserve node types, dependencies, verification,
-critical path, and first vertical slice.
+When the user asks for a quick view, a concise dependency list or diagram is
+sufficient. Preserve the outcome, meaningful node types, prerequisites,
+verification, critical path, first vertical slice, and unresolved decisions.
+If JSON is explicitly requested or required by an automated consumer, keep the
+JSON small while retaining its nodes/edges contract and projection checks.

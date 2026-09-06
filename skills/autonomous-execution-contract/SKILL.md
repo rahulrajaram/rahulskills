@@ -8,14 +8,61 @@ argument-hint: "<objective>"
 
 Use this skill when the user asks for long-running uninterrupted work, says to keep going for hours, grants broad autonomy, asks how to avoid routine interruptions, or explicitly invokes `autonomous-execution-contract`.
 
+## Intent, scope, and authority
+
+Complete the selected bounded objective with relevant verification. This skill
+executes an agreed task; it does not select a new epic, require a thesis/charter,
+or automatically enter `autonomy-loop` reactor continuation. A request to work
+for hours can remain one ordinary execution task.
+
+Reuse the user's objective, explicit decisions, permissions, and project stop
+rules. Choose routine methods and bounded recovery autonomously. Prepare concrete
+options and independent local work before asking about an unresolved material
+boundary; hold only the affected action. An existing valid grant is not erased
+by loading this skill. When called from an active reactor, inherit its stricter
+continuation envelope: authorization for an effect alone does not amend that
+envelope. Route a concrete scope amendment to its owner rather than bypass it.
+
+Do not invent approvals, source identities, receipts, usage, or completion.
+Defaults below fill omissions; they do not replace a user-selected objective,
+verification target, budget, or stronger applicable boundary.
+
+## Inputs and evidence profile
+
+Bind the target repository, task, verification commands, source/environment
+identity, permissions, and checkpoint path from existing project evidence.
+Choose the profile before interpreting the contract fields below:
+
+- **Standalone (default):** Use the project's current plan, issue, or handoff
+  and ordinary observed command output. Record the task, relevant source state
+  (including uncommitted changes), command/result, coverage, blockers, and next
+  action. Keep an aggregate usage figure when that is all the host exposes.
+  An epic ID, DAG, digest ledger, controller, and append-only event store are
+  unnecessary unless the selected project workflow requires them.
+- **Governed runtime:** Use this only when an actual selected controller and
+  proof policy provide the referenced identities, receipt validation, and
+  checkpoint mechanism. Verify those bindings and preserve their gates.
+  Do not manufacture controller receipts from agent summaries or describe
+  a handwritten checkpoint as replay assurance. Missing required runtime
+  evidence blocks the dependent governed action; it does not authorize a
+  silent downgrade to standalone execution.
+
+In the sections below, compiled epic contracts, policy digests, controller-owned
+receipts, and structured events apply to the governed profile. In standalone
+work, the corresponding steps mean the existing task/plan, observed verification,
+and concise project checkpoint. Reuse passing evidence only while relevant
+code, inputs, dependencies, environment, and requirement coverage remain valid;
+matching HEAD alone is insufficient. Inspect delegated evidence and rerun missing,
+stale, unverifiable, or insufficient checks rather than every delegated check.
+
 ## Contract Shape
 
 Treat the user's prompt as an execution contract. Extract or infer:
 
 - Objective: the concrete finish line.
-- Epic contract: the canonical path/checkpoint plus objective and authority
+- Epic contract (governed profile): the canonical path/checkpoint plus objective and authority
   digests whose unchanged policy this bounded task inherits.
-- Task ID and slice delta: the stable DAG node plus only the risk, authority,
+- Task ID and slice delta (when supplied by the project): the stable node plus the risk, authority,
   focused-proof, expected-evidence, and budget fields changed for this task.
 - Timebox: how long to keep working before summarizing or reassessing.
 - Reasoning posture: low by default for routine inspect/patch/test loops; escalate only for architecture, safety, product behavior, or unclear tradeoffs.
@@ -30,7 +77,8 @@ Treat the user's prompt as an execution contract. Extract or infer:
   bounded mechanical inspect/patch/test/benchmark work to lower-reasoning
   sub-agents, keeping proof and authorization judgment for the executor.
 
-If any field is missing, make the safest reasonable assumption and continue. A
+Infer ordinary missing fields where consequences permit; leave unavailable
+governed identities unresolved instead of inventing them. A
 missing `Via` follows an explicit host/project governor convention when one
 positively authorizes delegation; otherwise it defaults to `self`. Tool
 availability alone never grants delegation authority. Evidence-bearing
@@ -70,15 +118,16 @@ Routine implementation details, test failures, benchmark artifacts, noisy local 
 
 ## Execution Loop
 
-1. State the active task ID and objective, then verify the inherited epic
-   contract's objective/authority digests. Restate only changed policy.
-2. Orient: if resuming, load the canonical checkpoint and re-read only authority
-   or evidence whose digest changed. Never assume continuity you have not
+1. State the objective and existing task ID when supplied. In governed work,
+   verify the inherited epic contract's objective/authority digests. Restate
+   only changed policy.
+2. Orient: if resuming, load the canonical checkpoint and inspect changed
+   authority, source, inputs, or evidence; validate required governed digests. Never assume continuity you have not
    verified, but do not retransmit unchanged invariants as fresh prose.
 3. Gather the narrowest context needed for the next concrete step.
 4. Patch the next failure or missing capability directly (or delegate the mechanical patch to a sub-agent per the `Via` field; review its diff before accepting).
-5. Run focused verification after each coherent patch. If delegated, validate a
-   controller-owned receipt binding the command/manifest, exit, duration,
+5. Run focused verification after each coherent patch. In the governed profile,
+   validate delegated proof through a controller-owned receipt binding the command/manifest, exit, duration,
    source tree, dependencies, toolchain, features, environment, and artifacts.
    Re-run the acceptance check only when no valid receipt exists or a bound
    identity changed.
@@ -89,7 +138,8 @@ Routine implementation details, test failures, benchmark artifacts, noisy local 
 8. Add the completed task to its tranche. Commit only when the tranche is
    coherent, permitted, and has satisfied the proof schedule; a patch, slice,
    checkpoint, commit, and milestone are distinct events.
-9. Append a checkpoint event after every commit, expensive proof run, budget or
+9. In the governed profile, append a checkpoint event after every commit,
+   expensive proof run, budget or
    stop event, authority revision, and context compaction. Include stable task
    and acceptance IDs, receipts, budget consumption, source identities,
    failure evidence, and the next ready action.
@@ -99,7 +149,8 @@ Prefer the next concrete fix over a broad plan once the objective and stop rules
 
 ## Checkpoint And Receipt Minimum
 
-When the goal runtime supports only a flat objective and aggregate usage, store
+This section specifies the governed profile, not a standalone prerequisite.
+When its goal runtime supports only a flat objective and aggregate usage, store
 the richer append-only checkpoint in the project's canonical state. Each event
 must identify:
 
@@ -153,7 +204,10 @@ Default finite breakers (stop and report, do not improvise broad cleanup):
 - Docker/emulator is unhealthy or container/registry resources are accumulating without a project cleanup path.
 - The host crashes mid-proof; do not resume blind, re-orient first.
 
-Cost is not a stop reason by itself, but finite fault-containment breakers are; the executor chooses/escalates the breaker set, the orchestrator confirms them.
+Stay within authorized spend and explicit cost ceilings. Finite resource
+breakers apply independently; use project-defined floors when available and
+state reasonable defaults otherwise. A standalone task does not require an
+orchestrator merely to establish its resource limits.
 
 ## User Prompt Template
 
@@ -170,8 +224,10 @@ Verification: <exact proof target>
 Git: <commit/push/PR/merge policy>
 Via: <self | sub-agents>
 Resource: <heavy-resource scope + breaker floors, or 'none'>
-Epic contract: <canonical checkpoint path + objective/authority digest>
-Task ID: <stable DAG node ID>
+Evidence profile: <standalone | governed runtime>
+Checkpoint: <existing project plan or state path>
+Epic contract (governed only): <canonical path + verified objective/authority digest>
+Task ID: <existing task/plan ID, if used>
 Proof budget: <focused schedule + global schedule + run/time ceiling + receipt reuse>
 ```
 
@@ -183,7 +239,8 @@ Example:
 Use autonomous-execution-contract.
 
 Objective: Make 13_managed_queue_worker pass a two-repeat --require-churn-free sweep.
-Epic contract: PROMPT.md plus its recorded objective/authority digest.
+Evidence profile: standalone.
+Checkpoint: existing PROMPT.md project handoff.
 Task ID: benchmark.managed_queue.churn_free.
 Timebox: 3 hours.
 Reasoning: low by default; escalate only for architecture/safety decisions.
@@ -205,7 +262,8 @@ When the contract ends, report:
 - The next concrete blocker or recommended continuation.
 - Whether any resource breakers tripped and what state was left behind.
 - Whether the work is checkpointed and resumable, and the exact next command to resume.
-- Proof receipts produced or reused, their bound identities, and any failure
+- Observed verification (or governed proof receipts) produced or reused, its
+  relevant identities, and any failure
   evidence captured before stopping.
 - Budget usage separated into active/tool/wait/user-wait time and
   fresh/cached/output/reasoning tokens when the runtime exposes those fields.
