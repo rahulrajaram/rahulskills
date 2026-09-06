@@ -53,6 +53,15 @@ AUTONOMY_ASSISTANT_MARKERS = (
 )
 
 
+def load_diagnostic_taxonomy() -> dict:
+    """Read the assembled shared taxonomy, or remain standalone-safe."""
+    shared = Path(__file__).resolve().parents[2] / "references" / "diagnostic-taxonomy.json"
+    if not shared.exists():
+        return {"schema_version": 1, "rules": []}
+    with shared.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
 def _extract_codex_text(content) -> str:
     """Extract readable text from a Codex message content list."""
     if isinstance(content, str):
@@ -168,9 +177,7 @@ def _normalize_completed_item(event: dict) -> dict | None:
                     {
                         "status": item.get("status"),
                         "exit_code": item.get("exit_code"),
-                        "stderr": redact_sensitive_text(item.get("stderr") or "")[
-                            :2000
-                        ],
+                        "stderr": redact_sensitive_text(item.get("stderr") or "")[:2000],
                     },
                     sort_keys=True,
                 ),
@@ -232,9 +239,11 @@ def is_codex_conversation_file(conversation_file: str) -> bool:
                     "session_meta",
                     "turn_context",
                     "response_item",
-                }:
+                } or (
+                    event.get("type") == "event_msg"
+                    and (event.get("payload") or {}).get("type") == "item_completed"
+                ):
                     return True
-                return False
     except (OSError, json.JSONDecodeError):
         return False
     return False
@@ -245,6 +254,9 @@ def normalize_codex_conversation(conversation_file: str) -> str:
     normalized = []
     with open(conversation_file) as handle:
         events = [json.loads(line) for line in handle if line.strip()]
+
+    if not events:
+        raise ValueError("empty transcript: no supported conversation events")
 
     has_completed_item_stream = any(
         event.get("type") == "event_msg"
@@ -296,6 +308,9 @@ def normalize_codex_conversation(conversation_file: str) -> str:
                         ],
                     )
                 )
+
+    if not normalized:
+        raise ValueError("unsupported transcript: no supported Codex messages or tool events")
 
     temp = tempfile.NamedTemporaryFile(
         mode="w",
@@ -500,6 +515,12 @@ def _timestamp_span_seconds(first: str, last: str) -> float:
 def generate_markdown_report(conversation_file: str, output_dir: str = None) -> str:
     """Generate comprehensive markdown report."""
 
+    try:
+        if not any(line.strip() for line in Path(conversation_file).open(encoding="utf-8")):
+            raise ValueError("empty transcript: no supported conversation events")
+    except OSError:
+        raise
+
     codex_input = is_codex_conversation_file(conversation_file)
 
     # Create output directory
@@ -523,6 +544,8 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     print(f"Analyzing conversation: {conv_id}...")
     stats = analyze_conversation(analysis_file)
     messages = load_messages(analysis_file)
+    if not messages:
+        raise ValueError("unsupported transcript: no supported conversation messages")
 
     # Check project context for existing tools/docs
     project_context = check_project_context(original_conversation_file)
@@ -533,6 +556,8 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     retry_patterns = find_retry_without_diagnosis(messages)
     scope_patterns = find_scope_creep(messages)
     verify_patterns = find_missing_verification(messages)
+    taxonomy = load_diagnostic_taxonomy()
+    stable_ids = {item.get("legacy_id"): item.get("id") for item in taxonomy.get("rules", [])}
     tool_opps = find_tool_opportunities(messages)
     autonomy_user_signals = [
         msg
@@ -565,16 +590,24 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     # Executive Summary
     report_lines.append("## Executive Summary")
     report_lines.append("")
-    report_lines.append("### Top Anti-Patterns Found")
+    report_lines.append(
+        "These keyword-derived candidates cite observed transcript evidence, not established violations. "
+        "Review the full conversation, prior authorization, and active instructions. Missing keywords "
+        "do not prove missing checks. Severity ranks review priority and creates no stop authority. "
+        "Continue authorized work; pause an affected action if evidence establishes a current "
+        "authority or safety violation under an applicable instruction."
+    )
+    report_lines.append("")
+    report_lines.append("### Top Heuristic Candidates")
     report_lines.append("")
     report_lines.append(
-        f"1. **Retry-Without-Diagnosis**: {len(retry_patterns)} instances"
+        f"1. **Retry-Without-Diagnosis**: {len(retry_patterns)} candidates"
     )
     report_lines.append(
-        f"2. **Credential Assumptions**: {len(cred_patterns)} instances"
+        f"2. **Credential Assumptions**: {len(cred_patterns)} candidates"
     )
-    report_lines.append(f"3. **Scope Expansions**: {len(scope_patterns)} instances")
-    report_lines.append(f"4. **Unverified Values**: {len(verify_patterns)} instances")
+    report_lines.append(f"3. **Scope Expansions**: {len(scope_patterns)} candidates")
+    report_lines.append(f"4. **Unverified Values**: {len(verify_patterns)} candidates")
     report_lines.append(
         f"5. **File Creation Events**: {len(stats.file_writes)} "
         "(reported for review; not inherently a tooling gap)"
@@ -591,12 +624,8 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     for cmd, count in stats.repeated_commands.most_common(10):
         if count >= 3 and not is_normal_dev_command(cmd):
             tool_opp_count += 1
-            safe_cmd = redact_sensitive_text(cmd)
-            tool_name = (
-                f"myproject-{safe_cmd.split()[0] if safe_cmd.split() else 'cmd'}"
-            )
             report_lines.append(
-                f"{tool_opp_count}. **Repeated {count}x**: `{safe_cmd[:80]}...` → Tool: `{tool_name}`"
+                f"{tool_opp_count}. **Repeated {count}x**: `{redact_sensitive_text(cmd)[:80]}...` → Review whether a project-specific automation helper is warranted"
             )
             if tool_opp_count >= 5:
                 break
@@ -606,23 +635,23 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         )
     report_lines.append("")
 
-    report_lines.append("### Top Universal Rules Violated")
+    report_lines.append("### Rule-Related Candidates for Review")
     report_lines.append("")
     if len(retry_patterns) > 0:
         report_lines.append(
-            f"- **Rule 2** (diagnose before retry): {len(retry_patterns)} violations"
+            f"- **{stable_ids.get(2, 'DIAG-002')}** (diagnose before retry): {len(retry_patterns)} candidates"
         )
     if len(cred_patterns) > 0:
         report_lines.append(
-            f"- **Rule 1** (never hardcode creds): {len(cred_patterns)} violations"
+            f"- **{stable_ids.get(1, 'DIAG-001')}** (credential assumptions): {len(cred_patterns)} candidates"
         )
     if len(scope_patterns) > 0:
         report_lines.append(
-            f"- **Rule 3** (ask before scope expansion): {len(scope_patterns)} violations"
+            f"- **{stable_ids.get(3, 'DIAG-003')}** (scope authorization): {len(scope_patterns)} candidates"
         )
     if len(verify_patterns) > 0:
         report_lines.append(
-            f"- **Rule 6** (verify external values): {len(verify_patterns)} violations"
+            f"- **{stable_ids.get(6, 'DIAG-006')}** (external value verification): {len(verify_patterns)} candidates"
         )
     if not any((retry_patterns, cred_patterns, scope_patterns, verify_patterns)):
         report_lines.append("- None detected by the implemented heuristics")
@@ -650,26 +679,21 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         report_lines.append("### User Signals")
         report_lines.append("")
         for signal in autonomy_user_signals[:10]:
-            report_lines.append(
-                f"- {redact_sensitive_text(signal).replace(chr(10), ' ')[:220]}"
-            )
+            report_lines.append(f"- {redact_sensitive_text(signal).replace(chr(10), ' ')[:220]}")
         report_lines.append("")
     if autonomy_assistant_signals:
         report_lines.append("### Assistant Routing Questions")
         report_lines.append("")
         for signal in autonomy_assistant_signals[:10]:
-            report_lines.append(
-                f"- {redact_sensitive_text(signal).replace(chr(10), ' ')[:220]}"
-            )
+            report_lines.append(f"- {redact_sensitive_text(signal).replace(chr(10), ' ')[:220]}")
         report_lines.append("")
     if autonomy_user_signals or autonomy_assistant_signals:
         report_lines.append("### Recommended Operating Rule")
         report_lines.append("")
         report_lines.append(
             "When the user requests long-running autonomous work, proceed through "
-            "the next concrete task and pause only for destructive operations, "
-            "pushes/deploys, dependency additions, secrets, material product/API "
-            "decisions, or a real local blocker. Treat status updates as progress "
+            "the next authorized concrete task. Pause only when an applicable authority or safety "
+            "boundary requires new input, or a real local blocker prevents progress. Treat status updates as progress "
             "reports, not stopping points."
         )
         report_lines.append("")
@@ -709,17 +733,17 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     report_lines.append("")
 
     # Anti-Patterns Found
-    report_lines.append("## Anti-Patterns Found")
+    report_lines.append("## Heuristic Candidates")
     report_lines.append("")
 
     # Retry-without-diagnosis
     if retry_patterns:
         report_lines.append("### 1. Retry-Without-Diagnosis")
         report_lines.append("")
-        report_lines.append(f"**Found**: {len(retry_patterns)} instances")
+        report_lines.append(f"**Found**: {len(retry_patterns)} candidates")
         report_lines.append("")
         report_lines.append(
-            "**What Happened**: Commands were retried without checking logs/events between attempts."
+            "**Observed**: Commands repeated without recognized diagnostic text between attempts; intent and failure status remain unverified."
         )
         report_lines.append("")
         report_lines.append("**Examples**:")
@@ -729,23 +753,20 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
             report_lines.append(f"   - Retry attempt: Message {p['retry_attempt']}")
             report_lines.append(f"   - Issue: {p['evidence']}")
         report_lines.append("")
-        report_lines.append("**Fix**: Always run diagnostics before retry:")
-        report_lines.append("```bash")
-        report_lines.append("# Before retrying, check:")
-        report_lines.append("kubectl logs <resource>")
-        report_lines.append("kubectl describe <resource>")
-        report_lines.append("kubectl get events --sort-by='.lastTimestamp'")
-        report_lines.append("```")
+        report_lines.append(
+            "**Review**: Distinguish intentional repetition and test/fix cycles from blind failure retries. "
+            "For a confirmed failure, inspect relevant evidence before repeating the action."
+        )
         report_lines.append("")
 
     # Credential anti-patterns
     if cred_patterns:
         report_lines.append("### 2. Credential Assumptions")
         report_lines.append("")
-        report_lines.append(f"**Found**: {len(cred_patterns)} instances")
+        report_lines.append(f"**Found**: {len(cred_patterns)} candidates")
         report_lines.append("")
         report_lines.append(
-            "**What Happened**: Passwords/secrets used without reading from K8s secrets."
+            "**Observed**: Credential-like assignments appeared in assistant text. They may be examples, placeholders, or authorized references; source and exposure require review."
         )
         report_lines.append("")
         report_lines.append("**Examples**:")
@@ -754,23 +775,21 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
             report_lines.append(f"   - Evidence: {p.get('evidence', 'N/A')}")
             report_lines.append(f"   - Context: {p['context'][:150]}...")
         report_lines.append("")
-        report_lines.append("**Fix**: Always read from K8s secrets:")
-        report_lines.append("```bash")
         report_lines.append(
-            "kubectl get secret <name> -o jsonpath='{.data.password}' | base64 -d"
+            "**Review**: Establish whether a real credential was exposed or used outside existing "
+            "authorization. Use the project's authorized credential mechanism without printing values. "
+            "Do not retrieve or decode secrets merely to satisfy this diagnostic."
         )
-        report_lines.append("# Or use: myproject-creds get <secret> --namespace <ns>")
-        report_lines.append("```")
         report_lines.append("")
 
     # Scope creep
     if scope_patterns:
         report_lines.append("### 3. Scope Expansions")
         report_lines.append("")
-        report_lines.append(f"**Found**: {len(scope_patterns)} instances")
+        report_lines.append(f"**Found**: {len(scope_patterns)} candidates")
         report_lines.append("")
         report_lines.append(
-            "**What Happened**: Task scope expanded beyond original request without asking user."
+            "**Observed**: Scope-related language appeared. The latest request excerpt may omit earlier authorization, and necessary implementation work may already be in scope."
         )
         report_lines.append("")
         report_lines.append("**Examples**:")
@@ -778,23 +797,21 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
             report_lines.append(f"{i}. Original request: {p['original_request']}")
             report_lines.append(f"   - Expansion: {p['expansion']}")
         report_lines.append("")
-        report_lines.append("**Fix**: Stop and ask before expanding scope:")
         report_lines.append(
-            '> "Encountered blocker: [X]. This is outside the original task scope. Should I:'
+            "**Review**: Compare the proposed work with the full request and existing authorization. "
+            "Continue necessary authorized work; ask only when an actual scope or permission boundary "
+            "requires new user input. Additional files or scope keywords alone do not establish that boundary."
         )
-        report_lines.append("> a) Fix it now (expands scope)")
-        report_lines.append("> b) Document it and continue")
-        report_lines.append('> c) Stop here"')
         report_lines.append("")
 
     # Unverified values
     if verify_patterns:
         report_lines.append("### 4. Unverified External Values")
         report_lines.append("")
-        report_lines.append(f"**Found**: {len(verify_patterns)} instances")
+        report_lines.append(f"**Found**: {len(verify_patterns)} candidates")
         report_lines.append("")
         report_lines.append(
-            "**What Happened**: IP addresses or URLs used without verification."
+            "**Observed**: Address or URL usage appeared without recognized verification text in the same message; verification elsewhere is unobserved."
         )
         report_lines.append("")
         report_lines.append("**Examples**:")
@@ -803,17 +820,10 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
             report_lines.append(f"   - Value: {p.get('evidence', 'N/A')}")
             report_lines.append(f"   - Context: {p['context'][:100]}...")
         report_lines.append("")
-        report_lines.append("**Fix**: Always verify external values:")
-        report_lines.append("```bash")
-        report_lines.append("# For cluster IPs:")
         report_lines.append(
-            "docker inspect <container> | jq -r '.[0].NetworkSettings.Networks.kind.IPAddress'"
+            "**Review**: Check whether these are examples, supplied configuration, or values already "
+            "verified elsewhere. Verify a value when its uncertainty affects the current task."
         )
-        report_lines.append("# For service URLs:")
-        report_lines.append(
-            "kubectl get svc <name> -o jsonpath='{.status.loadBalancer.ingress[0].ip}'"
-        )
-        report_lines.append("```")
         report_lines.append("")
 
     report_lines.append("---")
@@ -828,15 +838,7 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     actionable_tool_opps = []
     for cmd, count in stats.repeated_commands.most_common(10):
         if count >= 3 and not is_normal_dev_command(cmd):
-            safe_cmd = redact_sensitive_text(cmd)
-            tool_name = (
-                f"myproject-{safe_cmd.split()[0]}"
-                if safe_cmd.split()
-                else "myproject-cmd"
-            )
-            report_lines.append(
-                f"- **{count}x**: `{safe_cmd[:80]}` → Tool: `{tool_name}`"
-            )
+            report_lines.append(f"- **{count}x**: `{redact_sensitive_text(cmd)[:80]}` → Review whether a project-specific automation helper is warranted")
             actionable_tool_opps.append((cmd, count))
 
     if not actionable_tool_opps:
@@ -875,18 +877,18 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     # HIGH priority - based on actual findings
     if len(retry_patterns) >= 5:
         high_priority_items.append(
-            "**Implement `myproject-diag`** - Automated diagnostics before retry\n"
-            f"   - Would have prevented: {len(retry_patterns)} retry-without-diagnosis instances"
+            "**Review repeated-action evidence** - Determine whether retries followed failures\n"
+            f"   - Candidates to review: {len(retry_patterns)} retry-without-diagnosis candidates"
         )
     if len(cred_patterns) > 0:
         high_priority_items.append(
-            "**Implement `myproject-creds`** - Safe credential retrieval\n"
-            f"   - Would have prevented: {len(cred_patterns)} credential anti-patterns"
+            "**Review credential handling** - Check existing authorization and exposure without retrieving values\n"
+            f"   - Candidates to review: {len(cred_patterns)} credential anti-patterns"
         )
     if len(stats.bash_commands) > 100 and len(stats.errors) > 10:
         high_priority_items.append(
-            "**Implement `myproject-preflight`** - Pre-test validation\n"
-            "   - Would have prevented: Failed test runs due to environment issues"
+            "**Review failure causes** - Check whether environment validation would help\n"
+            "   - Candidates to review: Command volume and error count alone do not establish environment failures"
         )
 
     # MEDIUM priority - context-aware (only suggest if not already present)
@@ -906,16 +908,16 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
 
     if len(scope_patterns) > 3:
         medium_priority_items.append(
-            "**Update workflow** - Add explicit scope confirmation checkpoints"
+            "**Review scope candidates** - Check prior authorization before proposing checkpoints"
         )
 
-    report_lines.append("### Priority 1 (HIGH) - Immediate Action")
+    report_lines.append("### Priority 1 (HIGH) - Review Candidates")
     report_lines.append("")
     if high_priority_items:
         for i, item in enumerate(high_priority_items, 1):
             report_lines.append(f"{i}. {item}")
     else:
-        report_lines.append("- None identified - conversation followed good practices")
+        report_lines.append("- No high-priority candidates identified; unobserved behavior is not assessed")
     report_lines.append("")
 
     report_lines.append("### Priority 2 (MEDIUM) - Short-Term")
@@ -925,20 +927,10 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
             report_lines.append(f"{i}. {item}")
     else:
         report_lines.append(
-            "- None identified - project already has good tooling/documentation"
+            "- No additional candidates identified from available project context"
         )
     report_lines.append("")
 
-    report_lines.append("### Priority 3 (LOW) - Long-Term")
-    report_lines.append("")
-    report_lines.append(
-        "1. **Add telemetry** - Track anti-pattern occurrences over time"
-    )
-    report_lines.append("2. **Build metrics dashboard** - Visualize improvement trends")
-    report_lines.append(
-        "3. **Continuous learning loop** - Feed learnings back into `/check-antipatterns`"
-    )
-    report_lines.append("")
     report_lines.append("---")
     report_lines.append("")
 
@@ -947,12 +939,12 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     report_lines.append("")
     report_lines.append("| Metric | Current | Target |")
     report_lines.append("|--------|---------|--------|")
-    report_lines.append(f"| Retry-without-diagnosis | {len(retry_patterns)} | 0 |")
-    report_lines.append(f"| Hardcoded credentials | {len(cred_patterns)} | 0 |")
+    report_lines.append(f"| Retry-without-diagnosis | {len(retry_patterns)} | Contextual review |")
+    report_lines.append(f"| Credential-assignment candidates | {len(cred_patterns)} | Contextual review |")
     report_lines.append(
-        f"| Scope expansions without asking | {len(scope_patterns)} | 0 |"
+        f"| Scope-language candidates | {len(scope_patterns)} | Contextual review |"
     )
-    report_lines.append(f"| Unverified values | {len(verify_patterns)} | 0 |")
+    report_lines.append(f"| Unverified values | {len(verify_patterns)} | Contextual review |")
     report_lines.append(
         f"| Shell commands captured | {len(stats.bash_commands)} | Informational; no universal target |"
     )
@@ -966,7 +958,7 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         + len(scope_patterns)
         + len(verify_patterns)
     )
-    total_opportunities = total_violations + 15  # 15 universal rules
+    total_opportunities = total_violations + 7  # seven implemented shared identities
     compliance_score = (
         int(((total_opportunities - total_violations) / total_opportunities) * 100)
         if total_opportunities > 0
@@ -974,7 +966,7 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     )
 
     report_lines.append(
-        f"**Heuristic Signal Score**: {compliance_score}% (Target: 95%+; "
+        f"**Heuristic Signal Score**: {compliance_score}% ("
         "not a compliance or completeness claim)"
     )
     report_lines.append("")
