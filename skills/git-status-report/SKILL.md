@@ -1,13 +1,41 @@
 ---
 name: git-status-report
-description: Report local git working-tree and tracking-ref status for the current repository and submodules. Refresh remotes only when explicitly requested and approved.
+description: Report local git working-tree and tracking-ref status for the current repository and submodules. Refresh remotes only within existing explicit authorization.
 argument-hint: ""
 ---
 
 # Git Status Report
 
-Report status relative to currently stored remote-tracking refs. A default report
-is local-only and must not imply those refs are current.
+## Intent and applicability
+
+Report working-tree, branch and submodule status relative to stored tracking
+refs. Default reporting is local-only. Use for repository sync/status questions.
+
+## Inputs and local bindings
+
+Use the requested repository, otherwise the current repository. Resolve its
+actual upstreams and initialized submodules; do not assume an `origin` remote or
+`main` branch. Distinguish a missing upstream from an unavailable tracking ref.
+
+## Non-goals
+
+Status reporting does not select fetching, checkout, submodule initialization,
+history repair, commits or pushing. A broader authorized workflow may select
+those separately; necessary local inspection remains autonomous.
+
+## Must not
+
+Do not describe stored tracking refs as current remote evidence, convert a
+failed read into a clean/in-sync result, or change repository state to make a
+status report easier. Never expose credentials embedded in remote URLs.
+
+## Interaction and authority
+
+Gather local evidence without confirmation. If fresh remote state is requested,
+resolve the remotes and refresh effects first; carry valid authorization into
+execution. Ask only for an unresolved refresh boundary under active instructions,
+not again for the same concrete grant. Continue the local report if refresh is
+unavailable or still awaiting authorization.
 
 ## Usage
 
@@ -17,7 +45,7 @@ is local-only and must not imply those refs are current.
 
 Use when user says "git status report", "repo sync status", "submodule status", "ahead behind", or asks whether repos are in sync with origin.
 
-## Workflow
+## Procedure
 
 ### Step 1: Detect Root Repository
 
@@ -57,9 +85,9 @@ git submodule status --recursive 2>/dev/null
 If submodules exist, for **each submodule**:
 
 1. Enter the submodule directory
-2. Do not fetch by default. If the user explicitly asks for current remote state,
-   preview all remotes that would be contacted and obtain approval before
-   `git fetch`; fetching uses the network and mutates remote-tracking refs.
+2. Apply the same local/default versus authorized-refresh branch as the root.
+   Fetch only selected remotes covered by valid authority, before collecting
+   counts. Do not initialize an uninitialized submodule; report that state.
 3. Collect the same 5 data points as the root (branch, upstream, ahead/behind, working tree, stash)
 4. Additionally check if the submodule HEAD matches what the parent expects:
    - `git -C <parent> ls-tree HEAD <submodule-path>` gives the expected SHA
@@ -68,7 +96,7 @@ If submodules exist, for **each submodule**:
 
 ### Step 4: Format and Display
 
-Display results as an ASCII table. The table MUST use box-drawing characters for clean formatting.
+Use a compact table in the user's requested format; plain Markdown or ASCII is sufficient. Box drawing and shell formatting tools are optional.
 
 #### Column Definitions
 
@@ -138,9 +166,9 @@ After the table, print a one-line summary with counts:
 
 ## Implementation Notes
 
-- Run `git fetch origin --quiet` for each repo before checking ahead/behind. If fetch fails (offline, auth issue), note it but continue with stale data and add a warning line.
-- Use `printf` for column alignment — do NOT rely on `column` command (not always available).
-- All numeric columns (Ahead, Behind) should be right-aligned.
+- Do not fetch by default. For an authorized refresh, fetch the selected remote before counts and report success/failure per repository. On failure, label counts as stored tracking-ref evidence and continue local inspection.
+- If generating an aligned terminal table, `printf` is sufficient; no formatting dependency is required.
+- `git rev-list --left-right --count @{upstream}...HEAD` returns **behind first, ahead second**. Preserve this interpretation when labeling columns.
 - Repository names should be left-aligned.
 - The table must dynamically size columns based on the longest value in each column.
 - Keep output compact — no verbose explanations, just the table + summary.
@@ -152,3 +180,12 @@ After the table, print a one-line summary with counts:
 - **Fetch failures**: Print a warning line above the table: "Warning: fetch failed for <repo> — showing cached data" and continue.
 - **Detached HEAD**: Show "(detached)" as the branch name.
 - **No upstream configured**: Show "none" for upstream, "-" for ahead/behind, "No upstream" for status.
+
+## Completion and evidence
+
+Report branch/upstream, ahead/behind, clean/dirty state, stash count, submodule
+pointer drift and coverage limits. Include whether each remote was refreshed.
+Report detached, unborn, uninitialized and unreadable states explicitly. A
+submodule can match its parent pointer while differing from its own upstream;
+these are separate comparisons. Omit irrelevant columns, but do not omit a
+failed or unavailable repository from the checked/unchecked accounting.

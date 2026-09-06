@@ -9,6 +9,27 @@ Turn an ambitious or ambiguous autonomous objective into an explicit charter
 that can safely govern execution across sessions. The charter is an authority
 and decision model, not merely a project plan.
 
+## Inputs, scope, and interaction
+
+Start with the requested system, existing policy/charter, named decision owners,
+known resources, and explicit grants. Bind role names and paths to actual project
+actors and mechanisms; a controller role in a draft does not prove a controller
+exists. Reuse still-valid decisions and ratification evidence rather than
+restarting the interview.
+
+This skill produces a charter or amendment; it does not automatically build or
+activate a supervisor, execute campaigns, install capabilities, or change grants.
+Relevant investigation and provisional drafting may proceed within existing
+permissions before ratification. Finish the concrete draft/options before asking
+for a missing owner decision, and hold only dependent policy activation or effects.
+Ordinary method choices do not require owner approval.
+
+Do not infer ratification from silence, a speculative model response, a digest,
+or a completed template. Defaults are proposals and cannot override the user's
+goal or existing authority. Preserve approval records for unchanged decisions;
+changed actors, effect scope, bounds, or reserved decisions require the applicable
+owner's amendment. Do not require new approval merely for reusing a valid charter.
+
 ## Core distinctions
 
 Keep these concepts separate throughout:
@@ -71,7 +92,8 @@ Never infer authority from identity, capability, convenience, or prior action.
     items that would change authority, safety, public behavior, irreversible
     scope, or the execution model. Make conservative assumptions for routine
     implementation detail and label them.
-14. Present a draft charter for explicit ratification. After ratification,
+14. Present the prepared draft or changed decisions for explicit ratification
+    where not already covered by valid owner approval. After ratification,
     record its version, effective scope, superseded policy, and amendment
     process.
 
@@ -118,13 +140,16 @@ Produce a compact but complete charter with these sections:
     superseded rules, and amendment procedure.
 
 Use a table only for mappings such as actor-to-authority or state-to-gate.
+Report draft versus ratified status, actual approval provenance, unresolved
+decisions, and what was verified. List a missing receipt/controller as missing;
+never generate fictional execution evidence to complete the charter.
 Use normative language precisely: **must**, **must not**, **may**, and
 **should** should have distinct force.
 
 ## Ratification discipline
 
-Before execution begins, verify that the owner has explicitly confirmed every
-decision that changes:
+Before execution under a new or amended charter begins, verify existing or new
+owner confirmation for every applicable decision that changes:
 
 - the actor with authority over living product behavior;
 - permitted model/provider routes and fallback conditions;

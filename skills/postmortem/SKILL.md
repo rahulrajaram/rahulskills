@@ -26,101 +26,39 @@ Generate comprehensive Correction of Error (COE) postmortem reports following Am
 
 - `incident-description-or-id` (optional): Description of the incident or an identifier (orchestration ID, PR number, etc.)
 
-## Report Structure
+## Intent, inputs and local bindings
 
-The postmortem follows this structure:
+Explain the selected incident using supplied facts and relevant available logs,
+metrics, source/history and operator accounts. Resolve actual systems, timezones,
+access and evidence sources; example SQL/Kubernetes commands below apply only to
+matching environments and authorized reads.
 
-### 1. Header
-```markdown
-# Correction of Error (COE) Report
+## Non-goals
 
-## Incident: [Title]
-**Date:** YYYY-MM-DD
-**Duration:** X minutes/hours
-**Severity:** Critical/High/Medium/Low
-**Affected Systems:** [list]
-```
+Writing a postmortem does not select remediation, production/database changes,
+new monitoring or a fixed-depth investigation. Necessary evidence gathering and
+proposed actions remain in scope; depth should match impact and uncertainty.
 
-### 2. Executive Summary
-2-3 sentences describing what happened and the business impact.
+## Must not
 
-### 3. Timeline
-Chronological table of events:
-```markdown
-| Time (UTC) | Event |
-|------------|-------|
-| HH:MM:SS | Event description |
-```
+Do not invent a fifth cause, force a process failure as the root cause, fabricate
+impact/timestamps/owners, or label a proposed action completed. Missing evidence
+is unknown; distinguish supported causes, hypotheses and contributing conditions.
 
-### 4. 5-Whys Analysis
+## Interaction and authority
 
-For each problem identified, drill down with 5 levels of "why":
+Proceed from available evidence, recording uncertainty and focused follow-up
+questions where answers change causal conclusions. Reuse access/decision context;
+ask before dependent actions outside existing authority. A report is not approval
+to perform its actions. Be blameless without hiding specific technical failures.
 
-```markdown
-### Problem N: [Problem Statement]
+## Report structure
 
-**Why did X happen?**
-→ Because Y
-
-**Why did Y happen?**
-→ Because Z
-
-**Why did Z happen?**
-→ Because A
-
-**Why did A happen?**
-→ Because B
-
-**Why did B happen?**
-→ Because C (ROOT CAUSE)
-```
-
-### 5. Root Causes Table
-```markdown
-| # | Root Cause | Category |
-|---|------------|----------|
-| RC1 | Description | Category (Infrastructure/Code/Process/etc.) |
-```
-
-### 6. Impact Assessment
-```markdown
-| Metric | Value |
-|--------|-------|
-| Affected users | N |
-| Failed operations | N |
-| Data loss | Yes/No |
-| Revenue impact | $X or N/A |
-```
-
-### 7. Action Items
-
-Prioritized by urgency:
-
-```markdown
-### Immediate (P0) - Completed ✅
-| # | Action | Owner | Status |
-|---|--------|-------|--------|
-
-### Short-term (P1) - This Sprint
-| # | Action | Owner | Status |
-|---|--------|-------|--------|
-
-### Medium-term (P2) - Next Sprint
-| # | Action | Owner | Status |
-|---|--------|-------|--------|
-
-### Long-term (P3) - Backlog
-| # | Action | Owner | Status |
-|---|--------|-------|--------|
-```
-
-### 8. Lessons Learned
-Numbered list of key takeaways that should inform future work.
-
-### 9. Appendix
-- Files changed
-- Related PRs/commits
-- Links to logs/dashboards
+Use [templates/coe-template.md](templates/coe-template.md) as the single maintained
+skeleton when a structured COE report is useful. Omit irrelevant placeholders;
+for a short incident, a proportionate narrative can carry the same evidence.
+Five whys is a technique: stop at a supported sufficient cause or explicit unknown,
+continue deeper when useful, and branch when there are distinct causal paths.
 
 ## Investigation Process
 
@@ -141,7 +79,8 @@ When generating a postmortem, follow this process:
 ### Step 3: Perform 5-Whys
 - Start with the observable symptom
 - Ask "why" and answer with facts, not assumptions
-- Continue until you reach systemic/process root causes
+- Continue while evidence supports a useful causal link; stop at a sufficient
+  supported explanation or an explicit unknown, regardless of the number of whys.
 - Multiple branches are normal (different failure modes)
 
 ### Step 4: Categorize Root Causes
@@ -156,7 +95,7 @@ Common categories:
 - **Documentation Gap**: Missing or outdated docs
 
 ### Step 5: Generate Action Items
-For each root cause, generate at least one action item:
+For each supported cause, propose an action or explain why none is warranted:
 - Make them specific and measurable
 - Assign clear ownership (even if TBD)
 - Set realistic priority based on recurrence risk and impact
@@ -204,7 +143,7 @@ Reports can be:
 
 1. **Blameless**: Focus on systems and processes, not individuals
 2. **Fact-based**: Use logs, metrics, and evidence - not assumptions
-3. **Actionable**: Every root cause should have a corresponding action item
+3. **Actionable**: Tie proposed actions to supported causes and recurrence risk
 4. **Proportional**: Depth of analysis should match severity of incident
 5. **Timely**: Write while details are fresh
 6. **Shareable**: Should be useful for others who weren't involved
@@ -213,3 +152,10 @@ Reports can be:
 
 - `/analyze-conversation`: Analyze conversation patterns (complementary)
 - `/check-antipatterns`: Real-time anti-pattern detection
+
+## Completion and evidence
+
+Deliver the report with provenance, uncertainty, impact coverage and actions whose
+status reflects observed execution. Dates, counts and completed mitigations require
+evidence. Unknown owners/dates remain explicitly unassigned; no forced root-cause
+or action quota proves completeness.

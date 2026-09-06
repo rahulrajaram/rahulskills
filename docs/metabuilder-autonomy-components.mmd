@@ -1,0 +1,117 @@
+%%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
+flowchart TB
+    principal(["HUMAN PRINCIPAL · owns goals, standing delegation, and reserved decisions"])
+    entry[/"ENTRY · objective, authority ceiling, acceptance, and hard bounds"/]
+
+    subgraph Orchestrator["PROCESS 1 · ORCHESTRATOR · strategic delegate"]
+        direction LR
+        o_understand["STATE · Understand intent and discover options"]
+        o_decide{"DECISION · delegated, evidenced, reversible, and enforceable?"}
+        o_frame["STATE · Frame one finite campaign"]
+        o_judge{"DECISION · accept, continue with a new request, or stop?"}
+        o_escalate["STATE · Explain the smallest reserved decision"]
+    end
+
+    subgraph MetaBuilder["PROCESS 2 · METABUILDER · control plane"]
+        direction LR
+        m_bind["INSTALLED · Bind exact source, plan, policy, adapters, and limits"]
+        m_admit{"INSTALLED · Can every requested effect be enforced?"}
+        m_persist["INSTALLED · Persist intent before dispatch"]
+        m_observe["INSTALLED · Observe, verify, recover, replay, and settle"]
+        m_candidate["INSTALLED MAINTAINER PATH · Materialize isolated no-hardlink candidate clone"]
+        m_prove["INSTALLED MAINTAINER PATH · Test, blind-review, and admit exact candidate"]
+        m_binary[/"VALUE · admitted MetaBuilder binary identity"/]
+    end
+
+    subgraph Harness["PROCESS 3 · HARNESS · finite execution runtime"]
+        direction LR
+        h_select["STATE · Select one compiled bounded action"]
+        h_direct[["INSTALLED · Run admitted local command"]]
+        h_protocol[["COMMITTED SOURCE · Run bounded offline MCP or agent protocol"]]
+        h_claim[/"MESSAGE · worker claim and produced artifacts"/]
+    end
+
+    subgraph Target["PROCESS 4 · TARGET PROGRAM · governed subject"]
+        direction LR
+        p_source[/"VALUE · exact source and isolated candidate state"/]
+        p_tools[["PROCESS · build, test, or run inside the granted boundary"]]
+        p_result[/"VALUE · candidate delta and test outputs"/]
+    end
+
+    evidence[("DURABLE STORE · controller state, journal, artifacts, and checkpoints")]
+    next_request[/"OUTPUT · checkpointed next ObjectiveRequest for a later campaign"/]
+    exit(["EXIT · accepted result, explicit bounded stop, or separately admitted next request"])
+
+    principal --> entry
+    entry --> o_understand
+    o_understand --> o_decide
+    o_decide -->|routine and inside standing delegation| o_frame
+    o_decide -->|reserved, ambiguous, expired, or revoked| o_escalate
+    o_escalate --> principal
+    o_frame --> m_bind
+    m_bind --> m_admit
+    m_admit -->|admit| m_persist
+    m_admit -->|refuse or unsupported| o_judge
+    m_persist --> evidence
+    m_persist --> h_select
+    h_select --> h_direct
+    h_select -.-> h_protocol
+    p_source --> p_tools
+    h_direct --> p_tools
+    h_protocol -.-> p_tools
+    p_tools --> p_result
+    p_result --> h_claim
+    h_claim --> m_observe
+    m_observe --> evidence
+    m_observe --> o_judge
+    evidence -.-> o_judge
+    o_judge -->|accepted or bounded stop| exit
+    o_judge -->|real work remains| next_request
+    next_request --> exit
+
+    o_decide -.->|MetaBuilder capability gap · separate bounded campaign| m_candidate
+    m_candidate --> m_prove
+    m_prove --> m_binary
+    m_binary -.->|input only to a later exact campaign| exit
+
+    grants["STANDING RULE · authority and narrower grants flow down"]
+    evidence_rule["STANDING RULE · claims, observations, and evidence flow up"]
+    source_rule["TYPE RULE · program source is a value; invoked tools are processes"]
+    discovery_rule["SAFETY RULE · discovery may propose work but can never grant execution"]
+    principal -.-> grants
+    grants -.-> m_admit
+    h_claim -.-> evidence_rule
+    evidence_rule -.-> o_judge
+    p_source -.-> source_rule
+    o_understand -.-> discovery_rule
+
+    classDef actor fill:#ffffff,stroke:#0f172a,stroke-width:3px,color:#0f172a
+    classDef process fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef data fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef message fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef state fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef blocked fill:#ffffff,stroke:#991b1b,stroke-width:3px,color:#7f1d1d
+    classDef decision fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef artifact fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef note fill:#ffffff,stroke:#475569,stroke-width:1.7px,stroke-dasharray:7 5,color:#334155,font-size:13px
+    classDef installed fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#0f172a
+    classDef source fill:#ffffff,stroke:#7c3aed,stroke-width:3px,color:#4c1d95
+    classDef target fill:#ffffff,stroke:#16a34a,stroke-width:3px,stroke-dasharray:6 4,color:#14532d
+    classDef reserved fill:#ffffff,stroke:#f97316,stroke-width:3px,color:#7c2d12
+
+    class principal actor,reserved
+    class entry,m_binary,h_claim,p_source,p_result,next_request artifact
+    class o_understand,o_frame,o_escalate,h_select state
+    class o_decide,o_judge,m_admit decision
+    class m_bind,m_persist,m_observe,m_candidate,m_prove,h_direct,p_tools process,installed
+    class h_protocol process,source
+    class o_decide,o_frame,o_judge target
+    class o_escalate reserved
+    class evidence data,installed
+    class exit actor
+    class grants,evidence_rule,source_rule,discovery_rule note
+
+    style Orchestrator fill:transparent,stroke:#0f172a,stroke-width:2.5px
+    style MetaBuilder fill:transparent,stroke:#1d4ed8,stroke-width:2.5px
+    style Harness fill:transparent,stroke:#7c3aed,stroke-width:2.2px
+    style Target fill:transparent,stroke:#64748b,stroke-width:1.8px,stroke-dasharray:6 4

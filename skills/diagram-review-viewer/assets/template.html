@@ -156,17 +156,16 @@
 {{RAIL_CONTENT}}
     </aside>
   </main>
-  <script type="text/plain" id="diagram-source">
-{{MERMAID_SOURCE}}</script>
+  <script type="application/json" id="diagram-source">{{MERMAID_SOURCE_JSON}}</script>
   <script src="{{MERMAJS_PATH}}"></script>
   <script>
     const viewport = document.getElementById('viewport');
     const target = document.getElementById('diagram');
-    const source = document.getElementById('diagram-source').textContent.trim();
+    const source = JSON.parse(document.getElementById('diagram-source').textContent);
     const layout = document.querySelector('main');
     const rail = document.querySelector('aside');
     const railResizer = document.getElementById('rail-resizer');
-    const railWidthKey = '{{STORAGE_KEY}}';
+    const railWidthKey = {{STORAGE_KEY_JSON}};
     let naturalWidth = 1800;
     let scale = 1;
     let drag = null;
@@ -243,7 +242,7 @@
       }
     });
 
-    mermaid.render('{{RENDER_ID}}', source).then(function(result) {
+    mermaid.render({{RENDER_ID_JSON}}, source).then(function(result) {
       target.innerHTML = result.svg;
       const svg = target.querySelector('svg');
       const box = svg.viewBox && svg.viewBox.baseVal;

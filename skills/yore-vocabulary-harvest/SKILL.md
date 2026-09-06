@@ -6,83 +6,89 @@ argument-hint: "[--index DIR] [--limit N] [--common-terms N] [--stopwords FILE]"
 
 # Yore Vocabulary Harvest
 
-Use this skill when the user wants to gather a corpus-derived candidate vocabulary list (for example, "top 200 terms") from a built Yore index.
-
-## Scope
-
-This skill produces candidate terms only. It does **not** call an LLM.
-It is intended to feed a human review step or the LLM filter skill.
+Gather a corpus-derived candidate vocabulary list (for example, "top 200 terms")
+from a built Yore index. This produces candidates only and makes no LLM call.
+It can feed human review or `yore-vocabulary-llm-filter`.
 
 ## Setup
 
-1. Resolve repository root:
+Resolve these bindings from the request and local evidence before harvesting:
+
+- `corpus_root`: the requested corpus, usually the target repository. Use the
+  current repository only when context identifies it as the intended corpus.
+- `index_dir`: an absolute path; default to `.yore` under `corpus_root`, and
+  resolve a supplied relative `--index` against that corpus. Check readable
+  `reverse_index.json` and `forward_index.json` and any available source-root,
+  revision or build metadata. Report unknown freshness rather than inventing it.
+- `yore_cmd`: an argument array for an existing Yore executable verified through
+  its help/provenance. If only a known Yore checkout is available, inspect its
+  existing build/invocation route and bind its executable explicitly. Never run
+  bare `cargo run` in the target corpus: its Cargo binary may be unrelated.
+  Report unavailable tooling without fetching or installing it. Building from
+  source is a separate action within existing build/dependency permissions.
+- Harvest options: requested `limit` (example below: 200), optional common-term
+  count and absolute stopword path. Preserve the existing broad-harvest default
+  `--no-default-stopwords`; disclose it. Validate supported flags against the
+  resolved executable's local help.
+
+A missing index is not permission to index another directory. Bind its source,
+output path, file types/exclusions and write scope first. If index construction
+is already authorized, use the resolved command with explicit paths:
 
 ```bash
-cd /path/to/repo
-git rev-parse --show-toplevel
+"${yore_cmd[@]}" build --output "$index_dir" "$corpus_root"
 ```
 
-2. Ensure an index exists (`.yore` by default). If not, build one:
+The documented Yore build defaults cover `md,txt,rst`; use locally supported
+`--types`/`--exclude` when the requested corpus needs different inputs. Ask only
+if building the missing index or its input/write scope is unresolved. Verify
+successful construction and index readability before harvesting.
+
+## Harvest workflow
+
+Create a unique private directory and preserve its identity across steps. With
+resolved Bash bindings, for example:
 
 ```bash
-cargo run --quiet -- build --output .yore .
+harvest_dir=$(mktemp -d "${TMPDIR:-/tmp}/yore-vocabulary-harvest.XXXXXXXX")
+harvest_json="$harvest_dir/candidates.json"
+"${yore_cmd[@]}" vocabulary --index "$index_dir" --format json \
+  --limit "$limit" --no-default-stopwords >"$harvest_json" \
+  2>"$harvest_dir/stderr.txt"
 ```
 
-3. Confirm the index is present and readable:
+Check command exit status and stderr before consuming stdout. Do not pass a
+failed command's partial artifact to filtering. Require a single JSON object
+with a `terms` array containing nonempty string `term` values and numeric
+`score`/`count` values. Reject duplicate terms. Retain the tool's metadata:
+`total` is the candidate count before pagination, `used_default_stopwords` and
+`include_stemming` are flags, and `auto_common_terms` is optional when disabled.
+
+For an optional corpus-common exclusion pass, allocate a new run directory and
+add `--common-terms "$common_terms"` and, when selected,
+`--stopwords "$stopwords_file"` to the same vocabulary invocation. Record the
+options separately from the first pass; common-term exclusion can remove domain
+terms in small corpora.
+
+After successful JSON validation, an optional plain-list artifact can be made:
 
 ```bash
-ls -la .yore/{reverse_index.json,forward_index.json}
+harvest_text="$harvest_dir/candidates.txt"
+jq -r '.terms[].term' "$harvest_json" >"$harvest_text"
 ```
 
-## Harvest Workflow
+Use the JSON artifact for downstream filtering when terms contain line breaks.
+An empty list is a valid outcome: report zero candidates, inspect the selected
+index/freshness and filters if unexpected, and do not trigger an empty LLM call.
+Supported output formats are `lines`, `json`, and `prompt`; this workflow uses
+`json` to retain term metrics and harvest identity.
 
-1. Run Yore vocabulary in JSON mode to capture the top terms:
+## Deliverables for the next step
 
-```bash
-cargo run --quiet -- \
-  vocabulary --index .yore \
-  --format json \
-  --limit 200 \
-  --no-default-stopwords \
-  > /tmp/vocabulary-harvest.json
-```
-
-2. Optional: extract a plain list of terms for downstream tools:
-
-```bash
-jq -r '.terms[].term' /tmp/vocabulary-harvest.json > /tmp/vocabulary-harvest.txt
-```
-
-3. Optional: include a domain-seeded common-word exclusion set first:
-
-```bash
-cargo run --quiet -- \
-  vocabulary --index .yore \
-  --format json \
-  --limit 200 \
-  --common-terms 20 \
-  --stopwords /path/to/custom/common-terms.txt \
-  --no-default-stopwords \
-  > /tmp/vocabulary-harvest-common-filtered.json
-```
-
-## Expected Output
-
-- JSON payload from `--format json` with:
-  - `terms` array
-  - each term object includes `term`, `score`, `count`
-  - `total` total candidate count before pagination
-  - flags: `used_default_stopwords`, `auto_common_terms`, `include_stemming`
-
-## Error Handling
-
-- If Yore returns an empty list, check:
-  - index path is correct
-  - index was built for the same repository/revision
-  - `--format` is valid (`lines`, `json`, `prompt`)
-
-## Deliverables for Next Step
-
-- `/tmp/vocabulary-harvest.json` (structured)
-- `/tmp/vocabulary-harvest.txt` (optional plain term list)
-- A stable `vocabulary-harvest` artifact that can be passed to the LLM filtering skill
+Return the exact JSON path and optional text path, corpus/index paths, resolved
+Yore command, selected options, exit/validation outcome, candidate count and
+known freshness evidence. Preserve these bindings with the artifact in context
+(or a run-local metadata file) so a subsequent filter does not infer its target
+repository from the Yore checkout. Keep the artifact available for that handoff;
+pass the exact JSON path as `--input`, never a fixed `/tmp` filename or a glob
+that could select another run.

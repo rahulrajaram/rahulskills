@@ -51,14 +51,13 @@ timestamp, and signal category.
 Scavenge, in order (skip any that do not exist):
 
 1. **Shell history** — the primary source. Prefer the extended zsh format
-   (`: <epoch>:<duration>;<command>`). Bash history is `: <epoch>:<command>`.
-   Apply the window filter (default: last 24h, or `--window`/`--dir`).
-2. **Pi/agent session artifacts** — look under platform tmpdir subtrees that the
-   harness writes (e.g. a `pi-*` subtree for per-session or per-subagent task
-   output). In package-level and evolution/per-session caches there may be
-   transcript JSONL, `.output` files, and campaign dossiers.
-3. **Notable files** — `NEXT_SHELL_PROMPT`-style handoff notes, `*.md`
-   reports, openrouter/inference CSV export in a Downloads dir, and `*.log`.
+   (`: <epoch>:<duration>;<command>`). Timestamped Bash history uses a `#<epoch>` line followed by command text;
+   untimestamped history cannot establish event time.
+   Apply the window filter (default: last 24h, or `--since DATE`/`--last DURATION`).
+2. **Pi/agent session artifacts** — only the current runtime-provided session
+   artifact roots, or explicit `--source PATH` inputs. Do not glob every tmpdir.
+3. **Additional files** — only explicitly supplied reports, logs, CSV exports
+   or handoffs; a Downloads directory is not a default scan target.
 
 Be robust: some paths may be absent or permission-restricted; skip and note
 skipped ones. Do not chase entries that are empty or still being written.
@@ -69,7 +68,7 @@ skipped ones. Do not chase entries that are empty or still being written.
    `~/.bash_history` if present. For extended zsh lines, decode epoch + duration
    and map to map timestamps.
 2. **Filter and redact a window.** Only include entries newer than the window start
-   (default last 24h; honor `--window <n>d` / `--dir <date>`). Keep enough raw
+   (default last 24h; honor `--last <n>d` / `--since <date>`). Keep enough raw
    lines to create an in-memory redacted copy, then discard raw values from the
    working set. Run the analytics below only on redacted text; do not token-dump
    everything.
@@ -78,6 +77,8 @@ skipped ones. Do not chase entries that are empty or still being written.
      more than a threshold (default 3x) as possible inefficiency/loops.
    - **Failures** — lines containing error markers (`error:`, `failed`, `exit code`,
      `not found`, `No such file`, `Could not`, `EACCES`, `ENOENT`, `FAIL`).
+     In command history these are only candidate strings, not evidence the
+     command failed; require outcome/log evidence for a failure claim.
    - **Unfinished work** — commands whose first token is `sudo`-less but trailing
      `&&` or a trailing backslash, or a heredoc that never closed, or a tailing
      `;`-chain that seems cutoff at the end of history.
@@ -109,3 +110,15 @@ skipped ones. Do not chase entries that are empty or still being written.
 - Do not run network commands or side-effecting analyses.
 - If the user specified `--out`, write there; else default above.
 - Stop ratio: prefer fewer, better-signal rows over a maximal inventory.
+
+## Interaction and evidence
+
+These flags are agent routing instructions, not a claim that a harvester binary
+exists. `--since` and `--last` are alternative time windows; default is 24 hours.
+Resolve dates in the stated/local timezone and report that choice. Explicit
+sources do not authorize execution of their contents. If timestamps are absent,
+report time coverage as unknown and keep those records separate from verified
+in-window events; file modification time is not each event's timestamp.
+Proceed with authorized readable sources, disclose skips, and ask only when a
+missing source/window choice materially changes the requested scope. Do not infer
+failure, unfinished execution or cost solely from a command's spelling.

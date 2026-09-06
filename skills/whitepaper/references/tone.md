@@ -8,18 +8,17 @@ each other; balance them:
 - **Reduce theatricality.** AI- and startup-speak overuse rhetorical drama.
   A restrained, direct read reads *more* confident than a breathless one.
 
-## For the war-room analogy
+## Optional example: a deliberation product
 
-For a decision product, frame it as **a virtual team that debates every angle
-and then lands on a conclusion** — opposition, deliberation, verdict — not as
-"Perplexity for X" (a search-answer framing that cheapens a deliberation
-product). Tie the analogy back to the brand name where possible (e.g.,
-*counterpoint* = a second melody arguing with the first).
+For a product that actually coordinates contrasting assessments, a virtual
+team or war-room analogy may help. Do not claim it debates every angle, reaches
+a reliable verdict, or differs from search unless the evidence supports that.
+Choose an analogy only when it clarifies the specified product.
 
 ## Cut the theatrical patterns
 
-Apply the clear-writing rules (separate skill) aggressively to an investor
-draft. The patterns that most often creep in:
+An optional `clear-writing` pass can refine an investor draft while preserving
+claims, modality, and useful structure. It is not a required dependency. The patterns that most often creep in:
 
 - **"— because" after an em-dash.** Split into two sentences. Don't start the
   second clause with "because"; that reads deliberately staged.
@@ -44,8 +43,8 @@ engineering move to the appendix** — do not strip the *claim* of its evidence.
 
 - "decide on a good-feeling plan, find the miss late, rework" (the before).
 - "run it through the engine, catch the blind spot before you commit" (after).
-- The 10x: "a single avoided mistake in one big call can pay for a year of
-  the tool."
+- If supported by an explicit cost model: "One avoided mistake could offset
+  the annual subscription." Do not invent the comparison.
 - "The technology exists. The process does not."
 
 ## A word on cautious honesty

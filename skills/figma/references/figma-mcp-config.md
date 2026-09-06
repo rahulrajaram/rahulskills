@@ -1,34 +1,48 @@
 # Figma MCP config reference
 
-Use this snippet to register the Figma MCP server in `~/.codex/config.toml` as a streamable HTTP server with bearer auth pulled from your env.
+Use an existing working Figma connection. A request to inspect or implement a design does not by itself authorize registering a server, changing client features or credential storage, authenticating an account, or restarting the client. Reuse authorization already given for those actions; ask only for any material action that remains unauthorized.
+
+## Diagnose before changing configuration
+
+- Distinguish a missing connection from an invalid node, file-access denial, authentication failure, or transient service error. Do not replace a working configuration because one request failed.
+- Inspect only the relevant non-secret settings and the client's tool availability. Do not dump credential-bearing configuration or environment variables.
+- If setup is needed, prepare the concrete server/configuration change and explain any login or restart it requires. Continue independent repository inspection or other authorized preparation while that boundary is unresolved; do not invent missing design context.
+- After an authorized change, check tool availability and a relevant read call. A non-empty credential variable alone does not establish authentication or file access.
+
+## Authorized setup options
+
+Confirm the installed client's supported commands with `codex mcp add --help` and `codex mcp login --help`. For a selected OAuth setup, add the server only if it is missing, then authenticate as needed:
+
+```bash
+codex mcp add figma --url https://mcp.figma.com/mcp
+codex mcp login figma
+```
+
+Do not change feature flags or force a restart from an old example. Follow the actual client's reload/login requirements; if a user action is still required, preserve the completed preparation and identify the remaining step.
+
+For an existing or explicitly selected bearer-token setup, reference the environment variable rather than embedding its value in `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.figma]
 url = "https://mcp.figma.com/mcp"
 bearer_token_env_var = "FIGMA_OAUTH_TOKEN"
-http_headers = { "X-Figma-Region" = "us-east-1" }
 ```
 
-## Notes and options
-- The bearer token must be available as `FIGMA_OAUTH_TOKEN` in the environment that launches Codex.
-- Keep the region header aligned with your Figma region. If your org uses another region, update `X-Figma-Region` consistently.
-- OAuth on streamable HTTP requires the RMCP client: set `[features].rmcp_client = true` (or `experimental_use_rmcp_client = true` on older builds) at the top level of `config.toml`.
-- Optional per-server timeouts: `startup_timeout_sec` (default 10) and `tool_timeout_sec` (default 60) can be set inside `[mcp_servers.figma]` if needed.
+Preserve existing required headers and organization settings; do not assume a region or overwrite another authentication method. Use the client's OAuth flow or the user's existing approved credential-provisioning method. Do not ask for a token in chat or put its value in a shell command, diagnostic output, or generated report. Changes to persistent credential storage are separate from checking the connection.
 
-## Env var setup (if missing)
-- One-time set for current shell: `export FIGMA_OAUTH_TOKEN="<token>"`
-- Persist for future sessions: add the export line to your shell profile (e.g., `~/.zshrc` or `~/.bashrc`), then restart the shell or your IDE.
-- Verify before launching Codex: `echo $FIGMA_OAUTH_TOKEN` should print a non-empty token.
+## Check credential presence without disclosure
 
-## Setup + verification checklist
-- Add the snippet above to `~/.codex/config.toml` under `[mcp_servers.figma]`, and enable `[features].rmcp_client = true` (or `experimental_use_rmcp_client = true` on older releases).
-- Restart Codex (CLI/IDE) after updating config and env vars.
-- Ask Codex to list Figma tools or run a simple call to confirm the server is reachable.
+For bearer-token configuration, run this in the environment that launches the client. The expansion returns a literal presence marker, never the token:
 
-## Troubleshooting
-- Token not picked up: Export `FIGMA_OAUTH_TOKEN` in the same shell that launches Codex, or add it to your shell profile and restart.
-- OAuth errors: Verify `rmcp_client` is enabled and the bearer token is valid. Tokens copied from Figma should not include surrounding quotes.
-- Network/headers: Keep the `X-Figma-Region` header; if your org uses another region, update the header consistently across config and requests.
+```bash
+if [ "${FIGMA_OAUTH_TOKEN:+set}" = set ]; then
+  printf '%s\n' 'FIGMA_OAUTH_TOKEN is set'
+else
+  printf '%s\n' 'FIGMA_OAUTH_TOKEN is missing'
+fi
+```
+
+A variable set in an unrelated shell may not be available to the running client. Resolve that launch-environment difference through the approved setup path, without printing or copying the credential into the conversation.
 
 ## Usage reminders
 - The server is link-based: copy the Figma frame or layer link, then ask the MCP client to implement that URL. The client will extract the node ID from the link (it does not browse the page).

@@ -1,157 +1,131 @@
 ---
 name: pr-lifecycle
-description: "Create and manage a GitHub pull request from local branch prep through green CI. Use when the user wants an agent to run the commit skill, run the squash-commits skill, ensure it is on a feature branch, verify hooks and fast local checks, do a quick PR review, run readme-doctor before versioning, decide whether a public package needs a version bump, push the branch, open a PR, wait for build success, then stop."
+description: "Prepare and open a GitHub pull request and follow required CI through success. Use for an end-to-end PR workflow; select commit, history cleanup, documentation and release steps only when needed and authorized."
 argument-hint: "[pr hint]"
 ---
 
 # PR Lifecycle
 
-Take a local worktree to an open GitHub PR with passing CI, then stop.
+## Intent and applicability
 
-## Autonomy Routing
+Take the requested change to an open GitHub PR with passing required CI. A
+local-preparation-only request ends with a reviewable branch and PR draft.
 
-An explicit PR lifecycle request authorizes local preparation, commits, and
-validation. It does not override global or repository approval requirements for
-pushes, PR creation, or release/version changes. Do not ask whether to use
-`/goal`, commit, or squash workflows; invoke the required sub-skills and
-continue. Still stop for push/auth failures, risky history rewrites, failing
-checks, unresolved review findings, visibility risk, or any user-visible release
-decision that cannot be inferred from repo policy.
+## Inputs and local bindings
 
-## Preconditions
+Resolve the requested change, current branch, actual base/upstream, remote and
+repository contribution/release policy. Read existing validation/setup commands;
+filenames below are examples, not proof that a command or flag is supported.
+Use locally available Git/gh or an already authorized equivalent. Missing remote
+authentication does not prevent independent local preparation.
 
-- Work inside a git repository with a GitHub remote.
-- `gh` must be installed and authenticated.
-- Stop immediately on glaring issues: hook failures, unresolved review findings,
-  risky squash plans, dirty tree after a major step, unclear versioning, push
-  failure, PR creation failure, or failing CI.
+## Non-goals
 
-## Workflow
+A PR request does not select squashing, hook installation, full README rebuilding,
+a package release, merge or deployment by default. Necessary local fixes and
+verification are within the requested preparation. Explicit broader scope can
+select the other operations under their own applicable boundaries.
 
-### 1. Preflight
+## Must not
 
-- Detect repo root, current branch, default branch, and upstream status.
-- Confirm `gh auth status` succeeds before doing PR work.
-- Derive a short hint from the argument, current top commit subject, or user
-  request for branch/PR naming.
+Do not bypass hooks with `--no-verify`, commit unrelated work, change shared
+history without authority, or claim CI success from stale/skipped/unknown required
+checks. Do not install tools/hooks or change release policy just to run this skill.
+Do not treat local tracking refs as proof that commits have never been shared.
 
-### 2. Run `/commit`
+## Interaction and authority
 
-- Use the `commit` skill first.
-- If it surfaces REVIEW or ALLOWED items, hook failures, or leaves material
-  changes uncommitted, stop and report instead of pushing ahead.
+An explicit PR lifecycle request selects local preparation, relevant commits,
+review and validation. Carry still-valid approvals into composed skills; do not
+ask again merely because a new phase starts. Push/PR creation/version changes
+must be covered by the request and active repository rules. Prepare the exact
+branch, diff, validation evidence, title/body and outbound action before asking
+about an unresolved boundary. Push approval alone does not authorize PR creation.
 
-### 3. Run `/squash-commits`
+Diagnose and fix ordinary local failures within scope, then rerun the affected
+check. Do not stop at the first failing test, fixable review finding or missing
+authentication when useful local work remains. Wait for genuinely missing access,
+a material release/scope decision or unsafe unresolved history effects; never
+loop blindly, weaken gates or expand the task to avoid the blocker.
 
-- Use `squash-commits` on unpushed commits only.
-- If it needs user approval, proposes a risky rewrite, hits conflicts, fails
-  tests, or leaves the repo dirty, stop and report.
+## Procedure
 
-### 4. Ensure Feature Branch
+### 1. Select the branch before mutation
 
-- Detect the default branch from `origin/HEAD`, then fall back to `main` or
-  `master` if needed.
-- If HEAD is detached or the current branch is still the default branch, create
-  and switch to `feature/<slug>` derived from the hint.
-- If already on a non-default branch, keep it.
+Inspect repository state and preserve unrelated files. Determine the base from
+repository evidence (`origin/HEAD` if applicable, then actual local branches).
+If detached or on the default branch, create a suitable feature branch at the
+intended starting commit before committing or rewriting history. Preserve an
+existing appropriate feature branch. Resolve ambiguity that would change the PR
+contents; do not reset or discard work to make the branch clean.
 
-### 5. Ensure Hooks And Fast Validation Ran
+### 2. Prepare only the necessary changes
 
-- Never use `--no-verify`.
-- Inspect `.githooks/`, `.git/hooks/`, `lefthook.yml`,
-  `.pre-commit-config.yaml`, `package.json`, `pyproject.toml`, `Cargo.toml`,
-  and other obvious project files to identify the concrete validation commands
-  behind the hooks.
-- Re-run those concrete validations against the current HEAD after commit and
-  squash.
-- If you cannot determine hook coverage confidently, stop and say so rather
-  than pretending all hooks ran.
+- Invoke `commit` when relevant changes need committing; reuse existing selected
+  files and preserve its secret/artifact triage. Unrelated untracked files alone
+  do not require abandoning the task.
+- Invoke `squash-commits` only when requested or required by repository policy
+  and covered by concrete history authority. Clean history needs no rewrite.
+- Use `readme-doctor` for documentation/help affected by this diff. A full audit
+  applies only when selected; a small help fix does not require rebuilding README.
+- Resolve local review findings within scope and commit resulting intended edits.
 
-### 6. Quick Local PR Review
+### 3. Verify the resulting change
 
-- Review `git diff --stat <base>...HEAD`, `git diff --check <base>...HEAD`, and
-  a skim of the patch itself.
-- Look for secrets, debug prints, stale TODO/FIXME markers, missing tests for
-  risky behavior, broken docs, or obviously noisy changes.
-- Stop on glaring issues.
+Inspect the patch, `git diff --check <base>...HEAD`, secrets exposure, behavior,
+relevant tests and documentation. Determine which checks already ran against
+unchanged relevant content, and run missing/stale required checks. A message-only
+rewrite need not rerun an unchanged build; required history checks still apply.
+Do not infer that all hooks ran merely from installed files. Preserve effective
+hook routing and inspect the commands it actually invokes.
 
-### 7. Run `/readme-doctor`
+If repository policy uses `scripts/run_ci_mirror.sh`, inspect its supported
+interface and run required gates. Do not assume `--list` or `--no-pytest` exists,
+or that a partial run meets the full gate. Broaden tests only for changed risk,
+insufficient coverage, a failure or an actual required check.
 
-- Run `readme-doctor` after the quick local PR review and before any version
-  decision.
-- Stop if it finds glaring README, help-text, or packaging-documentation drift.
-- If `readme-doctor` makes material doc changes, commit them normally so hooks
-  run before continuing.
+### 4. Resolve release requirements when applicable
 
-### 8. Check Public Package Versioning
+Skip release work for private/non-published packages and when the repository
+releases separately from PR preparation. For selected public-package versioning,
+read [references/version-registries.md](references/version-registries.md) and the
+actual release policy. Check the relevant registry only if needed to resolve the
+version decision. Propose a supported bump when required; edit it only under
+valid authority. An unpublished version alone does not settle compatibility or
+release policy. After authorized edits, rerun only affected checks and commit.
 
-- Detect whether the repo publishes a public package by inspecting
-  `package.json`, `pyproject.toml`, `Cargo.toml`, `*.gemspec`, or other release
-  metadata.
-- If the repo is private or has no publish target, skip this step.
-- If the repo publishes publicly, read
-  [references/version-registries.md](references/version-registries.md) and use
-  the matching registry check.
-- Compare the local package version with the currently published version.
-- Use the PR diff to decide whether the shipped package behavior or artifact
-  changed enough to warrant a release.
-- If the local version is already published and the PR changes shipped package
-  behavior or artifacts, propose the smallest correct SemVer bump and explain
-  why. Obtain explicit user approval before editing or committing version files.
-- If the local version has not been published yet, do not bump the version.
-- If you make a version bump, commit it normally so hooks run, then rerun the
-  quick local review and `readme-doctor`.
+### 5. Prepare and perform authorized external actions
 
-### 9. Run Repo-Local CI Mirror
+Confirm remote access when needed. Present the concrete branch, remote, commits,
+push command and PR title/body before an unresolved approval. Once covered, push
+with appropriate upstream tracking and create the PR (or use the existing PR).
+Do not force-push as a routine fallback. On failure, inspect whether an action
+partially succeeded before retrying so duplicate PRs are not created.
 
-- If `scripts/run_ci_mirror.sh` exists, run `scripts/run_ci_mirror.sh --list`
-  to record the available local mirror gates.
-- Then run `scripts/run_ci_mirror.sh` before pushing.
-- If the mirror fails, stop and report the failing gate names instead of
-  pushing.
-- For faster iteration before the final pre-push check, you may run
-  `scripts/run_ci_mirror.sh --no-pytest`, but treat it as a partial mirror that
-  skips the top-level `pytest+ratchet+ruff+complexity` gate.
-- If no `scripts/run_ci_mirror.sh` exists, skip this step.
+Write title/body from the actual diff and validation evidence; `--fill` is useful
+only when commit history accurately describes the final change. Capture the PR
+number and URL. Missing access leaves a completed local branch and draft with
+the smallest remaining user action, not a claim that the PR was opened.
 
-### 10. Push The Feature Branch
+### 6. Follow required CI
 
-- Show the branch, remote, commits to be sent, and exact push command. Obtain
-  explicit user approval immediately before pushing, even when this skill was
-  explicitly invoked.
-- After approval, push the current feature branch with upstream tracking.
-- Stop on any push rejection or auth failure.
+Use `gh pr checks <pr-number> --watch` or the available CI interface. Verify the
+checks correspond to current HEAD and all required checks succeeded; skipped,
+neutral and missing checks are not automatically green. Use an existing
+repository CI gate when required, checking its supported arguments first.
+Diagnose and repair relevant failures within scope. Further pushes still require
+applicable authority, reusing an existing grant when it covers the correction.
+Finish at green required CI; review/merge remains with the user unless selected.
 
-### 11. Open The PR
-
-- Treat PR creation as an external shared-state write. Obtain explicit approval
-  unless the user's current request explicitly and unambiguously authorized
-  opening the PR (approval to push alone is insufficient).
-- Use `gh pr create`.
-- Prefer `--fill` when the existing commit history is already clean; otherwise
-  provide an explicit title and body built from the branch diff.
-- Capture the PR number and URL.
-
-### 12. Wait For Build Success
-
-- Use `gh pr checks <pr-number> --watch` when available, otherwise watch the
-  corresponding GitHub Actions run.
-- After the watch reports green, run `bash scripts/ci_gate.sh --commit $(git rev-parse HEAD)`
-  from the repo root when that script exists so skipped, neutral, or stale
-  required checks still stop the flow.
-- If CI fails, notify the user and stop.
-- If CI passes, notify the user and stop. The user owns review, merge, and all
-  follow-up after that point.
-
-## Output Contract
+## Completion and evidence
 
 End with this plain-text block:
 
 ```text
 PR_LIFECYCLE_V1
-status: stopped-on-issue|opened-pr|ci-passed
+status: prepared-local|stopped-on-issue|opened-pr|ci-passed
 branch: <branch-name>
 pr_url: <url-or-none>
 version_action: none|checked-no-bump|bumped-to-<version>
-next_action: user-review|fix-issue|monitor-ci
+next_action: user-review|await-authorization|resolve-access|fix-issue|monitor-ci
 ```

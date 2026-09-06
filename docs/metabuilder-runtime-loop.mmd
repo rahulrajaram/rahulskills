@@ -1,0 +1,131 @@
+%%{init: {"theme":"base","themeVariables":{"background":"transparent","primaryColor":"#ffffff","primaryBorderColor":"#111827","primaryTextColor":"#111827","lineColor":"#334155","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"transparent","clusterBorder":"#111827"},"flowchart":{"htmlLabels":true,"curve":"basis","nodeSpacing":38,"rankSpacing":54}}}%%
+flowchart TB
+    entry[/"ENTRY · admitted bundle, immutable objective, authority, and exact RunState"/]
+
+    subgraph Orchestrator["PROCESS 1 · ORCHESTRATOR · epoch boundary"]
+        direction LR
+        o_start["STATE · Authorize one frozen finite epoch"]
+        o_continue{"DECISION · accept, open a fresh epoch, or stop?"}
+    end
+
+    subgraph MetaBuilder["PROCESS 2 · METABUILDER · controller owns state"]
+        direction TB
+        m_decide["1 · DECIDE · pure nextIntent over immutable state"]
+        m_choice{"Stop or execute one compiled action?"}
+        m_admit["2 · ADMIT · revalidate authority and resources; persist intent"]
+        m_broker{"Enforced adapter and current grant available?"}
+        m_observe["4 · VERIFY · controller records Observation"]
+        m_classify{"Succeeded, failed, denied, timed out, or Unknown?"}
+        m_verify["Apply named checks to exact observation"]
+        m_settle["5 · SETTLE · pure transition creates new immutable state"]
+        m_checkpoint["Persist checkpoint, evidence, and exact pins"]
+        m_epoch{"More compiled work remains inside this frozen epoch?"}
+        m_reconcile["RECOVERY · reconcile persisted intent with external reality"]
+    end
+
+    subgraph Harness["PROCESS 3 · HARNESS · effect interpretation only"]
+        direction LR
+        h_direct[["3 · INTERPRET · installed sandboxed command"]]
+        h_offline[["3 · INTERPRET · committed-source offline MCP or agent"]]
+        h_live[["TARGET · future separately authorized live adapter"]]
+        h_claim[/"MESSAGE · worker Claim and raw artifacts"/]
+    end
+
+    subgraph Target["PROCESS 4 · TARGET PROGRAM · isolated effect subject"]
+        direction LR
+        p_state[/"VALUE · exact source and candidate state"/]
+        p_read[["INSTALLED · build, test, or run against read-only source"]]
+        p_edit[["TARGET · governed edit inside isolated candidate"]]
+        p_outcome[/"VALUE · raw adapter outcome and produced files"/]
+    end
+
+    state_store[("DURABLE STORE · state, bundle pins, and authority references")]
+    journal[("DURABLE STORE · intent, attempt, observation, event, and reconciliation journal")]
+    artifacts[("DURABLE STORE · content-addressed outputs, receipts, and checkpoints")]
+    next_request[/"OUTPUT · checkpointed next ObjectiveRequest for a fresh epoch"/]
+    exit(["EXIT · accepted outcome, refusal, unresolved Unknown, bounded stop, or next request"])
+
+    entry --> o_start
+    o_start --> m_decide
+    state_store --> m_decide
+    m_decide --> m_choice
+    m_choice -->|typed stop| m_settle
+    m_choice -->|execute| m_admit
+    m_admit --> journal
+    m_admit --> m_broker
+    m_broker -->|installed direct command| h_direct
+    m_broker -.->|committed source only| h_offline
+    m_broker -.->|future live route| h_live
+    m_broker -->|deny| m_settle
+
+    p_state --> p_read
+    p_state -.-> p_edit
+    h_direct --> p_read
+    h_live -.-> p_edit
+    p_read --> p_outcome
+    p_edit -.-> p_outcome
+    h_offline -.-> h_claim
+    p_outcome --> h_claim
+    h_claim --> m_observe
+    m_observe --> journal
+    m_observe --> m_classify
+    m_classify -->|conclusive success| m_verify
+    m_classify -->|conclusive failure, timeout, or denial| m_settle
+    m_classify -->|effect may have happened| m_reconcile
+    m_reconcile --> journal
+    m_reconcile -->|conclusive observation| m_observe
+    m_reconcile -->|still Unknown| m_settle
+    m_verify --> m_settle
+    m_settle --> m_checkpoint
+    m_checkpoint --> state_store
+    m_checkpoint --> artifacts
+    m_checkpoint --> m_epoch
+    m_epoch ==>|yes · continue within the same frozen plan and bounds| m_decide
+    m_epoch -->|epoch terminal| o_continue
+    o_continue -->|accepted or bounded stop| exit
+    o_continue -->|real work remains| next_request
+    next_request --> exit
+    o_continue -->|reserved or materially ambiguous| exit
+
+    core_rule["FUNCTIONAL CORE · nextIntent and transition are pure; only harness interpreters perform effects"]
+    claim_rule["EVIDENCE RULE · the claim is not evidence; MetaBuilder observes and verifies independently"]
+    retry_rule["RECOVERY RULE · never blindly redispatch an effect that may have happened"]
+    epoch_rule["EPOCH RULE · no in-place revision; another epoch requires a fresh request and authority check"]
+    assurance_rule["ASSURANCE RULE · integrity, provenance, semantics, security, and production readiness stay separate"]
+    m_decide -.-> core_rule
+    h_claim -.-> claim_rule
+    m_reconcile -.-> retry_rule
+    o_continue -.-> epoch_rule
+    m_verify -.-> assurance_rule
+
+    classDef actor fill:#ffffff,stroke:#0f172a,stroke-width:3px,color:#0f172a
+    classDef process fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef data fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef message fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef state fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef blocked fill:#ffffff,stroke:#991b1b,stroke-width:3px,color:#7f1d1d
+    classDef decision fill:#ffffff,stroke:#111827,stroke-width:3px,color:#111827
+    classDef artifact fill:#ffffff,stroke:#1f2937,stroke-width:2.5px,color:#111827
+    classDef note fill:#ffffff,stroke:#475569,stroke-width:1.7px,stroke-dasharray:7 5,color:#334155,font-size:13px
+    classDef installed fill:#ffffff,stroke:#1d4ed8,stroke-width:3px,color:#0f172a
+    classDef source fill:#ffffff,stroke:#7c3aed,stroke-width:3px,color:#4c1d95
+    classDef target fill:#ffffff,stroke:#16a34a,stroke-width:3px,stroke-dasharray:6 4,color:#14532d
+    classDef reserved fill:#ffffff,stroke:#f97316,stroke-width:3px,color:#7c2d12
+
+    class entry,p_state,p_outcome,next_request artifact
+    class h_claim message
+    class o_start,m_decide,m_admit,m_observe,m_verify,m_settle,m_checkpoint,m_reconcile state
+    class o_continue,m_choice,m_broker,m_classify,m_epoch decision
+    class m_decide,m_admit,m_observe,m_classify,m_verify,m_settle,m_checkpoint,m_reconcile,h_direct,p_read installed
+    class p_edit target
+    class h_offline source
+    class h_live target
+    class o_start,o_continue target
+    class state_store,journal,artifacts data,installed
+    class exit actor
+    class core_rule,claim_rule,retry_rule,epoch_rule,assurance_rule note
+
+    style Orchestrator fill:transparent,stroke:#0f172a,stroke-width:2.5px
+    style MetaBuilder fill:transparent,stroke:#1d4ed8,stroke-width:2.5px
+    style Harness fill:transparent,stroke:#7c3aed,stroke-width:2.2px
+    style Target fill:transparent,stroke:#64748b,stroke-width:1.8px,stroke-dasharray:6 4

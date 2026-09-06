@@ -15,15 +15,10 @@ This repo collects skills (prompt-based automation units) for two AI coding assi
 
 Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `skills/` directory in this repo is the single source of truth, synced to both locations.
 
-Pi Coding Agent resolves skills from `~/.pi/agent/skills/` first, then the
-assembled Codex location at `~/.codex/skills/` and any other location in its
-discovery chain. Pi also scans `~/.agents/skills/` as a global location, so
-that directory must stay **empty** — codex owns `~/.codex/skills/` and claude
-owns `~/.claude/skills/`, and a duplicate name in `~/.agents/skills/` would
-make Pi report a collision for every skill. Run
-[`install-pi-skills.sh`](#install-pi-skills.sh) after cloning or pulling to link
-every repo skill into `~/.pi/agent/skills/` so Pi loads the repository copies
-directly and never a stale shadowing copy. Invoke a skill explicitly in Pi as
+Pi Coding Agent resolves selected links from `~/.pi/agent/skills/`. Run
+[`install-pi-skills.sh`](#install-pi-skills.sh) with the desired profile after
+cloning or pulling. It preserves unrelated links and user-managed directories;
+profile changes do not prune optional copies. Invoke a skill explicitly in Pi as
 `/skill:<name>`; for example, `/skill:handoff extract` reviews
 `NEXT_SHELL_PROMPT.md`, adopts it as the current request, and immediately
 executes its authorized work.
@@ -61,10 +56,12 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (47)
+### Package-managed skills (50)
 
-Authored in this package and deployed to Pi, Codex, and Claude Code. Runtime
-exclusions prevent package copies from shadowing system-owned Codex skills.
+Authored in this package and available for explicit selection on Pi, Codex, and
+Claude Code. The default `core` profile omits the optional design skills
+`figma`, `figma-implement-design`, and `tui-web-design-orchestrator`. Runtime
+exclusions prevent package copies from shadowing system-owned skills.
 
 | Skill | Description |
 |-------|-------------|
@@ -95,6 +92,9 @@ exclusions prevent package copies from shadowing system-owned Codex skills.
 | `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint |
 | `max-columns` | Keep output within a user-specified column width |
 | `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
+| `metabuilder` | Define, compile, inspect, run, recover, and improve governed MetaBuilder harnesses |
+| `metabuilder-consumer-qualification` | Run and assess an already designed consumer harness without conflating controller evidence with product judgment |
+| `metabuilder-harness-design` | Turn a target objective into an agreed brief and typed MetaBuilder harness design |
 | `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |
 | `objective-to-dag-decomposition` | Decompose vague objectives into typed reasoning trees, an execution DAG, and phased plans |
 | `postmortem` | Generate Amazon COE-style 5-whys postmortem reports |
@@ -128,35 +128,47 @@ for Pi and Claude while excluding that copy from the Codex assembly.
 
 ### `install-pi-skills.sh`
 
-Symlink every repo skill into the Pi coding agent's skill directory so Pi loads
-the repository copies directly (repo = single source of truth).
+Symlink the selected profile or explicitly named skills into Pi's skill
+directory. Selection defaults to `core` and preserves unrelated entries.
 
 ```bash
-./install-pi-skills.sh           # Link all repo skills into ~/.pi/agent/skills
-./install-pi-skills.sh grilling  # Link a single skill
-./install-pi-skills.sh -n        # Dry run
+./install-pi-skills.sh                       # Link the core profile
+./install-pi-skills.sh --profile design      # Add optional design skills
+./install-pi-skills.sh --profile all         # Select every package profile
+./install-pi-skills.sh --skill grilling      # Select one skill only
+./install-pi-skills.sh --preview --pi-root /tmp/pi-agent  # Isolated preview
 ```
 
-Pi resolves `~/.pi/agent/skills/` before `~/.agents/skills/`, so existing real
-directories are moved to `~/.pi/agent/backups/<name>.pre-pi-sync` (outside Pi's
-scan dirs) and replaced with symlinks pointing back at this repo; nothing is
-deleted. The installer also prunes stale symlinks into deleted repo skills and
-leftover `.pre-pi-sync` dirs, so Pi reports no skill collisions. Honors
-`.exclude-skills`.
+Existing package-owned links can be updated and explicitly removed with
+`--remove NAME`. Unmanaged copies and unrelated Pi symlinks are retained;
+ownership is recorded in `.rahulskills-ownership.json` under the Pi runtime.
+No optional profile selection activates MCPs, commands, or other dependencies.
+Runtime exclusions and `.exclude-skills` are honored.
 
 ### `stitch-skills.sh`
 
-Assembles generic skills with CLI-specific overlays and installs to both CLIs.
-Assembly and installation use staged replacements. Prior generated or installed
-trees are moved to timestamped backup directories and retained; these commands
-do not recursively delete the trees they replace.
+Assembles selected generic skills with CLI-specific overlays and can install to
+both CLIs. `--output PATH` always assembles into a fresh isolated destination;
+`preview` uses an isolated assembly and reports additions, updates, retained
+entries, ownership conflicts, and explicit removals without changing installs.
+`install` previews both runtimes before applying ownership-safe updates.
 
 ```bash
 ./stitch-skills.sh repo-layout   # Validate skills/ and overlays/ directories
-./stitch-skills.sh assemble      # Build assembled output in build/ from skills/ + overlays/
-./stitch-skills.sh install       # Assemble + install to ~/.codex/skills, ~/.claude/skills
-./stitch-skills.sh check         # Freshly assemble, then compare against installed locations
-./stitch-skills.sh all           # repo-layout + install + check
+./stitch-skills.sh assemble --profile core
+./stitch-skills.sh assemble --profile design --output /tmp/rahulskills-design
+./stitch-skills.sh preview --profile core --codex-root /tmp/codex --claude-root /tmp/claude
+./stitch-skills.sh install --profile core
+./stitch-skills.sh check --profile core
+./stitch-skills.sh all --profile all
+```
+
+Use `--remove NAME` only for an explicit removal of a verified package-owned
+entry. A read-only preview of the actual default installs is:
+
+```bash
+./stitch-skills.sh preview --codex-root "$HOME/.codex" --claude-root "$HOME/.claude"
+./install-pi-skills.sh --preview --pi-root "$HOME/.pi/agent"
 ```
 
 ### `sync-skills.sh`

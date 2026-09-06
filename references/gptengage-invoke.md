@@ -16,7 +16,8 @@ Use this recipe only for `gptengage invoke`.
 
 Forward only parsed options supported by current help: `--model`, `--session`,
 `--topic`, `--context-file`, repeatable `--image`, `--timeout`, `--write`, and
-`--stdin-as auto|context|ignore`. Images currently work only with backends that
+`--stdin-as auto|context|ignore`, and `--output text|json` when exposed by the
+selected binary. Images currently work only with backends that
 implement image passthrough.
 
 The wrapper's inner timeout defaults to 600 seconds, overriding the CLI's

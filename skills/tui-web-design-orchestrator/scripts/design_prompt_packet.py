@@ -182,6 +182,8 @@ def parse_args() -> argparse.Namespace:
         help="Preferred implementation stack (defaults by mode).",
     )
     parser.add_argument("--name", default="", help="Optional project name.")
+    parser.add_argument("--component", action="append", default=[],
+                        help="Component derived from the brief; repeat as needed.")
     parser.add_argument(
         "--output",
         choices=["markdown", "json"],
@@ -193,13 +195,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def normalize_constraints(raw_constraints: list[str]) -> list[str]:
-    constraints: list[str] = []
-    for item in raw_constraints:
-        for chunk in item.split(","):
-            text = chunk.strip()
-            if text:
-                constraints.append(text)
-    return constraints
+    return [item.strip() for item in raw_constraints if item.strip()]
 
 
 def infer_project_name(explicit_name: str, brief: str) -> str:
@@ -229,11 +225,23 @@ def build_assumptions(mode: str, audience: str, constraints: list[str], tech: st
 
 
 def build_packet(args: argparse.Namespace) -> dict:
-    mode_data = MODE_PRESETS[args.mode]
+    # Presets offer optional examples, never impose a product's component map.
+    preset = MODE_PRESETS[args.mode]
+    components = [item.strip() for item in getattr(args, "component", []) if item.strip()]
+    mode_data = {
+        "default_tech": preset["default_tech"],
+        "primary_tasks": [args.brief],
+        "information_architecture": components or ["Derive structure from the brief; no fixed layout selected."],
+        "components": components,
+        "interactions": ["Derive interactions and relevant states from the selected tasks and components."],
+    }
     constraints = normalize_constraints(args.constraints)
     tech = args.tech.strip() or mode_data["default_tech"]
     project_name = infer_project_name(args.name, args.brief)
     assumptions = build_assumptions(args.mode, args.audience, constraints, args.tech.strip())
+
+    if not components:
+        assumptions.append("No component map supplied; derive it from the brief before implementation.")
 
     a11y_checks = list(TUI_A11Y if args.mode.startswith("tui") else WEB_A11Y)
 
@@ -329,7 +337,7 @@ def build_implementation_prompt(
         f"Style direction:\n- {style}\n\n"
         f"Primary tasks:\n{task_lines}\n\n"
         f"Constraints:\n{constraint_lines}\n\n"
-        f"Required components:\n{component_lines}\n\n"
+        f"Brief-derived component choices (review assumptions):\n{component_lines or 'Derive from the brief; no fixed component set selected.'}\n\n"
         f"Interaction expectations:\n{interaction_lines}"
         f"{mode_specific}\n\n"
         "Deliver output in this order:\n"

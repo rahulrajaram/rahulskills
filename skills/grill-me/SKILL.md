@@ -1,12 +1,17 @@
 ---
 name: grill-me
 description: "A shortcut to run the grilling skill on a plan, decision, or idea. Use when the user says /grill-me or $grill-me."
-argument-hint: "[spec|factory|debate|gradient] [topic or artifact] [--n <stems>] [--branch <b>] [--depth <n>] [--keep <k>] [--zones <z>] [--cap <nodes>]"
+argument-hint: "[spec|factory|debate|gradient|linear-runtime] [topic or artifact] [--n <stems>] [--branch <b>] [--depth <n>] [--keep <k>] [--zones <z>] [--cap <nodes>]"
 disable-model-invocation: true
 ---
 
-Call the Skill tool with `grilling`, preserving any arguments.
+Invoke the available `grilling` skill, preserving the topic, arguments,
+selected mode, existing decisions and authority. This alias inherits that
+skill's intent, boundaries, interaction policy and completion contract; it adds
+no backend calls, approval gate or speculative mode. With no mode selected,
+start the ordinary user interview.
 
-For Pi: invoke `grilling` via the Skill tool. For other CLIs, run the
-`grilling` skill directly; this alias exists only as a convenient trigger
-name so `/grill-me` and `$grill-me` resolve to the full grilling skill.
+Use the host's actual skill-loading mechanism. A Skill tool is one supported
+route when present; otherwise read the available `grilling/SKILL.md` directly.
+Do not invent a host tool or install a missing skill. If the target is
+unavailable, report the missing binding instead of claiming the alias ran it.

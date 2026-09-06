@@ -102,4 +102,6 @@ Return system facts, pressure evidence, top consumers, tunable context,
 limitations, and prioritized recommendations. If changes may help, provide a
 read-only proposal containing current value, proposed value, rationale,
 workload assumptions, verification, rollback, and whether persistence is
-desired. Wait for explicit approval before generating or running an apply script.
+desired. A requested local apply-script proposal may be prepared and reviewed
+within existing write authority; generating it is separate from executing it.
+Wait only for unresolved execution/privilege/persistence authority before applying.

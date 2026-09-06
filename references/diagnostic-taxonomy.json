@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "rules": [
+    {"id": "DIAG-001", "legacy_id": 1, "name": "credential-assumption", "evidence_category": "security", "severity": "HIGH"},
+    {"id": "DIAG-002", "legacy_id": 2, "name": "retry-without-diagnosis", "evidence_category": "workflow", "severity": "HIGH"},
+    {"id": "DIAG-003", "legacy_id": 3, "name": "scope-authorization", "evidence_category": "authority", "severity": "MEDIUM"},
+    {"id": "DIAG-004", "legacy_id": 4, "name": "dependency-verification", "evidence_category": "verification", "severity": "HIGH"},
+    {"id": "DIAG-005", "legacy_id": 5, "name": "tool-discovery", "evidence_category": "workflow", "severity": "LOW"},
+    {"id": "DIAG-006", "legacy_id": 6, "name": "external-value-verification", "evidence_category": "verification", "severity": "MEDIUM"},
+    {"id": "DIAG-016", "legacy_id": 16, "name": "destructive-target-guard", "evidence_category": "safety", "severity": "HIGH"}
+  ]
+}

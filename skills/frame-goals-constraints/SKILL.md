@@ -16,6 +16,26 @@ language such as **product thesis**, **north star**, **operating story**,
 native to a fast-moving software company: ambitious, testable, revisable, and
 useful for making the next decision.
 
+## Inputs, scope, and interaction
+
+Bind the requested audience, objective, horizon, existing thesis, decisions, and
+available product/customer evidence from the conversation and project material.
+Use the user's terminology where precise; an example buyer, market, or operating
+model below does not select that direction for their project.
+
+This skill frames a decision or product direction. It does not automatically
+select implementation, an execution charter, a research campaign, or external
+publication. Necessary local evidence gathering and reasonable provisional
+analysis remain autonomous within scope. Reuse settled choices; investigate
+routine uncertainty without turning the invocation into a required interview.
+When an unknown materially changes the buyer, public promise, threat model,
+authority, or irreversible scope, prepare the alternatives and ask the owner for
+that decision. Continue independent analysis and mark the dependent choice open.
+
+Do not invent customer evidence, market facts, measured success, implemented
+capabilities, or approval. Proposals and strategic bets must remain distinguishable
+from facts and commitments. A persuasive thesis does not authorize its execution.
+
 ## Select the depth
 
 - Use a **decision frame** for a bounded architecture or operating decision.
@@ -23,8 +43,9 @@ useful for making the next decision.
   positioning, a long-range horizon, a product wedge, or several connected
   decisions.
 
-If the request spans customer meaning and technical architecture, use the full
-living-product-thesis workflow. Do not force one vocabulary on every audience.
+If the request spans customer meaning and technical architecture, the full
+living-product-thesis workflow is usually useful; honor a requested quick or
+bounded frame. Do not force one vocabulary on every audience.
 
 ## Work backward from the artifact
 
@@ -197,6 +218,13 @@ issue tree or execution DAG.
 When marketing language is requested, derive it from the customer and product
 layers. Keep the technical layer as the truth source and flag any claim whose
 evidence is not yet strong enough for external use.
+
+## Completion and evidence
+
+Return the selected decision frame or thesis at the requested depth. Identify
+the evidence used, consequential assumptions, still-open decisions, and revision
+triggers. State proposal/accepted status from actual decisions; do not claim the
+model has been implemented, validated, or ratified without corresponding evidence.
 
 ## Quality check
 

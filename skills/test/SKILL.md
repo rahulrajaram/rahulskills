@@ -1,12 +1,45 @@
 ---
 name: test
-description: Run tests with overwatch for streaming output, early failure detection, and timeout management. Use when running test suites (npm test, pytest, playwright, etc.)
+description: Run focused tests with available supervision or the native project runner, preserving output, timeouts and required coverage. Use when running test suites (npm test, pytest, playwright, etc.)
 argument-hint: "<test-command>"
 ---
 
 # Test Runner with Overwatch
 
-Run test commands through `overwatch` for better visibility and control.
+## Intent and applicability
+
+Run the selected project checks and report actual results. Prefer an existing
+working `overwatch` service when supervision improves the run; use the native
+runner for ordinary tests when the service is unavailable or adds no useful
+control. Explicitly requested supervision must be preserved or reported unavailable.
+
+## Inputs and local bindings
+
+Resolve the project command, working directory, interpreter/environment and
+required coverage. A daemon may have a different PATH: use explicit executable
+paths or a reviewed subprocess environment for required dependencies. Do not
+dump credentials while diagnosing environment differences.
+
+## Non-goals
+
+Testing does not select tool/daemon installation, full-suite repetition after
+every edit, or fixes beyond the active task. Necessary diagnosis and authorized
+local repairs remain autonomous.
+
+## Must not
+
+Do not start/install a daemon merely because this skill loaded, run a test twice
+because a launched supervised task's state is unknown, or claim cancelled,
+timed-out, partial or unobserved output as a passing suite.
+
+## Interaction and authority
+
+Use existing test authorization and choose routine runner details. If supervision
+is unavailable before launch, run ordinary tests natively and explain the fallback.
+If a launch may have succeeded, inspect its task state before any retry. Missing
+required infrastructure blocks its dependent check, not independent preparation.
+
+## Procedure
 
 ## Why Use This
 
@@ -77,9 +110,12 @@ Don't use `--cancel-on-output` when:
 - The test output might contain the pattern in non-failure context
 - You're debugging and need full output
 
-## Prerequisites
+## Completion and evidence
 
-The overwatch daemon must be running:
-```bash
-overwatch serve  # In a separate terminal, or use systemd
-```
+Record the command, scope, exit status and relevant failures/coverage limits.
+Use task cancellation/status APIs when supervised; with a native runner retain
+process identity and output and use the host's timeout/cancellation mechanisms.
+A wrapper exit or disconnected stream alone does not prove all child processes
+stopped. Confirm termination where it matters before retrying heavy work.
+Run the narrowest reliable checks and actual required gates. Broaden or repeat
+only for changed risk, missing/stale coverage or a diagnosed failure.

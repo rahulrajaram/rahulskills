@@ -16,8 +16,8 @@ recipe before calling a backend.
 
 1. Parse the topic and debate options, validating participant selection and
    dependent flags with the operation recipe.
-2. Run only through `~/.local/bin/gptengage debate`, passing an inner
-   per-invocation timeout when the user supplied one.
+2. Resolve the authorized existing `gptengage` executable and run only its
+   `debate` operation, passing an inner per-invocation timeout when supplied.
 3. Capture the full debate, distinguish orchestration failures from individual
    backend failures, and return or integrate the requested output format.
 
