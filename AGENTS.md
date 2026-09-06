@@ -36,7 +36,7 @@ must remain locally sufficient without loading that authoring reference.
 Use focused verification appropriate to each change. Do not require matched
 before/after behavior recording or a model-comparison campaign. Preserve existing
 work, keep source edits separate from installation or external capability
-activation, and track the active optimization goal in `OPTIMIZATION_PLAN.md`.
+activation, and track active optimization notes in the ignored `.agent/` planning directory.
 
 ## Backup retention
 

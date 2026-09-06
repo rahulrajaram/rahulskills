@@ -31,3 +31,14 @@ skill-candidates.md
 build/
 build.stale*
 .build-stage.*/
+
+# Generated local diagram review snapshots
+/docs/diagram-preview*/
+
+# Explicitly excluded session reports (kept out of committed corpus)
+/ARCHIVE_CLEANUP_REVIEW.md
+/INSTALLATION_PREVIEW.md
+/NEXT_SHELL_PROMPT.md
+/OPTIMIZATION_PLAN.md
+/GLM_REVIEW.md
+/AUDIT.md
