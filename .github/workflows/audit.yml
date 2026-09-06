@@ -26,5 +26,5 @@ jobs:
         working-directory: skills/skill-creator/scripts
         run: python3 -m unittest -v test_quick_validate.py
 
-      - name: Test stitch backup allocation
-        run: python3 -m unittest -v test_stitch_skills.py
+      - name: Test shared safety contracts
+        run: python3 -m unittest -v test_stitch_skills.py test_redaction.py test_install_commithooks.py
