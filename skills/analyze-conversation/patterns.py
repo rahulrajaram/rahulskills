@@ -35,7 +35,7 @@ def extract_text(content) -> str:
 
 
 def find_credential_antipatterns(messages: List[Dict]) -> List[Dict]:
-    """Find instances where credentials were hardcoded or assumed."""
+    """Find credential-assignment candidates; authorization requires contextual review."""
     findings = []
 
     for i, msg in enumerate(messages):
@@ -49,28 +49,13 @@ def find_credential_antipatterns(messages: List[Dict]) -> List[Dict]:
             findings.append(
                 {
                     "type": "HARDCODED_PASSWORD",
+                    "uncertainty": "May be a placeholder, example, or authorized reference; inspect context before concluding exposure",
                     "index": i,
                     "timestamp": msg.get("timestamp", ""),
                     "evidence": "Credential assignment detected (value redacted)",
                     "context": redact_sensitive_text(content)[:300],
                 }
             )
-
-        # Pattern 2: Using credentials without reading from secrets
-        if "PASSWORD" in content and "kubectl get secret" not in content:
-            if any(
-                keyword in content
-                for keyword in ["export", "DATA_PLANE_DB_PASSWORD", "DB_PASSWORD"]
-            ):
-                findings.append(
-                    {
-                        "type": "ASSUMED_CREDENTIAL",
-                        "index": i,
-                        "timestamp": msg.get("timestamp", ""),
-                        "evidence": "Used PASSWORD env var without reading from secret",
-                        "context": redact_sensitive_text(content)[:300],
-                    }
-                )
 
     return findings
 
@@ -184,7 +169,7 @@ def find_retry_without_diagnosis(messages: List[Dict]) -> List[Dict]:
                                         "first_attempt": prev["index"],
                                         "retry_attempt": i,
                                         "timestamp": msg.get("timestamp", ""),
-                                        "evidence": "Retried command without checking logs/events",
+                                        "evidence": "Repeated command; no recognized diagnostic text in the intervening window. Intent and failure status require review.",
                                     }
                                 )
 
@@ -192,7 +177,7 @@ def find_retry_without_diagnosis(messages: List[Dict]) -> List[Dict]:
 
 
 def find_scope_creep(messages: List[Dict]) -> List[Dict]:
-    """Find instances where scope expanded beyond original request."""
+    """Find scope-language candidates, without inferring unauthorized expansion."""
     findings = []
 
     # Track user requests and assistant responses
@@ -229,12 +214,11 @@ def find_scope_creep(messages: List[Dict]) -> List[Dict]:
                             findings.append(
                                 {
                                     "type": "SCOPE_EXPANSION",
-                                    "original_request": redact_sensitive_text(
-                                        current_request
-                                    )[:200],
+                                    "original_request": redact_sensitive_text(current_request)[:200],
                                     "expansion": redact_sensitive_excerpt(
                                         content, *match.span()
                                     ).strip()[:300],
+                                    "evidence": "Scope language detected; prior authorization and necessary implementation work require review",
                                     "request_index": current_request_idx,
                                     "expansion_index": i,
                                     "timestamp": msg.get("timestamp", ""),
@@ -309,13 +293,7 @@ def extract_conversation_timeline(messages: List[Dict]) -> List[Tuple[str, str, 
         if msg.get("type") == "user":
             content = extract_text(msg.get("message", {}).get("content", ""))
             if content.strip():
-                timeline.append(
-                    (
-                        msg.get("timestamp", ""),
-                        "USER",
-                        redact_sensitive_text(content)[:150],
-                    )
-                )
+                timeline.append((msg.get("timestamp", ""), "USER", redact_sensitive_text(content)[:150]))
 
     return timeline
 
@@ -386,8 +364,10 @@ if __name__ == "__main__":
     messages = load_messages(filepath)
 
     print("=" * 80)
-    print("DEEP ANTI-PATTERN ANALYSIS")
+    print("HEURISTIC CANDIDATES FOR REVIEW")
     print("=" * 80)
+
+    print("Candidates require context and prior authorization review; they do not establish violations or stop authority.")
 
     # Timeline
     print("\nCONVERSATION TIMELINE (User Requests):")
@@ -398,7 +378,7 @@ if __name__ == "__main__":
     print(f"\n... ({len(timeline)} total user messages)")
 
     # Credential anti-patterns
-    print("\n\n1. CREDENTIAL ANTI-PATTERNS:")
+    print("\n\n1. CREDENTIAL ASSIGNMENT CANDIDATES:")
     print("-" * 80)
     cred_patterns = find_credential_antipatterns(messages)
     for p in cred_patterns[:10]:
@@ -418,7 +398,7 @@ if __name__ == "__main__":
         print(f"  Evidence: {p['evidence']}")
 
     # Scope creep
-    print("\n\n3. SCOPE EXPANSION INSTANCES:")
+    print("\n\n3. SCOPE LANGUAGE CANDIDATES:")
     print("-" * 80)
     scope_patterns = find_scope_creep(messages)
     for p in scope_patterns[:10]:
