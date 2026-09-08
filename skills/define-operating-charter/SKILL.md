@@ -162,6 +162,11 @@ Do not turn a draft into effective policy merely because it is detailed. Mark
 unratified sections as proposals. Once ratified, preserve the charter as a
 versioned durable artifact and require amendments to name what they replace.
 
+When the chartered system will run as a MetaBuilder harness, the ratified
+charter is the authoritative input for the harness brief's actors and
+authority boundaries; `metabuilder-harness-design` restates rather than
+re-decides them.
+
 ## Quality check
 
 Before returning, verify that:

@@ -133,3 +133,7 @@ live check into a completed-session postmortem.
 - Use `--conversation-only` when no source review is desired.
 - Use `analyze-conversation` after a session is complete when a durable markdown
   report and longitudinal/tooling analysis are wanted.
+- Emit findings that warrant durable follow-up as learning records in the
+  shared shape (`references/learning-record.schema.json`), citing the
+  diagnostic-taxonomy `rule_id`; a MetaBuilder campaign retrospective or the
+  friction ledger consumes them from there.

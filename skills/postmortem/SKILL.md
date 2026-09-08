@@ -159,3 +159,8 @@ Deliver the report with provenance, uncertainty, impact coverage and actions who
 status reflects observed execution. Dates, counts and completed mitigations require
 evidence. Unknown owners/dates remain explicitly unassigned; no forced root-cause
 or action quota proves completeness.
+
+Action items that should change a governed workflow or tooling are also emitted
+as learning records in the shared shape
+(`references/learning-record.schema.json`) so a MetaBuilder campaign
+retrospective or the friction ledger can consume them.

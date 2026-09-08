@@ -1,0 +1,116 @@
+{
+  "contract_schema": 1,
+  "unit": {
+    "phase_id": "design-harness",
+    "skill": "metabuilder-harness-design",
+    "semantic_version": "1.0.0",
+    "guidance_digest": "06fd6828d031f6b664bb7b83fbb80a12403a5d41be61dc0b9db722a2f8c5df1d"
+  },
+  "inputs": [
+    {
+      "name": "objective_request",
+      "epistemic_class": "human_decision",
+      "required": true,
+      "cardinality": "one"
+    },
+    {
+      "name": "product_thesis",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one",
+      "schema_digest": null
+    },
+    {
+      "name": "resolved_questions",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one"
+    },
+    {
+      "name": "ratified_charter",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one"
+    },
+    {
+      "name": "execution_dag",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "design_packet",
+      "epistemic_class": "claim",
+      "cardinality": "one",
+      "artifact_kind": "brief + intent source + module + bundle identities + stop decisions"
+    }
+  ],
+  "preconditions": {
+    "prior_stages": ["classify-work-horizon"],
+    "approvals": [
+      "named product owner approves every formal decision",
+      "every required approver accepts the exact prepared brief digest"
+    ],
+    "toolchains": ["metabuilder"],
+    "platforms": []
+  },
+  "failures": [
+    {
+      "failure_type": "invalid_input",
+      "retryable": true,
+      "recovery": "Hold the affected decision; finish independent authorized preparation and request the specific missing decision."
+    },
+    {
+      "failure_type": "denied_effect",
+      "retryable": false,
+      "recovery": "Stop at the unsupported effect boundary; emit design-only handoff labeling uncreated downstream identities."
+    },
+    {
+      "failure_type": "conclusive_failure",
+      "retryable": true,
+      "recovery": "Return upstream to preparation; never repair the design silently inside qualification."
+    }
+  ],
+  "effects": [
+    { "kind": "filesystem", "mode": "read", "ceiling": "target repository reads" },
+    { "kind": "process", "mode": "execute", "ceiling": "metabuilder CLI brief/intent/compile/check operations" },
+    { "kind": "filesystem", "mode": "write", "ceiling": "design artifacts in authorized local output paths" }
+  ],
+  "determinism": {
+    "status": "effectful",
+    "canonical_serialization": "brief/intent/module/bundle JSON artifacts with digests",
+    "replay_inputs": false,
+    "nondeterminism_notes": "CLI admission is deterministic over exact bytes; grilling and ratification are human-in-the-loop."
+  },
+  "resources": {
+    "time_budget": "design session bounded by the campaign envelope"
+  },
+  "authority": {
+    "attenuate_only": true,
+    "author": "rahulskills",
+    "human_gates": [
+      "Formal construction requires named product-owner ratification and acceptance of the exact prepared brief digest.",
+      "Design acceptance alone authorizes no execution, provider dispatch, or spend."
+    ],
+    "ceiling": ["design artifacts only; target source receives no mutation authority"]
+  },
+  "evidence": {
+    "acceptance_checks": [
+      "metabuilder intent check exits zero for the defineIntent rendition",
+      "metabuilder harness compile + harness check exit zero for the exact module and bundle"
+    ],
+    "artifact_provenance": [
+      "finding ledger",
+      "candidate/prepared/agreed brief identities",
+      "checked intent source",
+      "compiled and re-admitted module and bundle identities"
+    ],
+    "journal_events": [],
+    "report_boundary": "No production-readiness claim; explicit qualification handoff only."
+  },
+  "compatibility": {
+    "breaking_widenings": ["effect", "authority", "confinement", "resource", "recovery", "output_meaning"]
+  }
+}

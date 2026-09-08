@@ -79,3 +79,11 @@ The selected mode is authorization to complete that mode without asking
 whether to proceed. It does not authorize destructive actions, secrets work,
 pushes, deploys, database writes, or resolving a real multi-repository ambiguity
 without any approval otherwise required by current policy.
+
+## Boundary with governed harness runs
+
+For work executing inside a MetaBuilder harness, in-run recovery belongs to
+the harness's durable attempts and controller observations, not to this file.
+Use this skill for the human-facing cross-shell resume: record the harness
+run and checkpoint identities in the prompt so the next shell re-enters
+through `metabuilder-consumer-qualification` instead of re-deriving state.

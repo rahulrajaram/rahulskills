@@ -55,6 +55,10 @@ Treat `check-antipatterns/rules.json` as the canonical live rule taxonomy when
 both skills are installed. This retrospective may add longitudinal and tooling
 findings, but it must not redefine the shared rule meanings.
 
+Findings that warrant durable follow-up are emitted as learning records in the
+shared shape (`references/learning-record.schema.json`); a MetaBuilder campaign
+retrospective or the friction ledger consumes them from there.
+
 ## What It Analyzes
 
 ### Anti-Patterns Detected
