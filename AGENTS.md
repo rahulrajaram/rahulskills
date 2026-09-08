@@ -50,6 +50,20 @@ new Git objects merely to justify deletion, or expire reflogs or prune Git
 objects as part of backup cleanup. Apply this rule within the user's authorized
 cleanup scope; it does not authorize deleting unrelated data.
 
+## Git history safety
+
+Never rewrite history on the default branch (`master`/`main`) of this or any
+user repository — no squash, rebase, or message rewrite — even when commits
+are unpushed, and even if a generic approval seems to cover it. History
+rewrites happen only on a feature branch the user explicitly names, with a
+backup ref created first. If a squash/rewrite request arrives while on the
+default branch, stop and confirm the intended branch before analyzing.
+
+Never commit directly to `master` in this repository: master advances only
+through merged pull requests. Start or continue a `feat/…` or `feature/…`
+branch for session work, commit there, and let the user decide on PR
+creation and merging.
+
 ## Temporary worktree cleanup
 
 Remove temporary worktrees after their task is complete when their commits
