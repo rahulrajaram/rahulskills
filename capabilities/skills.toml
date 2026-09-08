@@ -36,32 +36,41 @@ effects = ["readonly", "network-read"]
 [skills.figma]
 mcps = ["figma"]
 effect = "readonly"
+effects = ["readonly"]
 layer = "primitive"
+overlaps = ["figma-implement-design"]
+overlap_kind = "producer-consumer"
 membership = "optional-design"
 
 [skills.figma-implement-design]
 mcps = ["figma"]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 overlaps = ["figma"]
+overlap_kind = "producer-consumer"
 membership = "optional-design"
 
 [skills.openai-docs]
 optional_mcps = ["openai_docs"]
 effect = "readonly"
+effects = ["readonly"]
 layer = "workflow"
 
 [skills.imagegen]
 mcps = ["image_gen"]
 effect = "external-call"
+effects = ["external-call"]
 layer = "workflow"
 
 [skills.plugin-creator]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 
 [skills.review-agent]
 effect = "readonly"
+effects = ["readonly"]
 layer = "workflow"
 
 [skills.skill-installer]
@@ -74,28 +83,38 @@ layer = "workflow"
 [skills.invokellm]
 commands = ["gptengage"]
 effect = "external-call"
+effects = ["external-call"]
 layer = "primitive"
+overlaps = ["debate", "ideate"]
+overlap_kind = "shared-backend"
 
 [skills.debate]
 commands = ["gptengage"]
 effect = "external-call"
+effects = ["external-call"]
 layer = "workflow"
 overlaps = ["invokellm"]
+overlap_kind = "shared-backend"
 
 [skills.define-operating-charter]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 overlaps = ["autonomous-execution-contract", "frame-goals-constraints"]
+overlap_kind = "producer-consumer"
 
 [skills.ideate]
 commands = ["gptengage"]
 effect = "external-call"
+effects = ["external-call"]
 layer = "workflow"
 overlaps = ["invokellm"]
+overlap_kind = "shared-backend"
 
 [skills.test]
 optional_commands = ["overwatch"]
 effect = "local-process"
+effects = ["local-process"]
 layer = "workflow"
 
 [skills.markdown-to-pdf]
@@ -109,6 +128,7 @@ layer = "workflow"
 [skills.repo-topics]
 commands = ["gh"]
 effect = "remote-write"
+effects = ["remote-write"]
 layer = "workflow"
 
 [skills.pr-lifecycle]
@@ -119,6 +139,7 @@ effects = ["local-write", "history-rewrite", "network-read", "remote-write"]
 approval_boundaries = ["version-change", "push", "pr-create"]
 layer = "composer"
 overlaps = ["commit", "squash-commits", "readme-doctor"]
+overlap_kind = "composer"
 
 [skills.pr-lifecycle.modes.local-prep]
 effect = "local-write"
@@ -140,27 +161,38 @@ layer = "workflow"
 
 [skills.check-antipatterns]
 effect = "readonly"
+effects = ["readonly"]
 layer = "primitive"
 overlaps = ["analyze-conversation"]
+overlap_kind = "router"
 
 [skills.analyze-conversation]
 commands = ["python3"]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 overlaps = ["check-antipatterns"]
+overlap_kind = "router"
 
 [skills.archdiagram]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 
 [skills.autonomous-execution-contract]
 effect = "local-write"
+effects = ["local-write"]
 layer = "composer"
+overlaps = ["autonomy-loop", "define-operating-charter"]
+overlap_kind = "composer"
+overlap_kinds = { autonomy-loop = "composer", define-operating-charter = "producer-consumer" }
 
 [skills.autonomy-loop]
 effect = "local-write"
+effects = ["local-write"]
 layer = "composer"
 overlaps = ["autonomous-execution-contract"]
+overlap_kind = "composer"
 
 [skills.commit]
 commands = ["git"]
@@ -168,35 +200,47 @@ effect = "local-write"
 effects = ["local-write"]
 approval_boundaries = ["review-file", "allowed-override", "secret", "ignore-policy-change"]
 layer = "workflow"
+overlaps = ["handoff", "pr-lifecycle"]
+overlap_kind = "composer"
 
 [skills.clear-writing]
 effect = "readonly"
+effects = ["readonly"]
 layer = "primitive"
 
 [skills.clean-code-refine]
 effect = "local-write"
+effects = ["local-write"]
 layer = "composer"
 overlaps = ["fp-refine"]
+overlap_kind = "router"
 
 [skills.ecosystem-borrow-audit]
 commands = ["git", "gptengage"]
 effect = "external-call"
+effects = ["external-call"]
 layer = "composer"
 
 [skills.fp-refine]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 overlaps = ["clean-code-refine"]
+overlap_kind = "router"
 
 [skills.frame-goals-constraints]
 effect = "readonly"
+effects = ["readonly"]
 layer = "primitive"
-overlaps = ["objective-to-dag-decomposition"]
+overlaps = ["objective-to-dag-decomposition", "humanize", "define-operating-charter", "metabuilder-harness-design"]
+overlap_kind = "producer-consumer"
 
 [skills.humanize]
 effect = "readonly"
+effects = ["readonly"]
 layer = "primitive"
 overlaps = ["frame-goals-constraints"]
+overlap_kind = "producer-consumer"
 
 [skills.git-status-report]
 commands = ["git"]
@@ -206,10 +250,17 @@ layer = "primitive"
 
 [skills.grilling]
 effect = "readonly"
+effects = ["readonly"]
 layer = "workflow"
+overlaps = ["grill-me", "metabuilder-harness-design"]
+overlap_kind = "producer-consumer"
+overlap_kinds = { grill-me = "alias", metabuilder-harness-design = "producer-consumer" }
 
 [skills.grill-me]
 effect = "readonly"
+effects = ["readonly"]
+overlaps = ["grilling"]
+overlap_kind = "alias"
 layer = "workflow"
 
 [skills.handoff]
@@ -218,14 +269,17 @@ effect = "local-write"
 effects = ["local-write"]
 layer = "composer"
 overlaps = ["commit"]
+overlap_kind = "composer"
 
 [skills.install-commithooks]
 commands = ["git"]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 
 [skills.max-columns]
 effect = "readonly"
+effects = ["readonly"]
 layer = "primitive"
 
 [skills.memleak-investigate]
@@ -234,6 +288,8 @@ effect = "readonly"
 effects = ["readonly", "privileged-observe"]
 approval_boundaries = ["sudo", "attach", "trace", "signal", "restart"]
 layer = "workflow"
+overlaps = ["system-memory-audit"]
+overlap_kind = "router"
 
 [skills.metabuilder]
 commands = ["metabuilder"]
@@ -242,6 +298,7 @@ effects = ["readonly", "local-process", "local-write"]
 approval_boundaries = ["target-write", "network", "credential-use", "dependency-install", "external-state", "provider-dispatch"]
 layer = "composer"
 overlaps = ["metabuilder-harness-design", "metabuilder-consumer-qualification"]
+overlap_kind = "router"
 
 [skills.metabuilder-consumer-qualification]
 commands = ["metabuilder"]
@@ -250,6 +307,7 @@ effects = ["readonly", "local-process", "local-write"]
 approval_boundaries = ["target-write", "network", "credential-use", "dependency-install", "external-state"]
 layer = "workflow"
 overlaps = ["metabuilder"]
+overlap_kind = "router"
 
 [skills.metabuilder-harness-design]
 commands = ["metabuilder"]
@@ -257,23 +315,30 @@ effect = "local-write"
 effects = ["readonly", "local-process", "local-write"]
 approval_boundaries = ["artifact-write", "network", "credential-use", "dependency-install", "external-state", "provider-dispatch"]
 layer = "composer"
-overlaps = ["metabuilder", "grilling", "frame-goals-constraints"]
+overlaps = ["metabuilder", "grilling", "frame-goals-constraints", "objective-to-dag-decomposition"]
+overlap_kind = "producer-consumer"
 
 [skills.next-todos]
 effect = "readonly"
+effects = ["readonly"]
 layer = "primitive"
 
 [skills.objective-to-dag-decomposition]
 effect = "readonly"
+effects = ["readonly"]
 layer = "workflow"
+overlaps = ["frame-goals-constraints", "metabuilder-harness-design"]
+overlap_kind = "producer-consumer"
 
 [skills.postmortem]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 
 [skills.privateify]
 commands = ["git", "gh"]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 
 [skills.pythonpackagesevere]
@@ -284,26 +349,35 @@ layer = "composer"
 
 [skills.readme-doctor]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
+overlaps = ["pr-lifecycle"]
+overlap_kind = "composer"
 
 [skills.reference-cleaner]
 commands = ["git", "git-filter-repo"]
 effect = "destructive"
+effects = ["destructive"]
 layer = "workflow"
 
 [skills.rewrite-commit-messages]
 commands = ["git", "git-filter-repo"]
 effect = "destructive"
+effects = ["destructive"]
 layer = "workflow"
 
 [skills.skill-creator]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 
 [skills.squash-commits]
 commands = ["git"]
 effect = "destructive"
+effects = ["destructive"]
 layer = "workflow"
+overlaps = ["pr-lifecycle"]
+overlap_kind = "composer"
 
 [skills.system-memory-audit]
 platforms = ["linux"]
@@ -311,14 +385,17 @@ effect = "readonly"
 effects = ["readonly"]
 layer = "workflow"
 overlaps = ["memleak-investigate"]
+overlap_kind = "router"
 
 [skills.tui-web-design-orchestrator]
 effect = "local-write"
+effects = ["local-write"]
 layer = "workflow"
 membership = "optional-design"
 
 [skills.yore-vocabulary-harvest]
 effect = "local-write"
+effects = ["local-write"]
 layer = "primitive"
 
 [skills.yore-vocabulary-llm-filter]
@@ -341,6 +418,13 @@ effects = ["local-write", "network-read"]
 approval_boundaries = ["overwrite-output", "dependency-install", "trademark-check", "domain-check"]
 layer = "workflow"
 
+[skills.work-intake]
+effect = "readonly"
+effects = ["readonly"]
+layer = "primitive"
+routes_to = ["autonomy-loop", "autonomous-execution-contract", "metabuilder"]
+
 [skills.diagram-review-viewer]
 effect = "local-write"
+effects = ["local-write"]
 layer = "composer"

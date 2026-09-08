@@ -1,0 +1,93 @@
+{
+  "contract_schema": 1,
+  "unit": {
+    "phase_id": "orchestrate-epic",
+    "skill": "autonomy-loop",
+    "semantic_version": "1.0.0",
+    "guidance_digest": "ea82deb54a9918614dd5d1fed83b2e02fe82242c5099aedfb1ac5805a0e91429"
+  },
+  "inputs": [
+    {
+      "name": "epic_objective",
+      "epistemic_class": "human_decision",
+      "required": true,
+      "cardinality": "one"
+    },
+    {
+      "name": "project_state",
+      "epistemic_class": "observation",
+      "required": true,
+      "cardinality": "one"
+    },
+    {
+      "name": "routing_decision",
+      "epistemic_class": "observation",
+      "required": false,
+      "cardinality": "zero-or-one"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ranked_frontier",
+      "epistemic_class": "diagnostic",
+      "cardinality": "one",
+      "artifact_kind": "epic plan section"
+    },
+    {
+      "name": "slice_checkpoints",
+      "epistemic_class": "claim",
+      "cardinality": "many",
+      "artifact_kind": "project checkpoint"
+    }
+  ],
+  "preconditions": {
+    "prior_stages": ["classify-work-horizon"],
+    "approvals": [],
+    "toolchains": [],
+    "platforms": []
+  },
+  "failures": [
+    {
+      "failure_type": "conclusive_failure",
+      "retryable": true,
+      "recovery": "Executor circuit breaker; escalate to high reasoning after repeated slice failures."
+    },
+    {
+      "failure_type": "timeout",
+      "retryable": true,
+      "recovery": "Stop at budget boundary with checkpoint; never claim completion because a budget ended."
+    }
+  ],
+  "effects": [
+    { "kind": "filesystem", "mode": "write", "ceiling": "project plan and checkpoint files" }
+  ],
+  "determinism": {
+    "status": "effectful",
+    "canonical_serialization": "epic contract / plan section with stable acceptance IDs",
+    "replay_inputs": false,
+    "nondeterminism_notes": "Ranking is principal-architect judgment; governed profile receipts come from the selected runtime, never synthesized here."
+  },
+  "resources": {
+    "time_budget": "bounded per slice; stop rules recorded in epic contract",
+    "processes": "delegated to bounded executor"
+  },
+  "authority": {
+    "attenuate_only": true,
+    "author": "rahulskills",
+    "human_gates": [
+      "New product direction, runtime installation, external publication, or an enforced controller are non-goals by default."
+    ],
+    "ceiling": ["bounded strategic discretion delegated by the epic objective; no new authority classes"]
+  },
+  "evidence": {
+    "acceptance_checks": [
+      "Each slice ends with recorded verification (standalone) or controller receipts (governed profile)."
+    ],
+    "artifact_provenance": ["epic plan", "checkpoints"],
+    "journal_events": ["slice completion checkpoints"],
+    "report_boundary": "A passing check or detailed plan is not effect authorization."
+  },
+  "compatibility": {
+    "breaking_widenings": ["effect", "authority", "confinement", "resource", "recovery", "output_meaning"]
+  }
+}

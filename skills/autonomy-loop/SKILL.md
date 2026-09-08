@@ -26,11 +26,16 @@ verification commands, authority, and budgets from current instructions and
 observed project state. Reuse valid decisions; ask only about a material unresolved
 scope or effect after independent preparation makes the choice concrete.
 
-Select evidence and continuation separately. **Standalone evidence** uses the
-project's ordinary plan, command outputs, relevant source/environment identity,
+Select evidence and continuation separately. **Standalone evidence** uses
+the project's ordinary plan, command outputs, relevant source/environment identity,
 and checkpoints; it needs no synthetic epic digest, receipt, or controller.
 **Governed-runtime evidence** applies only when an actual selected runtime
 provides the compiled contract, proof policy, receipt checks, and durable events.
+**Selecting the governed runtime:** when the epic qualifies as long-horizon
+(see `work-intake`), prefer the MetaBuilder lifecycle as that runtime —
+compile the epic through `metabuilder-harness-design` and consume controller
+receipts from `metabuilder-consumer-qualification` rather than reconstructing
+equivalent guarantees by hand.
 The compiled-contract/receipt sections below specify that profile. For standalone
 work their corresponding steps use the ordinary plan, observed verification, and
 project checkpoint. Do not fabricate runtime guarantees, IDs, digests, receipts,

@@ -24,6 +24,10 @@ A single markdown digest, default written to the user digests dir
 (`~/.pi/agent/reports/YYYY-MM-DD_shell-harvest.md`; override with
 `--out <file>`). The digest also prints to the chat.
 
+Defect signals with durable tooling relevance are also emitted as learning
+records in the shared shape (`references/learning-record.schema.json`) so the
+friction ledger or a MetaBuilder campaign retrospective can consume them.
+
 ## Sensitive-source boundary
 
 Shell histories and agent artifacts are sensitive local sources and may contain

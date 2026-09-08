@@ -79,6 +79,28 @@ are structurally valid so the Rust gate can demonstrate the full shape, but
 they are not evidence. Replace every placeholder with the digest of the exact
 answer, policy, investigation, or approval record it cites before agreement.
 
+## Consume preparation artifacts
+
+Before grilling from scratch, look for artifacts already produced by the
+preparation skills and consume them as cited inputs:
+
+- A `frame-goals-constraints` product thesis fills the brief's goals,
+  non-goals, constraints, and risks. Cite the thesis artifact and its digest;
+  do not re-derive or silently paraphrase it.
+- A `grilling` or `grill-me` resolved-question record maps directly into the
+  brief's `grilling.resolved_questions` with its original basis and evidence
+  digest. Grill only the material questions those records do not cover.
+- A ratified `define-operating-charter` charter is authoritative for the
+  brief's actors and authority boundaries; the brief restates, never
+  re-decides, them.
+- An `objective-to-dag-decomposition` execution DAG feeds the typed intent
+  and workflow topology: obligations come from its task and verification
+  nodes, and ordering follows its `depends_on` projection.
+
+Reuse stays subject to the freshness rule above: changed actors, effect
+scope, or evidence reopen the affected decision, and each cited artifact's
+digest must be recomputed and recorded in the prepared brief.
+
 ## Workflow
 
 1. Establish the requester, consumer, product decision owner, technical owner,

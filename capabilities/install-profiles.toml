@@ -49,6 +49,7 @@ core = [
   "system-memory-audit",
   "test",
   "whitepaper",
+  "work-intake",
   "yore-vocabulary-harvest",
   "yore-vocabulary-llm-filter",
 ]

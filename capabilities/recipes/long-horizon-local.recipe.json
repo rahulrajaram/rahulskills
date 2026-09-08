@@ -1,0 +1,117 @@
+{
+  "recipe_schema": 1,
+  "name": "long-horizon-local",
+  "description": "Repository-owned recipe selecting the required roles for a governed long-horizon engineering campaign under the local read-only consumer profile. Resolved against the contract catalog; the resolver must refuse unresolved roles, missing bindings, operations outside the authority envelope, or unenforceable resource bounds.",
+  "runtime_profile": "metabuilder linux-local consumer (no network, 4 GiB, read-only workspace, tmpfs /tmp, direct commands, declared outputs, run root outside the target)",
+  "entry": "classify-work-horizon",
+  "required_roles": [
+    {
+      "role": "horizon_intake",
+      "resolve_to": ["classify-work-horizon"]
+    },
+    {
+      "role": "product_thesis",
+      "resolve_to": ["frame-goals-constraints"],
+      "optional": true,
+      "when": "the objective is a product or platform direction, not a pure repair"
+    },
+    {
+      "role": "decision_grilling",
+      "resolve_to": ["grilling"],
+      "alternatives": ["grill-me"],
+      "optional": true,
+      "when": "material questions remain that preparation artifacts and the design workflow's own grilling do not already cover"
+    },
+    {
+      "role": "charter",
+      "resolve_to": ["define-operating-charter"],
+      "optional": true,
+      "when": "the campaign introduces a new orchestrator/harness operating envelope or changes authority"
+    },
+    {
+      "role": "decomposition",
+      "resolve_to": ["objective-to-dag-decomposition"],
+      "optional": true,
+      "when": "the objective does not already carry an accepted execution DAG"
+    },
+    {
+      "role": "harness_design",
+      "resolve_to": ["design-harness"]
+    },
+    {
+      "role": "qualification",
+      "resolve_to": ["qualify-harness"]
+    },
+    {
+      "role": "independent_review",
+      "resolve_to": ["check-antipatterns"],
+      "alternatives": ["analyze-conversation"],
+      "optional": true,
+      "when": "a review/self-improvement loop is part of the campaign"
+    },
+    {
+      "role": "retrospective",
+      "resolve_to": ["postmortem"],
+      "optional": true,
+      "when": "a campaign failure or material gap needs a durable learning record"
+    }
+  ],
+  "edges": [
+    {
+      "from": "classify-work-horizon",
+      "output": "routing_decision",
+      "to": "design-harness",
+      "input": "objective_request",
+      "note": "routing line is recorded context, not an effect grant"
+    },
+    {
+      "from": "frame-goals-constraints",
+      "output": "product_thesis",
+      "to": "design-harness",
+      "input": "product_thesis"
+    },
+    {
+      "from": "grilling",
+      "output": "resolved_questions",
+      "to": "design-harness",
+      "input": "resolved_questions"
+    },
+    {
+      "from": "define-operating-charter",
+      "output": "ratified_charter",
+      "to": "design-harness",
+      "input": "ratified_charter"
+    },
+    {
+      "from": "objective-to-dag-decomposition",
+      "output": "execution_dag",
+      "to": "design-harness",
+      "input": "execution_dag"
+    },
+    {
+      "from": "design-harness",
+      "output": "design_packet",
+      "to": "qualify-harness",
+      "input": "design_packet"
+    },
+    {
+      "from": "qualify-harness",
+      "output": "qualification_report",
+      "to": "check-antipatterns",
+      "input": "campaign_artifacts",
+      "note": "review loop consumes the report; findings route to the learning record"
+    }
+  ],
+  "completeness_checks": [
+    "horizon_intake, harness_design, and qualification roles are always resolved",
+    "every preparation artifact consumed by design-harness cites its producer's digest",
+    "profile check recorded: any effect class outside the runtime_profile stops at design-only",
+    "no resolved phase declares operations outside the campaign authority envelope",
+    "independent_review, when present, closes with a durable learning record"
+  ],
+  "stop_rules": [
+    "stop if any phase boundary cannot be stated without mixing effects or authority",
+    "stop at unratified effect widening; prepare the exact request and hold only dependent work",
+    "zero tolerance for unauthorized effects, replay mismatch, forged or stale admission, or blind Unknown redispatch"
+  ]
+}

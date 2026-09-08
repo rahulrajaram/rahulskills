@@ -202,6 +202,11 @@ work, prepare the exact queue changes and use the applicable existing authority.
 Reuse an accepted decomposition when still valid; ask only about unresolved
 material scope or queue-write authority before the dependent write.
 
+When the objective is long-horizon work routed to a MetaBuilder harness, the
+execution DAG feeds `metabuilder-harness-design` directly: obligations come
+from task and verification nodes, and workflow ordering follows the
+`depends_on` projection.
+
 ## Quality checks
 
 Before returning the result, validate:

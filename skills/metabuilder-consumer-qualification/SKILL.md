@@ -119,6 +119,11 @@ and uses the existing workflow reducer, so selector, current-head, and replay
 checks remain in force under the single-controller run-store contract.
 Do not run concurrent controller writers against the same run root.
 
+When learning records from the review skills exist for this campaign (shared
+shape: `references/learning-record.schema.json`), cite the relevant ones inside
+the retrospective record's findings rather than re-deriving them; a learning
+record is a claim about the work, not controller evidence.
+
 Operating notes verified in a real governed campaign:
 
 - Every worker action is followed by a `retrospective_required` blocker that

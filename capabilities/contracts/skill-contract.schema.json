@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rahulskills.local/capabilities/contracts/skill-contract.schema.json",
+  "title": "Skill Contract",
+  "description": "Phase-sized callable unit declaration. SKILL.md remains human guidance; this contract is the callable boundary. A whole skill is one unit only when it has one outcome, one effect and authority envelope, and one retry/recovery policy.",
+  "type": "object",
+  "required": [
+    "contract_schema",
+    "unit",
+    "inputs",
+    "outputs",
+    "preconditions",
+    "failures",
+    "effects",
+    "determinism",
+    "resources",
+    "authority",
+    "evidence",
+    "compatibility"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "contract_schema": {
+      "const": 1,
+      "description": "Version of this contract shape."
+    },
+    "unit": {
+      "type": "object",
+      "required": ["phase_id", "skill", "semantic_version", "guidance_digest"],
+      "additionalProperties": false,
+      "properties": {
+        "phase_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Stable callable unit name."
+        },
+        "skill": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Owning package skill directory name."
+        },
+        "semantic_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "guidance_digest": {
+          "$ref": "#/$defs/digest",
+          "description": "SHA-256 of the owning SKILL.md at authoring time; verified by the composition linter."
+        }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "epistemic_class", "required"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "schema_digest": {
+            "description": "Optional digest of the value's own schema when one exists.",
+            "$ref": "#/$defs/digest_or_null"
+          },
+          "epistemic_class": {
+            "enum": ["artifact", "observation", "claim", "human_decision"]
+          },
+          "required": { "type": "boolean" },
+          "cardinality": {
+            "enum": ["one", "zero-or-one", "many"]
+          },
+          "size_bound": { "type": "string" }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "epistemic_class", "cardinality"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "schema_digest": { "$ref": "#/$defs/digest_or_null" },
+          "epistemic_class": {
+            "enum": ["claim", "diagnostic", "controller_evidence", "rendering"]
+          },
+          "cardinality": {
+            "enum": ["one", "zero-or-one", "many"]
+          },
+          "artifact_kind": {
+            "description": "Durable artifact identity this output produces, when it does.",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "preconditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prior_stages": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+        },
+        "approvals": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "toolchains": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "platforms": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "accepted_contract_versions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "failures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["failure_type", "retryable"],
+        "additionalProperties": false,
+        "properties": {
+          "failure_type": {
+            "enum": [
+              "invalid_input",
+              "denied_effect",
+              "conclusive_failure",
+              "timeout",
+              "cancellation",
+              "unknown"
+            ]
+          },
+          "retryable": { "type": "boolean" },
+          "recovery": { "type": "string" }
+        }
+      }
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "mode"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "filesystem",
+              "process",
+              "network",
+              "credential",
+              "model",
+              "external_state",
+              "install",
+              "git",
+              "release",
+              "deployment",
+              "none"
+            ]
+          },
+          "mode": {
+            "enum": ["read", "write", "execute"]
+          },
+          "ceiling": {
+            "description": "Declared bound for this effect, enforced by the admitting runtime.",
+            "type": "string"
+          }
+        }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": ["pure", "effectful"]
+        },
+        "canonical_serialization": { "type": "string" },
+        "replay_inputs": { "type": "boolean" },
+        "nondeterminism_notes": { "type": "string" }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number"]
+      },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "description": "Bounded resource declarations: time_budget, processes, bytes, storage, concurrency, retries, epochs, tokens, monetary_ceiling."
+    },
+    "authority": {
+      "type": "object",
+      "required": ["attenuate_only"],
+      "additionalProperties": false,
+      "properties": {
+        "attenuate_only": {
+          "const": true,
+          "description": "A contract may only attenuate the ratified authority envelope, never widen it. Invariant, not a default."
+        },
+        "author": { "type": "string" },
+        "human_gates": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "ceiling": {
+          "description": "Effect/decision classes this phase may act within, already attenuated from the campaign envelope.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_checks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "artifact_provenance": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "journal_events": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "report_boundary": {
+          "type": "string",
+          "description": "What this phase's outputs may NOT claim (e.g. no production-readiness claim)."
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "required": ["breaking_widenings"],
+      "additionalProperties": false,
+      "properties": {
+        "breaking_widenings": {
+          "const": [
+            "effect",
+            "authority",
+            "confinement",
+            "resource",
+            "recovery",
+            "output_meaning"
+          ],
+          "description": "Widening any of these dimensions is a breaking change requiring human ratification even when data schemas stay compatible."
+        },
+        "adapter_digests": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/digest" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "digest_or_null": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/digest" }
+      ]
+    }
+  }
+}
