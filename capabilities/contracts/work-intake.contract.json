@@ -3,15 +3,15 @@
   "unit": {
     "phase_id": "classify-work-horizon",
     "skill": "work-intake",
-    "semantic_version": "1.0.0",
-    "guidance_digest": "157d46f72f7aca34ec884200d771a174745887a62927a3469601764fb44e2c1d"
+    "semantic_version": "1.0.2",
+    "guidance_digest": "9bd0645391f02332489da105470e2f13561ea18b28ae216022a2f5b1a4198fd8"
   },
   "inputs": [
     {
       "name": "work_description",
       "epistemic_class": "artifact",
-      "required": true,
-      "cardinality": "one",
+      "required": false,
+      "cardinality": "zero-or-one",
       "size_bound": "one conversation request"
     },
     {
@@ -31,6 +31,14 @@
       "epistemic_class": "artifact",
       "required": false,
       "cardinality": "zero-or-one",
+      "schema_digest": null
+    },
+    {
+      "name": "resume_discovery",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one",
+      "size_bound": "one invocation-local no_resumable_state result bound to the checked repository and scope",
       "schema_digest": null
     }
   ],
@@ -89,9 +97,10 @@
   },
   "evidence": {
     "acceptance_checks": [
+      "Continuation routing preserves the existing scope, policy, budget and stop conditions without reducing a multi-epoch grant to one iteration.",
       "Routing decision names horizon, decisive signals, selected route, and any profile-check boundary.",
-      "Fast path: a continuation handoff routes directly to harness design without re-classification; an exhausted batch or expanding envelope routes to the principal.",
-      "Idempotent resume route: with no work statement and existing routed work, intake routes to the resume owner (continuation fast path, autonomy-loop, or handoff extract) or reports the human gate \u2014 never re-classifies in-flight work and never asks first."
+      "Fast path is owned by continue-work: a supplied continuation handoff is delegated there and its direct design-owner decision preserves scope, policy, budget and stop conditions; an exhausted batch or expanding envelope routes to the principal.",
+      "Resume discovery is delegated to continue-work exactly once; intake consumes a same-repository/scope no_resumable_state result to classify a genuine new statement or ask once when none exists, and never cycles back without changed relevant state or a new invocation."
     ],
     "artifact_provenance": [
       "one recorded line in the session, reusable by downstream skills"

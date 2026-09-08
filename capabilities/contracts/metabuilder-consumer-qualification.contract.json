@@ -3,8 +3,8 @@
   "unit": {
     "phase_id": "qualify-harness",
     "skill": "metabuilder-consumer-qualification",
-    "semantic_version": "1.0.0",
-    "guidance_digest": "ebfecc95e434718d722f13c6947cf4dc5b0b1b9150c49aa337480a0511d6df89"
+    "semantic_version": "1.0.1",
+    "guidance_digest": "2f0703c91c717915aaf1619950d18a824049bf5043e6b8883d82997d05e1a229"
   },
   "inputs": [
     {
@@ -110,6 +110,7 @@
   },
   "evidence": {
     "acceptance_checks": [
+      "After required evidence is complete, remaining same-envelope work immediately re-enters design then qualification under valid delegation, budget and renewal policy; completion or a real gate stops continuation.",
       "Reuse an unchanged admitted bundle; recompile only when the handoff requires it",
       "Qualification template/report checked via metabuilder qualify prepare|report|check",
       "Every close emits a continuation handoff with envelope class and delegation budget accounting"

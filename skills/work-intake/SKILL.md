@@ -1,7 +1,7 @@
 ---
 name: work-intake
 description: "Classify incoming engineering work by horizon and route it: bounded work to autonomy-loop or autonomous-execution-contract, long-horizon work to the MetaBuilder lifecycle. Use at the start of any non-trivial work, at epic or campaign start, or when unsure which workflow should own the work."
-argument-hint: "<work-description>"
+argument-hint: "[work-description]"
 ---
 
 # Work Intake
@@ -16,25 +16,30 @@ appears mid-work.
 
 ## Inputs and local bindings
 
-Bind the work statement from the invocation argument, the current request,
-or the active conversation — in that order. Do not interview for it.
+Bind the optional work statement from the invocation argument, the current
+request, or the active conversation — in that order. A bare "continue",
+"resume", "keep going", or equivalent is a resume request, not a genuine
+new work statement.
 
-When no work statement exists anywhere, do not ask yet: first check
-observable project state for already-routed work and take the **resume
-route** — intake is an idempotent front door, so re-invoking it on in-flight
-work must land on the resume owner, never re-classify:
+An explicit already-routed owner for the current objective is retained
+directly; do not rediscover it. An unrelated earlier task's owner does not
+bind a genuine new work statement: classify that statement directly without
+resume discovery. A supplied in-flight plan or checkpoint is existing work,
+not a new statement. When its owner is unknown, when no work statement exists,
+or when the invocation is a resume request, delegate discovery to
+`continue-work` once.
+When a `continuation_handoff` is supplied, pass it to `continue-work` as a
+cited input; do not duplicate surface precedence or inspect resumable state
+here. Consume its invocation-local `no_resumable_state` result only when it is
+bound to the same checked repository and scope:
 
-- a qualification continuation handoff → the continuation fast path below;
-- an active epic plan or ranked backlog → `autonomy-loop` (it owns ranking
-  and next-slice selection);
-- a `NEXT_SHELL_PROMPT.md` handoff artifact → `handoff` extract mode.
+- classify a genuine new work statement; or
+- ask one compact "state the work" question when no genuine statement exists.
 
-If the routed work sits at a human gate — pending adjudications, an
-exhausted delegation budget, envelope expansion — report that gate as the
-next action; do not route to an executor as if executable work existed.
-Only when no routed work exists at all make ONE compact ask ("state the
-work"), not an objectives/targets/constraints menu — that is the downstream
-brief's job.
+The no-resumable result is bounded to this invocation. Intake must never
+cycle back to `continue-work` without changed relevant state or a new
+invocation. If discovery finds a human gate, report that gate as the next
+action; do not route to an executor as if executable work existed.
 
 Then resolve from the work statement and observed project state: expected
 sessions, effect classes already authorized (read, write, process, network,
@@ -78,13 +83,11 @@ class, and stop the dependent execution there. Do not treat a planned or
 rumored capability as available; verify against the installed CLI and source
 as the metabuilder skill directs.
 
-**Continuation fast path:** when a qualification continuation handoff exists
-(leftover checkpoint + proposed next ObjectiveRequest + envelope class), the
-work is already long-horizon — do not re-classify. Route straight to
-`metabuilder-harness-design` with the handoff as a cited input. Same-envelope
-handoffs proceed only under a still-valid standing delegation with budget
-remaining; an exhausted batch or an expanding envelope routes the prepared
-request to the principal instead.
+**Supplied continuation:** `continue-work` owns the qualification continuation
+fast path. Intake preserves its direct owner decision and passes through the
+existing campaign scope, continuation policy, remaining budget, and stop
+conditions unchanged; it does not re-classify or create a second precedence
+rule.
 
 ## Non-goals
 
@@ -96,6 +99,10 @@ selection of a workflow is honored without re-classification.
 
 - Must not route qualifying long-horizon work around MetaBuilder for
   convenience, budget pressure, or an unavailable CLI operation.
+- Must not rediscover resumable state; `continue-work` is the sole discovery
+  owner.
+- Must not treat a bare resume request as a fresh work statement or retry a
+  no-resumable result in the same invocation without relevant state change.
 - Must not describe work as governed when no MetaBuilder controller observed
   it.
 - Must not perform the destination skill's startup work — locating
@@ -115,7 +122,9 @@ design-only boundary.
 
 ## Completion and evidence
 
-Report the classification (long-horizon or bounded), the decisive signals,
+For resumed work, reuse the existing owner/routing evidence without issuing
+a fresh classification. For new work, report the classification
+(long-horizon or bounded), the decisive signals,
 the selected route, and any profile-check boundary reached. One recorded line
 suffices; downstream skills reuse it instead of re-classifying.
 

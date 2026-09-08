@@ -422,7 +422,17 @@ layer = "workflow"
 effect = "readonly"
 effects = ["readonly"]
 layer = "primitive"
-routes_to = ["autonomy-loop", "autonomous-execution-contract", "metabuilder"]
+routes_to = ["autonomy-loop", "autonomous-execution-contract", "metabuilder", "continue-work"]
+overlaps = ["continue-work"]
+overlap_kind = "router"
+
+[skills.continue-work]
+effect = "readonly"
+effects = ["readonly"]
+layer = "composer"
+routes_to = ["handoff", "work-intake", "metabuilder-harness-design", "metabuilder-consumer-qualification", "autonomy-loop"]
+overlaps = ["work-intake"]
+overlap_kind = "router"
 
 [skills.diagram-review-viewer]
 effect = "local-write"

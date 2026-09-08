@@ -145,7 +145,9 @@ Operating notes verified in a real governed campaign:
   directory may not overlap committed source.
 
 Here “epoch” means one root-workflow incarnation; autonomous multi-epoch
-self-rebuild remains deferred.
+self-rebuild remains deferred. The continuation-at-close protocol below is
+orchestrator-side re-entry through design and qualification under existing
+authority; it does not add an autonomous self-rebuild capability to the core.
 
 ## Declared file outputs
 
@@ -299,12 +301,23 @@ whether or not more work is expected. It contains:
 4. standing-delegation budget accounting: units consumed and units remaining
    of the ratified batch M, and whether renewal falls due at this close.
 
-The handoff is a proposal, not continuation authority. Same-envelope
-continuation proceeds only while a valid standing delegation covers it (see
-`define-operating-charter`); an exhausted budget or an expanding envelope
-routes the prepared request to the principal instead. Never declare an epoch
-final by convergence alone — the handoff determines what is next and slates
-it.
+The handoff is a proposal, not continuation authority. Before any next epoch,
+complete the current epoch's required report, attestations, controller
+observations, and remaining evidence, and preserve them with the handoff.
+If authorized work remains, the next request is same-envelope, and valid
+standing delegation and budget cover it, immediately re-enter the existing
+MetaBuilder lifecycle through `metabuilder-harness-design`, then
+`metabuilder-consumer-qualification`. Preserve the ratified renewal policy;
+perform an authorized automatic renewal when due, or hold for the principal
+when that policy requires approval. Do not invent an additional approval
+for continuation already covered by the grant. If the objective is complete
+or no authorized work remains, close without inventing a next epoch. An
+exhausted or expired/revoked delegation, an expanding envelope, a reserved
+decision, recovery failure, or a ratified terminal milestone stops or routes
+the prepared request to the principal as applicable. Preserve the existing
+reactor envelope and policy on resume. Never declare an epoch final by
+convergence alone, and do not create synthetic controller evidence or
+automatically rebuild the core to force continuation.
 
 ## Report back to MetaBuilder
 

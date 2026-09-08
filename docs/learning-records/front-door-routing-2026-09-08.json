@@ -1,0 +1,136 @@
+[
+  {
+    "record_schema": 1,
+    "finding": "The continue-work and work-intake prose does not declare one shared precedence order when a handoff and active plan coexist.",
+    "rule_id": null,
+    "source_skill": "continue-work",
+    "evidence_refs": [
+      "skills/continue-work/SKILL.md:27,43-46,73-78",
+      "skills/work-intake/SKILL.md:22-30",
+      "docs/front-door-validation.md",
+      ".agent/front-door-validation/cases.md"
+    ],
+    "disposition": {
+      "status": "routed",
+      "target": "docs/metabuilder-maturity-backlog.md entry 12"
+    },
+    "promotion_contract": "Promote when both front doors consume one tested precedence contract and a handoff-plus-plan fixture yields one owner under repeated evaluation."
+  },
+  {
+    "record_schema": 1,
+    "finding": "A governed plan with its own epoch and verification discipline is preserved by continue-work but selected for autonomy-loop by work-intake's active-plan branch.",
+    "rule_id": null,
+    "source_skill": "work-intake",
+    "evidence_refs": [
+      "skills/continue-work/SKILL.md:50-55",
+      "skills/work-intake/SKILL.md:27-29,64-66",
+      "docs/front-door-validation.md",
+      ".agent/front-door-validation/cases.md"
+    ],
+    "disposition": {
+      "status": "routed",
+      "target": "docs/metabuilder-maturity-backlog.md entry 13"
+    },
+    "promotion_contract": "Promote when a governed-plan fixture records and preserves its owning discipline through both front doors without reclassification."
+  },
+  {
+    "record_schema": 1,
+    "finding": "Stale, invalid and completed root-handoff runtime dispositions were not exercised; source review found validation and invalid/completed blocker rules but no runtime evidence for these cases.",
+    "rule_id": null,
+    "source_skill": "continue-work",
+    "evidence_refs": [
+      "skills/continue-work/SKILL.md:71-81",
+      "skills/handoff/SKILL.md:activation protocol steps 1-5",
+      "docs/front-door-validation.md",
+      ".agent/front-door-validation/cases.md"
+    ],
+    "disposition": {
+      "status": "routed",
+      "target": "docs/metabuilder-maturity-backlog.md entry 14"
+    },
+    "promotion_contract": "Promote when stale, invalid, and fully complete handoff fixtures each produce an explicitly documented single owner or blocker."
+  },
+  {
+    "record_schema": 1,
+    "finding": "A fresh-context native subagent activation routed continue-work through handoff extract, executed the authorized task, and a repeated work-intake invocation verified the existing result without changing it.",
+    "rule_id": null,
+    "source_skill": "handoff",
+    "evidence_refs": [
+      ".agent/front-door-validation/scratch/NEXT_SHELL_PROMPT.md",
+      ".agent/front-door-validation/scratch/RESULT.md",
+      ".agent/front-door-validation/cases.md",
+      "docs/front-door-validation.md"
+    ],
+    "disposition": {
+      "status": "recorded",
+      "target": null
+    },
+    "promotion_contract": "Promote only after live epoch chaining and governed-controller evidence exercise the continuation path."
+  },
+  {
+    "record_schema": 1,
+    "finding": "Cultivar read-only evidence showed stale handoff identity claims while a ratified W1 plan recorded W1-E0 completion and W1-E1 continuation under fresh-approval boundaries.",
+    "rule_id": null,
+    "source_skill": "continue-work",
+    "evidence_refs": [
+      ".agent/front-door-validation/cultivar.md",
+      "cultivar/harnesses/metabuilder/performance/W1-CAMPAIGN-PLAN.md:3-14,33-34",
+      "cultivar/target/performance-epoch-20260907-006/epoch-decision.json:3-7"
+    ],
+    "disposition": {
+      "status": "recorded",
+      "target": null
+    },
+    "promotion_contract": "Promote only when a live governed continuation validates stale handoff facts against controller-observed campaign state and records the renewal or stop edge."
+  },
+  {
+    "record_schema": 1,
+    "finding": "Autonomy-loop limits an ordinary continue to one coherent iteration while qualification emits a next-epoch proposal without mandating immediate re-entry under an already-valid multi-epoch grant.",
+    "rule_id": null,
+    "source_skill": "metabuilder-consumer-qualification",
+    "evidence_refs": [
+      "skills/autonomy-loop/SKILL.md:95-101",
+      "skills/metabuilder-consumer-qualification/SKILL.md:288-307",
+      "skills/define-operating-charter/SKILL.md:121-130",
+      "docs/front-door-validation.md"
+    ],
+    "disposition": {
+      "status": "routed",
+      "target": "docs/metabuilder-maturity-backlog.md#15"
+    },
+    "promotion_contract": "Promote when the qualification owner immediately re-enters same-envelope epochs under an existing grant and stops only at the ratified terminal milestone, budget, revocation, recovery failure, or human gate."
+  },
+  {
+    "record_schema": 1,
+    "finding": "After the approved source fix, one fresh-context bare continue-work invocation completed all three authorized standalone slices and stopped at completion with budget consumed 3 and remaining 0.",
+    "source_skill": "continue-work",
+    "evidence_refs": [
+      "docs/front-door-validation.md",
+      ".agent/continuation-fix-fixture/IMPLEMENTATION_PLAN.md",
+      ".agent/continuation-fix-fixture/FIRST.md",
+      ".agent/continuation-fix-fixture/SECOND.md",
+      ".agent/continuation-fix-fixture/THIRD.md"
+    ],
+    "disposition": {
+      "status": "recorded",
+      "target": null
+    },
+    "promotion_contract": "Live governed epoch chaining and controller observations remain required before closing campaign qualification gap 11."
+  },
+  {
+    "record_schema": 1,
+    "finding": "Following the approved sole-discovery-owner refactor, a fresh-context bare intake invocation in an empty repository delegated discovery once and consumed no_resumable_state to ask one question without cycling.",
+    "source_skill": "work-intake",
+    "evidence_refs": [
+      "docs/front-door-validation.md",
+      "skills/work-intake/SKILL.md",
+      "skills/continue-work/SKILL.md",
+      ".agent/router-refactor/empty"
+    ],
+    "disposition": {
+      "status": "routed",
+      "target": "docs/metabuilder-maturity-backlog.md entries 12 and 13"
+    },
+    "promotion_contract": "Preserve the fresh-work/resume boundary in future changes; live stale-state reconciliation and governed epoch chaining need separate evidence."
+  }
+]
