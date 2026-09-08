@@ -3,8 +3,8 @@
   "unit": {
     "phase_id": "orchestrate-epic",
     "skill": "autonomy-loop",
-    "semantic_version": "1.0.0",
-    "guidance_digest": "ea82deb54a9918614dd5d1fed83b2e02fe82242c5099aedfb1ac5805a0e91429"
+    "semantic_version": "1.0.1",
+    "guidance_digest": "4260f86834a21b48283920803b6c3de2e70c712727113b20602d43cfb58e7e70"
   },
   "inputs": [
     {
@@ -81,6 +81,7 @@
   },
   "evidence": {
     "acceptance_checks": [
+      "A bare resume preserves valid inherited multi-slice authority; checkpoints do not end it unless the inherited policy makes them terminal.",
       "Each slice ends with recorded verification (standalone) or controller receipts (governed profile)."
     ],
     "artifact_provenance": ["epic plan", "checkpoints"],

@@ -3,7 +3,7 @@
   "unit": {
     "phase_id": "design-harness",
     "skill": "metabuilder-harness-design",
-    "semantic_version": "1.0.0",
+    "semantic_version": "1.0.1",
     "guidance_digest": "94a259549ba40ede50ef56b7bd32ef2c01319934ba1572be2408e98e69a1d7dd"
   },
   "inputs": [
@@ -37,6 +37,13 @@
       "epistemic_class": "artifact",
       "required": false,
       "cardinality": "zero-or-one"
+    },
+    {
+      "name": "continuation_handoff",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one",
+      "schema_digest": null
     }
   ],
   "outputs": [

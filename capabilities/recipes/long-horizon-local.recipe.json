@@ -104,9 +104,9 @@
     {
       "from": "qualify-harness",
       "output": "continuation_handoff",
-      "to": "classify-work-horizon",
+      "to": "design-harness",
       "input": "continuation_handoff",
-      "note": "continuation loop: same-envelope handoffs with delegation budget remaining take the intake fast path back to design; exhaustion or envelope expansion exits to the principal"
+      "note": "Continuation returns directly to design under valid same-envelope delegation and renewal policy; cross-shell discovery belongs to continue-work. The handoff cites the proposed objective and authority; it is not a fresh effect grant or horizon classification."
     }
   ],
   "completeness_checks": [
