@@ -49,3 +49,13 @@ is not established; mixed backups may retain just that remainder. Do not create
 new Git objects merely to justify deletion, or expire reflogs or prune Git
 objects as part of backup cleanup. Apply this rule within the user's authorized
 cleanup scope; it does not authorize deleting unrelated data.
+
+## Temporary worktree cleanup
+
+Remove temporary worktrees after their task is complete when their commits
+remain recoverable from verified Git history or a retained Git ref. Do not keep
+a worktree merely as a commit backup. Before removal, inspect tracked changes,
+untracked files and ignored files; preserve unique work that still matters and
+record any necessary recovery metadata. Use `git worktree remove` to remove the
+checkout and its registration together. Do not create replacement backup copies
+of content already recoverable from Git.

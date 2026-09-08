@@ -4,7 +4,7 @@
     "phase_id": "design-harness",
     "skill": "metabuilder-harness-design",
     "semantic_version": "1.0.0",
-    "guidance_digest": "06fd6828d031f6b664bb7b83fbb80a12403a5d41be61dc0b9db722a2f8c5df1d"
+    "guidance_digest": "94a259549ba40ede50ef56b7bd32ef2c01319934ba1572be2408e98e69a1d7dd"
   },
   "inputs": [
     {
@@ -48,12 +48,16 @@
     }
   ],
   "preconditions": {
-    "prior_stages": ["classify-work-horizon"],
+    "prior_stages": [
+      "classify-work-horizon"
+    ],
     "approvals": [
       "named product owner approves every formal decision",
       "every required approver accepts the exact prepared brief digest"
     ],
-    "toolchains": ["metabuilder"],
+    "toolchains": [
+      "metabuilder"
+    ],
     "platforms": []
   },
   "failures": [
@@ -74,9 +78,21 @@
     }
   ],
   "effects": [
-    { "kind": "filesystem", "mode": "read", "ceiling": "target repository reads" },
-    { "kind": "process", "mode": "execute", "ceiling": "metabuilder CLI brief/intent/compile/check operations" },
-    { "kind": "filesystem", "mode": "write", "ceiling": "design artifacts in authorized local output paths" }
+    {
+      "kind": "filesystem",
+      "mode": "read",
+      "ceiling": "target repository reads"
+    },
+    {
+      "kind": "process",
+      "mode": "execute",
+      "ceiling": "metabuilder CLI brief/intent/compile/check operations"
+    },
+    {
+      "kind": "filesystem",
+      "mode": "write",
+      "ceiling": "design artifacts in authorized local output paths"
+    }
   ],
   "determinism": {
     "status": "effectful",
@@ -94,7 +110,9 @@
       "Formal construction requires named product-owner ratification and acceptance of the exact prepared brief digest.",
       "Design acceptance alone authorizes no execution, provider dispatch, or spend."
     ],
-    "ceiling": ["design artifacts only; target source receives no mutation authority"]
+    "ceiling": [
+      "design artifacts only; target source receives no mutation authority"
+    ]
   },
   "evidence": {
     "acceptance_checks": [
@@ -111,6 +129,13 @@
     "report_boundary": "No production-readiness claim; explicit qualification handoff only."
   },
   "compatibility": {
-    "breaking_widenings": ["effect", "authority", "confinement", "resource", "recovery", "output_meaning"]
+    "breaking_widenings": [
+      "effect",
+      "authority",
+      "confinement",
+      "resource",
+      "recovery",
+      "output_meaning"
+    ]
   }
 }

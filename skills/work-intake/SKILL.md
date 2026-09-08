@@ -16,11 +16,15 @@ appears mid-work.
 
 ## Inputs and local bindings
 
-Resolve from the request and observed project state: the stated outcome,
+Bind the work statement from the invocation argument, the current request,
+or the active conversation — in that order. Do not interview for it: only
+when no work statement exists anywhere make ONE compact ask ("state the
+work"), not an objectives/targets/constraints menu — that is the downstream
+brief's job. Then resolve from that statement and observed project state:
 expected sessions, effect classes already authorized (read, write, process,
 network, credential), whether evidence must survive interruption, and which
-workflows are actually installed. Missing or conflicting bindings require a
-decision only when they change the route.
+destination workflows are installed (presence checks only). Missing or
+conflicting bindings require a decision only when they change the route.
 
 ## Classification
 
@@ -58,6 +62,14 @@ class, and stop the dependent execution there. Do not treat a planned or
 rumored capability as available; verify against the installed CLI and source
 as the metabuilder skill directs.
 
+**Continuation fast path:** when a qualification continuation handoff exists
+(leftover checkpoint + proposed next ObjectiveRequest + envelope class), the
+work is already long-horizon — do not re-classify. Route straight to
+`metabuilder-harness-design` with the handoff as a cited input. Same-envelope
+handoffs proceed only under a still-valid standing delegation with budget
+remaining; an exhausted batch or an expanding envelope routes the prepared
+request to the principal instead.
+
 ## Non-goals
 
 Intake does not plan, decompose, grill, or execute the work, and does not
@@ -70,6 +82,10 @@ selection of a workflow is honored without re-classification.
   convenience, budget pressure, or an unavailable CLI operation.
 - Must not describe work as governed when no MetaBuilder controller observed
   it.
+- Must not perform the destination skill's startup work — locating
+  checkouts, reading its README, confirming CLI journeys, or resolving help
+  evidence. A presence check (`command -v`) is the ceiling; discovery
+  belongs to the routed skill.
 - Must not widen an effect class to force a route, or narrow reporting of
   needed effects to fit the current profile.
 - Should not ask the user to classify what the signals already determine.

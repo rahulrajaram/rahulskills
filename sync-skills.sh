@@ -6,6 +6,7 @@ CODEX_SRC="${CODEX_SKILLS_DIR:-$HOME/.codex/skills}"
 CODEX_SYSTEM_SRC="${CODEX_SYSTEM_SKILLS_DIR:-$CODEX_SRC/.system}"
 PI_SRC="${PI_SKILLS_DIR:-$HOME/.pi/agent/skills}"
 CLAUDE_SRC="$HOME/.claude/skills"
+OPENCODE_SRC="${OPENCODE_SKILLS_DIR:-$HOME/.config/opencode/skills}"
 REPO_SKILLS_DIR="$SKILLS_DIR/skills"
 BUILD_DIR="$SKILLS_DIR/build"
 STITCH_SCRIPT="$SKILLS_DIR/stitch-skills.sh"
@@ -79,6 +80,7 @@ Installed locations:
   Codex skills:     ~/.codex/skills/
   Pi skills:        ~/.pi/agent/skills/
   Claude skills:    ~/.claude/skills/
+  opencode skills:  ~/.config/opencode/skills/
 USAGE
     exit 1
 }
@@ -362,6 +364,7 @@ compare_implementations() {
     local in_codex
     local in_pi
     local in_claude
+    local in_opencode
     local runtime_only
     declare -A all_skills
 
@@ -370,13 +373,15 @@ compare_implementations() {
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CODEX_SYSTEM_SRC")
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$PI_SRC")
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CLAUDE_SRC")
+    while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$OPENCODE_SRC")
 
-    echo "=== Skill Name Parity (repo/codex/pi/claude) ==="
+    echo "=== Skill Name Parity (repo/codex/pi/claude/opencode) ==="
     while IFS= read -r skill; do
         in_repo="no"
         in_codex="no"
         in_pi="no"
         in_claude="no"
+        in_opencode="no"
         runtime_only="no"
         [ -d "$REPO_SKILLS_DIR/$skill" ] && in_repo="yes"
         [ -d "$CODEX_SRC/$skill" ] && in_codex="yes"
@@ -389,22 +394,23 @@ compare_implementations() {
         fi
         [ -d "$PI_SRC/$skill" ] && in_pi="yes"
         [ -d "$CLAUDE_SRC/$skill" ] && in_claude="yes"
+        [ -d "$OPENCODE_SRC/$skill" ] && in_opencode="yes"
 
         if [[ "$runtime_only" == "yes" ]]; then
             continue
         fi
-        if [ "$in_repo" != "yes" ] || [[ "$in_codex" != "yes" && "$in_codex" != "runtime" ]] || [ "$in_pi" != "yes" ] || [ "$in_claude" != "yes" ]; then
-            printf "  MISMATCH: %-30s repo=%s codex=%s pi=%s claude=%s\n" "$skill" "$in_repo" "$in_codex" "$in_pi" "$in_claude"
+        if [ "$in_repo" != "yes" ] || [[ "$in_codex" != "yes" && "$in_codex" != "runtime" ]] || [ "$in_pi" != "yes" ] || [ "$in_claude" != "yes" ] || [ "$in_opencode" != "yes" ]; then
+            printf "  MISMATCH: %-30s repo=%s codex=%s pi=%s claude=%s opencode=%s\n" "$skill" "$in_repo" "$in_codex" "$in_pi" "$in_claude" "$in_opencode"
             has_issue=1
         fi
     done < <(printf '%s\n' "${!all_skills[@]}" | sort)
 
     echo ""
     echo "Summary:"
-    echo "  repo=$(count_skill_names "$REPO_SKILLS_DIR"), codex=$(count_skill_names "$CODEX_SRC"), pi=$(count_skill_names "$PI_SRC"), claude=$(count_skill_names "$CLAUDE_SRC")"
+    echo "  repo=$(count_skill_names "$REPO_SKILLS_DIR"), codex=$(count_skill_names "$CODEX_SRC"), pi=$(count_skill_names "$PI_SRC"), claude=$(count_skill_names "$CLAUDE_SRC"), opencode=$(count_skill_names "$OPENCODE_SRC")"
 
     if [ "$has_issue" -eq 0 ]; then
-        echo "PASS: repo, Codex, Pi, and Claude skill sets are consistent."
+        echo "PASS: repo, Codex, Pi, Claude, and opencode skill sets are consistent."
     else
         echo "FAIL: Skill sets are out of sync."
         return 1
@@ -460,22 +466,25 @@ status() {
     local codex
     local pi
     local claude
+    local opencode
     declare -A all_skills
 
-    printf "%-35s %-8s %-8s %-8s %-8s\n" "SKILL" "REPO" "CODEX" "PI" "CLAUDE"
-    printf "%-35s %-8s %-8s %-8s %-8s\n" "-----" "----" "-----" "--" "------"
+    printf "%-35s %-8s %-8s %-8s %-8s %-10s\n" "SKILL" "REPO" "CODEX" "PI" "CLAUDE" "OPENCODE"
+    printf "%-35s %-8s %-8s %-8s %-8s %-10s\n" "-----" "----" "-----" "--" "------" "--------"
 
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$REPO_SKILLS_DIR")
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CODEX_SRC")
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CODEX_SYSTEM_SRC")
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$PI_SRC")
     while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$CLAUDE_SRC")
+    while IFS= read -r skill; do all_skills["$skill"]=1; done < <(list_skill_names "$OPENCODE_SRC")
 
     while IFS= read -r skill; do
         repo="--"
         codex="--"
         pi="--"
         claude="--"
+        opencode="--"
         [ -d "$REPO_SKILLS_DIR/$skill" ] && repo="yes"
         [ -d "$CODEX_SRC/$skill" ] && codex="yes"
         if [[ "$codex" == "--" ]] && is_runtime_excluded codex "$skill" && [[ -d "$CODEX_SYSTEM_SRC/$skill" ]]; then
@@ -484,11 +493,12 @@ status() {
         fi
         [ -d "$PI_SRC/$skill" ] && pi="yes"
         [ -d "$CLAUDE_SRC/$skill" ] && claude="yes"
-        printf "%-35s %-8s %-8s %-8s %-8s\n" "$skill" "$repo" "$codex" "$pi" "$claude"
+        [ -d "$OPENCODE_SRC/$skill" ] && opencode="yes"
+        printf "%-35s %-8s %-8s %-8s %-8s %-10s\n" "$skill" "$repo" "$codex" "$pi" "$claude" "$opencode"
     done < <(printf '%s\n' "${!all_skills[@]}" | sort)
 
     echo ""
-    echo "Totals: repo=$(count_skill_names "$REPO_SKILLS_DIR"), codex=$(count_skill_names "$CODEX_SRC") user + $(count_skill_names "$CODEX_SYSTEM_SRC") runtime, pi=$(count_skill_names "$PI_SRC"), claude=$(count_skill_names "$CLAUDE_SRC")"
+    echo "Totals: repo=$(count_skill_names "$REPO_SKILLS_DIR"), codex=$(count_skill_names "$CODEX_SRC") user + $(count_skill_names "$CODEX_SYSTEM_SRC") runtime, pi=$(count_skill_names "$PI_SRC"), claude=$(count_skill_names "$CLAUDE_SRC"), opencode=$(count_skill_names "$OPENCODE_SRC")"
 }
 
 [ $# -lt 1 ] && usage

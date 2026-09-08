@@ -45,6 +45,7 @@ decision; a stale cited artifact is not valid reuse.
 | `autonomy-loop` → `autonomous-execution-contract` | composer | The contract is the loop's bounded executor, unchanged. |
 | `autonomy-loop` governed profile → MetaBuilder | router (new) | When an epic is long-horizon, the governed runtime is the MetaBuilder lifecycle; the loop consumes controller receipts rather than reconstructing them. |
 | `handoff` ↔ MetaBuilder checkpoints | boundary (new) | In-run recovery belongs to harness durable attempts; `handoff` owns human cross-shell resume and records harness run/checkpoint identities for re-entry. |
+| `metabuilder-consumer-qualification` → { `work-intake`, `metabuilder-harness-design` } | producer-consumer (new) | Every close emits a continuation handoff (leftover checkpoint + proposed next ObjectiveRequest + envelope class + delegation budget accounting). Same-envelope handoffs with budget remaining take the intake fast path to design; exhaustion or expansion exits to the principal. Batch size M and renewal policy are fixed once in the charter's continuation standing delegation. |
 | `check-antipatterns` → `analyze-conversation` | router | Completed sessions route to retrospective analysis. |
 | `clean-code-refine` ↔ `fp-refine` | router | Mutual routing with veto, unchanged. |
 | `system-memory-audit` → `memleak-investigate` | router | Named-process longitudinal analysis routes onward. |

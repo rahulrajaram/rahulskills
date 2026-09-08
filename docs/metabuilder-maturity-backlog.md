@@ -27,6 +27,7 @@ citing the commit, contract, or qualification that removed it.
 | 8 | prepared | Composition linter | `scripts/lint_skill_composition.py` wired into `audit-skills.sh check` 2026-09-07; close when it also validates edge schema digests |
 | 9 | open | Learning-loop wiring | Shared learning-record shape landed 2026-09-07; close when metabuilder retrospectives consume records mechanically |
 | 10 | open | Profile expansion (network, credential, target-write) | Versioned profiles with enforcing adapters and adversarial qualification (audit rollout phase 4) |
+| 11 | prepared | Post-epoch continuation mechanics | Orchestrator-side loop landed 2026-09-08: continuation handoff at qualification close, work-intake fast path, charter standing delegation with batch M and renewal policy. Core-side unattended multi-epoch remains intentionally excluded (`define-intent-capabilities.md`: convergence never creates continuation authority). Close when a real multi-epoch engagement chains epochs through the fast path and the renewal/exit edges both fire correctly. |
 
 ## Engagement log
 
