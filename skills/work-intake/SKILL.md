@@ -17,12 +17,28 @@ appears mid-work.
 ## Inputs and local bindings
 
 Bind the work statement from the invocation argument, the current request,
-or the active conversation — in that order. Do not interview for it: only
-when no work statement exists anywhere make ONE compact ask ("state the
+or the active conversation — in that order. Do not interview for it.
+
+When no work statement exists anywhere, do not ask yet: first check
+observable project state for already-routed work and take the **resume
+route** — intake is an idempotent front door, so re-invoking it on in-flight
+work must land on the resume owner, never re-classify:
+
+- a qualification continuation handoff → the continuation fast path below;
+- an active epic plan or ranked backlog → `autonomy-loop` (it owns ranking
+  and next-slice selection);
+- a `NEXT_SHELL_PROMPT.md` handoff artifact → `handoff` extract mode.
+
+If the routed work sits at a human gate — pending adjudications, an
+exhausted delegation budget, envelope expansion — report that gate as the
+next action; do not route to an executor as if executable work existed.
+Only when no routed work exists at all make ONE compact ask ("state the
 work"), not an objectives/targets/constraints menu — that is the downstream
-brief's job. Then resolve from that statement and observed project state:
-expected sessions, effect classes already authorized (read, write, process,
-network, credential), whether evidence must survive interruption, and which
+brief's job.
+
+Then resolve from the work statement and observed project state: expected
+sessions, effect classes already authorized (read, write, process, network,
+credential), whether evidence must survive interruption, and which
 destination workflows are installed (presence checks only). Missing or
 conflicting bindings require a decision only when they change the route.
 
