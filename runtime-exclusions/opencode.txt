@@ -1,0 +1,4 @@
+# opencode runtime-owned skill names that must not be installed as package
+# links. opencode's built-in skills (for example customize-opencode) are
+# internal to the app and do not collide with package skill names; keep this
+# list empty unless a real conflict appears.

@@ -4,7 +4,7 @@
     "phase_id": "classify-work-horizon",
     "skill": "work-intake",
     "semantic_version": "1.0.0",
-    "guidance_digest": "00c7e9836e4de697ececb434c559fd0b00997e28529562bd2c811bd61ba50c4a"
+    "guidance_digest": "4eac460573ff7f990ad1201573ce55d947682d2da494ad22f47a6d17d441c1d2"
   },
   "inputs": [
     {
@@ -25,6 +25,13 @@
       "epistemic_class": "observation",
       "required": false,
       "cardinality": "zero-or-one"
+    },
+    {
+      "name": "continuation_handoff",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one",
+      "schema_digest": null
     }
   ],
   "outputs": [
@@ -55,7 +62,11 @@
     }
   ],
   "effects": [
-    { "kind": "none", "mode": "read", "ceiling": "in-context reasoning only; no side effects" }
+    {
+      "kind": "none",
+      "mode": "read",
+      "ceiling": "in-context reasoning only; no side effects"
+    }
   ],
   "determinism": {
     "status": "pure",
@@ -72,17 +83,29 @@
     "human_gates": [
       "Escalate only when stated outcome and observed effect classes conflict, or when ratifying a design-only boundary."
     ],
-    "ceiling": ["classification and routing statements; no execution"]
+    "ceiling": [
+      "classification and routing statements; no execution"
+    ]
   },
   "evidence": {
     "acceptance_checks": [
-      "Routing decision names horizon, decisive signals, selected route, and any profile-check boundary."
+      "Routing decision names horizon, decisive signals, selected route, and any profile-check boundary.",
+      "Fast path: a continuation handoff routes directly to harness design without re-classification; an exhausted batch or expanding envelope routes to the principal."
     ],
-    "artifact_provenance": ["one recorded line in the session, reusable by downstream skills"],
+    "artifact_provenance": [
+      "one recorded line in the session, reusable by downstream skills"
+    ],
     "journal_events": [],
     "report_boundary": "A route is a recommendation to the caller, not an effect grant."
   },
   "compatibility": {
-    "breaking_widenings": ["effect", "authority", "confinement", "resource", "recovery", "output_meaning"]
+    "breaking_widenings": [
+      "effect",
+      "authority",
+      "confinement",
+      "resource",
+      "recovery",
+      "output_meaning"
+    ]
   }
 }

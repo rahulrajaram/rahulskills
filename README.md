@@ -12,6 +12,7 @@ This repo collects skills (prompt-based automation units) for two AI coding assi
 
 - **Codex** (`~/.codex/skills/`) -- OpenAI Codex CLI skills
 - **Claude Code** (`~/.claude/skills/`) -- Claude Code skills
+- **opencode** (`~/.config/opencode/skills/`) -- opencode CLI skill links
 
 Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `skills/` directory in this repo is the single source of truth, synced to both locations.
 
@@ -22,6 +23,14 @@ profile changes do not prune optional copies. Invoke a skill explicitly in Pi as
 `/skill:<name>`; for example, `/skill:handoff extract` reviews
 `NEXT_SHELL_PROMPT.md`, adopts it as the current request, and immediately
 executes its authorized work.
+
+opencode resolves selected links from `~/.config/opencode/skills/`. Run
+[`install-opencode-skills.sh`](#install-opencode-skills.sh) with the desired
+profile; it follows the same conservative linking and ownership rules as the
+Pi installer. opencode also auto-discovers `~/.claude/skills/` by default, so
+the linked install and the Claude install can surface the same skill names;
+export `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1` before starting opencode to
+suppress the Claude scan if that duplication is unwanted.
 
 Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yore vocabulary curation).
 
@@ -37,7 +46,8 @@ rahulskills/
   build/                   # Gitignored — assembled output from stitch step
   bin/                     # Shared assistant shell helpers
   audit-skills.sh          # Pre-commit guard against private reference leaks
-  install-pi-skills.sh     # Symlink repo skills into ~/.pi/agent/skills for Pi
+  install-pi-skills.sh       # Symlink repo skills into ~/.pi/agent/skills for Pi
+  install-opencode-skills.sh # Symlink repo skills into ~/.config/opencode/skills for opencode
   stitch-skills.sh         # Assemble skills + overlays, install to CLI locations
   runtime-exclusions/      # Runtime-owned names that must not be installed twice
   scripts/audit_catalog.py # Audit resolved roots for collisions and portability
@@ -145,6 +155,20 @@ Existing package-owned links can be updated and explicitly removed with
 ownership is recorded in `.rahulskills-ownership.json` under the Pi runtime.
 No optional profile selection activates MCPs, commands, or other dependencies.
 Runtime exclusions and `.exclude-skills` are honored.
+
+### `install-opencode-skills.sh`
+
+Symlink the selected profile or explicitly named skills into opencode's
+global skill directory. Selection defaults to `core` and preserves unrelated
+entries; it shares the Pi installer's migration, ownership ledger, and
+runtime-exclusion rules.
+
+```bash
+./install-opencode-skills.sh                   # Link the core profile
+./install-opencode-skills.sh --profile all     # Select every package profile
+./install-opencode-skills.sh --skill grilling  # Select one skill only
+./install-opencode-skills.sh --preview --opencode-root /tmp/opencode  # Isolated preview
+```
 
 ### `stitch-skills.sh`
 

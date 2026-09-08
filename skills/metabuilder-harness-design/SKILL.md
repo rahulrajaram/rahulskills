@@ -97,6 +97,13 @@ preparation skills and consume them as cited inputs:
   and workflow topology: obligations come from its task and verification
   nodes, and ordering follows its `depends_on` projection.
 
+When preparation records do not cover a material unknown, convene an
+autonomous grilling by default (`grilling` speculative mode with its bounded
+internal debate) to resolve TECHNICAL unknowns before asking the principal;
+record its resolved questions with basis and evidence digest like any other.
+Product, authority, and approval decisions are never resolved this way —
+they still require the named owner.
+
 Reuse stays subject to the freshness rule above: changed actors, effect
 scope, or evidence reopen the affected decision, and each cited artifact's
 digest must be recomputed and recorded in the prepared brief.

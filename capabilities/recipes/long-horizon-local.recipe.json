@@ -100,6 +100,13 @@
       "to": "check-antipatterns",
       "input": "campaign_artifacts",
       "note": "review loop consumes the report; findings route to the learning record"
+    },
+    {
+      "from": "qualify-harness",
+      "output": "continuation_handoff",
+      "to": "classify-work-horizon",
+      "input": "continuation_handoff",
+      "note": "continuation loop: same-envelope handoffs with delegation budget remaining take the intake fast path back to design; exhaustion or envelope expansion exits to the principal"
     }
   ],
   "completeness_checks": [
