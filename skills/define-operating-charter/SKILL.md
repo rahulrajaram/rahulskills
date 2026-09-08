@@ -116,6 +116,19 @@ Never infer authority from identity, capability, convenience, or prior action.
 - Fallback resources remain fallbacks. State the exact condition that permits
   their use and preserve evidence of that condition.
 
+### Continuation standing delegation
+
+A charter for multi-epoch work may ratify, once, a standing delegation that
+lets the orchestrator slate same-envelope continuation without re-asking at
+every epoch close. The clause must state: the delegated decision class
+(same-envelope continuation only), the batch budget M — how many further
+epochs it covers — the renewal policy (fixed total, renewable on report
+every M epochs, or renew-silently-until-revoked), expiry, and revocation.
+Envelope-expanding continuation — new effect classes, spend, credentials, or
+target writes — is never delegated and always returns to the principal.
+Each qualification close's continuation handoff records its budget
+accounting against this clause.
+
 ## Output contract
 
 Produce a compact but complete charter with these sections:
@@ -161,6 +174,11 @@ owner confirmation for every applicable decision that changes:
 Do not turn a draft into effective policy merely because it is detailed. Mark
 unratified sections as proposals. Once ratified, preserve the charter as a
 versioned durable artifact and require amendments to name what they replace.
+
+When the chartered system will run as a MetaBuilder harness, the ratified
+charter is the authoritative input for the harness brief's actors and
+authority boundaries; `metabuilder-harness-design` restates rather than
+re-decides them.
 
 ## Quality check
 

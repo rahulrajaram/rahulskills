@@ -1,0 +1,95 @@
+{
+  "contract_schema": 1,
+  "unit": {
+    "phase_id": "execute-bounded-task",
+    "skill": "autonomous-execution-contract",
+    "semantic_version": "1.0.0",
+    "guidance_digest": "7d4a406b3bf42f7be6fac38c22e25bc1e0f17483c4e4afc071d452b85fa367b8"
+  },
+  "inputs": [
+    {
+      "name": "bounded_task",
+      "epistemic_class": "artifact",
+      "required": true,
+      "cardinality": "one",
+      "schema_digest": null
+    },
+    {
+      "name": "stop_rules",
+      "epistemic_class": "human_decision",
+      "required": true,
+      "cardinality": "one"
+    },
+    {
+      "name": "verification_targets",
+      "epistemic_class": "artifact",
+      "required": true,
+      "cardinality": "many"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "execution_claim",
+      "epistemic_class": "claim",
+      "cardinality": "one",
+      "artifact_kind": "work summary + observed verification"
+    }
+  ],
+  "preconditions": {
+    "prior_stages": ["orchestrate-epic"],
+    "approvals": ["task selection under a valid epic envelope"],
+    "toolchains": [],
+    "platforms": []
+  },
+  "failures": [
+    {
+      "failure_type": "conclusive_failure",
+      "retryable": true,
+      "recovery": "Circuit breaker; report failure evidence and stop rather than force completion."
+    },
+    {
+      "failure_type": "timeout",
+      "retryable": true,
+      "recovery": "Stop at the recorded boundary; preserve partial evidence."
+    },
+    {
+      "failure_type": "unknown",
+      "retryable": false,
+      "recovery": "Preserve state; reconcile before any retry."
+    }
+  ],
+  "effects": [
+    { "kind": "filesystem", "mode": "write", "ceiling": "target repository working tree within task scope" },
+    { "kind": "process", "mode": "execute", "ceiling": "verification commands named by verification_targets" },
+    { "kind": "git", "mode": "write", "ceiling": "local commits within task scope" }
+  ],
+  "determinism": {
+    "status": "effectful",
+    "canonical_serialization": "work summary with observed command results",
+    "replay_inputs": false,
+    "nondeterminism_notes": "Verification outputs are observations recorded as-run; a passing check is not effect authorization."
+  },
+  "resources": {
+    "time_budget": "per-task bound from the contract",
+    "processes": "verification toolchain"
+  },
+  "authority": {
+    "attenuate_only": true,
+    "author": "rahulskills",
+    "human_gates": [
+      "Destructive operations, pushes, deploys, dependency additions, secrets, and material product decisions pause for the user."
+    ],
+    "ceiling": ["the single selected bounded task's declared effects"]
+  },
+  "evidence": {
+    "acceptance_checks": [
+      "Verification targets actually run; results recorded with the work summary."
+    ],
+    "artifact_provenance": ["work summary", "verification output"],
+    "journal_events": [],
+    "report_boundary": "Worker output is a claim; only controller-observed evidence (governed profile) upgrades it."
+  },
+  "compatibility": {
+    "breaking_widenings": ["effect", "authority", "confinement", "resource", "recovery", "output_meaning"]
+  }
+}

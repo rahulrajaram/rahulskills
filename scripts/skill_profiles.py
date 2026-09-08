@@ -108,7 +108,7 @@ def migration(root: Path, source: Path, destination: Path, names: tuple[str, ...
     owned = load_ownership(destination, root)
     selected = {f"skills/{name}" for name in names}
     reference_root = source / "references"
-    if not links and reference_root.exists():
+    if reference_root.exists():
         selected |= {f"references/{p.relative_to(reference_root).as_posix()}"
                      for p in reference_root.rglob("*") if p.is_file()}
     changes = []
@@ -237,7 +237,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("select", "preview", "apply"))
     parser.add_argument("--root", type=Path, default=ROOT)
-    parser.add_argument("--runtime", choices=("codex", "claude", "pi"), required=True)
+    parser.add_argument("--runtime", choices=("codex", "claude", "pi", "opencode"), required=True)
     parser.add_argument("--profile", action="append", default=[])
     parser.add_argument("--skill", action="append", default=[])
     parser.add_argument("--source", type=Path)

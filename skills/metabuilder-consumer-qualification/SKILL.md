@@ -119,6 +119,11 @@ and uses the existing workflow reducer, so selector, current-head, and replay
 checks remain in force under the single-controller run-store contract.
 Do not run concurrent controller writers against the same run root.
 
+When learning records from the review skills exist for this campaign (shared
+shape: `references/learning-record.schema.json`), cite the relevant ones inside
+the retrospective record's findings rather than re-deriving them; a learning
+record is a claim about the work, not controller evidence.
+
 Operating notes verified in a real governed campaign:
 
 - Every worker action is followed by a `retrospective_required` blocker that
@@ -279,6 +284,27 @@ record was constructed, not that the product passed or is production-ready.
 The subject binds the package version and digest of the MetaBuilder executable
 that reconstructed the report. This identifies the reporter; it does not claim
 that every earlier run command used those same executable bytes.
+
+## Continuation handoff at close
+
+Every qualification close emits a continuation handoff alongside the report,
+whether or not more work is expected. It contains:
+
+1. the leftover-work checkpoint: controller-observed remaining obligations,
+   unfinished workflow nodes, and unmet acceptance checks;
+2. a proposed next ObjectiveRequest for the next epoch, ready for
+   `metabuilder-harness-design` as a cited input;
+3. the envelope classification: same-envelope (no new effect classes, spend,
+   or target writes) or envelope-expanding, with the exact expansion named;
+4. standing-delegation budget accounting: units consumed and units remaining
+   of the ratified batch M, and whether renewal falls due at this close.
+
+The handoff is a proposal, not continuation authority. Same-envelope
+continuation proceeds only while a valid standing delegation covers it (see
+`define-operating-charter`); an exhausted budget or an expanding envelope
+routes the prepared request to the principal instead. Never declare an epoch
+final by convergence alone — the handoff determines what is next and slates
+it.
 
 ## Report back to MetaBuilder
 

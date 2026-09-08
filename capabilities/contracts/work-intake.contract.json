@@ -1,0 +1,112 @@
+{
+  "contract_schema": 1,
+  "unit": {
+    "phase_id": "classify-work-horizon",
+    "skill": "work-intake",
+    "semantic_version": "1.0.0",
+    "guidance_digest": "157d46f72f7aca34ec884200d771a174745887a62927a3469601764fb44e2c1d"
+  },
+  "inputs": [
+    {
+      "name": "work_description",
+      "epistemic_class": "artifact",
+      "required": true,
+      "cardinality": "one",
+      "size_bound": "one conversation request"
+    },
+    {
+      "name": "project_state",
+      "epistemic_class": "observation",
+      "required": false,
+      "cardinality": "zero-or-one"
+    },
+    {
+      "name": "authorized_effect_classes",
+      "epistemic_class": "observation",
+      "required": false,
+      "cardinality": "zero-or-one"
+    },
+    {
+      "name": "continuation_handoff",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one",
+      "schema_digest": null
+    }
+  ],
+  "outputs": [
+    {
+      "name": "routing_decision",
+      "epistemic_class": "diagnostic",
+      "cardinality": "one",
+      "schema_digest": null
+    }
+  ],
+  "preconditions": {
+    "prior_stages": [],
+    "approvals": [],
+    "toolchains": [],
+    "platforms": [],
+    "accepted_contract_versions": []
+  },
+  "failures": [
+    {
+      "failure_type": "invalid_input",
+      "retryable": true,
+      "recovery": "Ask for the missing decisive signal only when it changes the route."
+    },
+    {
+      "failure_type": "conclusive_failure",
+      "retryable": false,
+      "recovery": "Report bounded classification with the open signal recorded."
+    }
+  ],
+  "effects": [
+    {
+      "kind": "none",
+      "mode": "read",
+      "ceiling": "in-context reasoning only; no side effects"
+    }
+  ],
+  "determinism": {
+    "status": "pure",
+    "canonical_serialization": "one recorded classification line: horizon, decisive signals, route, profile boundary",
+    "replay_inputs": true,
+    "nondeterminism_notes": "Model judgment over ambiguous requests; ambiguity resolves to bounded unless a durable-evidence signal is present."
+  },
+  "resources": {
+    "time_budget": "seconds"
+  },
+  "authority": {
+    "attenuate_only": true,
+    "author": "rahulskills",
+    "human_gates": [
+      "Escalate only when stated outcome and observed effect classes conflict, or when ratifying a design-only boundary."
+    ],
+    "ceiling": [
+      "classification and routing statements; no execution"
+    ]
+  },
+  "evidence": {
+    "acceptance_checks": [
+      "Routing decision names horizon, decisive signals, selected route, and any profile-check boundary.",
+      "Fast path: a continuation handoff routes directly to harness design without re-classification; an exhausted batch or expanding envelope routes to the principal.",
+      "Idempotent resume route: with no work statement and existing routed work, intake routes to the resume owner (continuation fast path, autonomy-loop, or handoff extract) or reports the human gate \u2014 never re-classifies in-flight work and never asks first."
+    ],
+    "artifact_provenance": [
+      "one recorded line in the session, reusable by downstream skills"
+    ],
+    "journal_events": [],
+    "report_boundary": "A route is a recommendation to the caller, not an effect grant."
+  },
+  "compatibility": {
+    "breaking_widenings": [
+      "effect",
+      "authority",
+      "confinement",
+      "resource",
+      "recovery",
+      "output_meaning"
+    ]
+  }
+}

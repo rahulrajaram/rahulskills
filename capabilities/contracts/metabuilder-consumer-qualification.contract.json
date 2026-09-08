@@ -1,0 +1,137 @@
+{
+  "contract_schema": 1,
+  "unit": {
+    "phase_id": "qualify-harness",
+    "skill": "metabuilder-consumer-qualification",
+    "semantic_version": "1.0.0",
+    "guidance_digest": "ebfecc95e434718d722f13c6947cf4dc5b0b1b9150c49aa337480a0511d6df89"
+  },
+  "inputs": [
+    {
+      "name": "design_packet",
+      "epistemic_class": "artifact",
+      "required": true,
+      "cardinality": "one"
+    },
+    {
+      "name": "inspection_scope",
+      "epistemic_class": "human_decision",
+      "required": false,
+      "cardinality": "zero-or-one"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "qualification_report",
+      "epistemic_class": "controller_evidence",
+      "cardinality": "one",
+      "artifact_kind": "qualification report + attestations over controller observations"
+    },
+    {
+      "name": "semantic_assessment",
+      "epistemic_class": "diagnostic",
+      "cardinality": "one",
+      "artifact_kind": "consumer-owned judgment, separate from controller evidence"
+    },
+    {
+      "name": "continuation_handoff",
+      "epistemic_class": "claim",
+      "cardinality": "one",
+      "artifact_kind": "leftover checkpoint + proposed next ObjectiveRequest + envelope class + standing-delegation budget accounting"
+    }
+  ],
+  "preconditions": {
+    "prior_stages": [
+      "design-harness"
+    ],
+    "approvals": [
+      "exact admitted bundle from the design handoff"
+    ],
+    "toolchains": [
+      "metabuilder"
+    ],
+    "platforms": [
+      "linux-local consumer profile"
+    ]
+  },
+  "failures": [
+    {
+      "failure_type": "unknown",
+      "retryable": false,
+      "recovery": "Preserve Unknown; reconcile from durable run state without blind redispatch."
+    },
+    {
+      "failure_type": "conclusive_failure",
+      "retryable": true,
+      "recovery": "Return upstream to design when evidence exposes a design gap; never repair the design silently."
+    },
+    {
+      "failure_type": "denied_effect",
+      "retryable": false,
+      "recovery": "Report the capability as unavailable; continue independent authorized preparation."
+    }
+  ],
+  "effects": [
+    {
+      "kind": "filesystem",
+      "mode": "read",
+      "ceiling": "run root and target reads under the enforced confinement profile"
+    },
+    {
+      "kind": "process",
+      "mode": "execute",
+      "ceiling": "admitted direct commands inside the sandbox (no network, 4 GiB, read-only workspace, tmpfs /tmp)"
+    },
+    {
+      "kind": "filesystem",
+      "mode": "write",
+      "ceiling": "declared outputs and run-root evidence"
+    }
+  ],
+  "determinism": {
+    "status": "effectful",
+    "canonical_serialization": "qualification report over controller-recorded observations and receipts",
+    "replay_inputs": true,
+    "nondeterminism_notes": "Byte-stable replay from unchanged source is required; nondeterministic provider output is never silently rerun."
+  },
+  "resources": {
+    "bytes": "4 GiB address space",
+    "storage": "run root outside the target repository"
+  },
+  "authority": {
+    "attenuate_only": true,
+    "author": "rahulskills",
+    "human_gates": [
+      "Fresh generation and maintainer-only operations require explicit separate authority."
+    ],
+    "ceiling": [
+      "execute the unchanged admitted bundle within the confinement profile; no design changes"
+    ]
+  },
+  "evidence": {
+    "acceptance_checks": [
+      "Reuse an unchanged admitted bundle; recompile only when the handoff requires it",
+      "Qualification template/report checked via metabuilder qualify prepare|report|check",
+      "Every close emits a continuation handoff with envelope class and delegation budget accounting"
+    ],
+    "artifact_provenance": [
+      "controller observations",
+      "receipts",
+      "qualification report"
+    ],
+    "journal_events": [
+      "durable run events"
+    ],
+    "report_boundary": "Controller observations stay separate from consumer semantic judgment; no production-readiness claim."
+  },
+  "compatibility": {
+    "breaking_widenings": [
+      "effect",
+      "authority",
+      "confinement",
+      "resource",
+      "recovery",
+      "output_meaning"
+    ]
+  }
+}

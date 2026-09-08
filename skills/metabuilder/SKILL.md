@@ -125,6 +125,12 @@ uses its CLI and skills.
 
 ## Improve MetaBuilder through use
 
+Every long-horizon engagement routed here owes the maturation flywheel: before
+closing the campaign, file a record for each gap it exposed. Campaign-level
+MetaBuilder gaps follow the steps below; tool-ecosystem-level friction also
+goes to the friction ledger, and both surface in
+`docs/metabuilder-maturity-backlog.md`.
+
 When the target exposes a MetaBuilder gap:
 
 1. Stop the unsupported target operation.
