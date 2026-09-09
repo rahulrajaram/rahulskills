@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Design packet identity",
+  "description": "Consumer claim binding existing design artifacts. Digest identity is not authentication or authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "packet_schema",
+    "agreed_brief",
+    "module",
+    "bundle",
+    "composition_lock"
+  ],
+  "properties": {
+    "packet_schema": {
+      "type": "integer",
+      "const": 1
+    },
+    "agreed_brief": {
+      "$ref": "#/$defs/artifact"
+    },
+    "module": {
+      "$ref": "#/$defs/artifact"
+    },
+    "bundle": {
+      "$ref": "#/$defs/artifact"
+    },
+    "composition_lock": {
+      "$ref": "#/$defs/artifact"
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

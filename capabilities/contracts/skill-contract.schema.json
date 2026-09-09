@@ -58,12 +58,13 @@
         "additionalProperties": false,
         "properties": {
           "name": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "schema_path": {"type": "string", "minLength": 1, "description": "Schema path relative to this contract directory; bytes must match schema_digest."},
           "schema_digest": {
             "description": "Optional digest of the value's own schema when one exists.",
             "$ref": "#/$defs/digest_or_null"
           },
           "epistemic_class": {
-            "enum": ["artifact", "observation", "claim", "human_decision"]
+            "enum": ["artifact", "observation", "claim", "human_decision", "diagnostic"]
           },
           "required": { "type": "boolean" },
           "cardinality": {
@@ -82,6 +83,7 @@
         "additionalProperties": false,
         "properties": {
           "name": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "schema_path": {"type": "string", "minLength": 1, "description": "Schema path relative to this contract directory; bytes must match schema_digest."},
           "schema_digest": { "$ref": "#/$defs/digest_or_null" },
           "epistemic_class": {
             "enum": ["claim", "diagnostic", "controller_evidence", "rendering"]

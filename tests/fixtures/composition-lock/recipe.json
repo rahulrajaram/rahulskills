@@ -1,0 +1,1 @@
+{"recipe_schema":1,"name":"fixture","runtime_profile":"local","entry":"alpha","required_roles":[],"edges":[{"from":"alpha","output":"value","to":"beta","input":"value"}],"completeness_checks":[]}

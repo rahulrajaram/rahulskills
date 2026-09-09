@@ -1,0 +1,14 @@
+{
+  "grant_id": "1111111111111111111111111111111111111111111111111111111111111111",
+  "campaign_id": "camp-1",
+  "owner": "owner-1",
+  "objective_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "repository_identity": "repo@abc",
+  "policy_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "expires_at": "2026-09-08T22:00:00Z",
+  "revoked": false,
+  "renewal_allowed": false,
+  "authority": {"envelope_class": "local-read", "effect_ceiling": ["none"]},
+  "budget_caps": {"batch_limit": 4, "total_ceiling": 8},
+  "decision_class": "same-envelope-continuation"
+}

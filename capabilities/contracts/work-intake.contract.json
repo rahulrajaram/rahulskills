@@ -3,7 +3,7 @@
   "unit": {
     "phase_id": "classify-work-horizon",
     "skill": "work-intake",
-    "semantic_version": "1.0.2",
+    "semantic_version": "1.1.0",
     "guidance_digest": "9bd0645391f02332489da105470e2f13561ea18b28ae216022a2f5b1a4198fd8"
   },
   "inputs": [
@@ -47,7 +47,8 @@
       "name": "routing_decision",
       "epistemic_class": "diagnostic",
       "cardinality": "one",
-      "schema_digest": null
+      "schema_digest": "13045567de1dfc1a9c8c74775d037de10200ef1633fad01d2a35ec3687e33026",
+      "schema_path": "../ports/routing-diagnostic.schema.json"
     }
   ],
   "preconditions": {

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rahulskills.local/references/composition-lock.schema.json",
+  "title": "Composition Lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["lock_schema", "lock_digest", "tool_version", "recipe", "catalog", "schema", "contracts", "roles", "edges"],
+  "properties": {
+    "lock_schema": {"const": 1},
+    "lock_digest": {"$ref": "#/$defs/digest"},
+    "tool_version": {"type": "string", "minLength": 1},
+    "recipe": {"$ref": "#/$defs/identity"},
+    "catalog": {"$ref": "#/$defs/identity"},
+    "schema": {"$ref": "#/$defs/identity"},
+    "contracts": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["phase_id", "digest", "semantic_version"], "properties": {"phase_id": {"type": "string"}, "digest": {"$ref": "#/$defs/digest"}, "semantic_version": {"type": "string"}}}},
+    "roles": {"type": "array", "items": {"type": "object"}},
+    "selected_roles": {"type": ["array", "null"], "items": {"type": "string"}},
+    "inactive_edges": {"type": "array", "items": {"type": "object"}},
+    "edges": {"type": "array", "items": {"type": "object", "additionalProperties": true, "required": ["from", "output", "to", "input", "producer_contract_digest", "consumer_contract_digest", "producer_schema_digest", "consumer_schema_digest"], "properties": {"from": {"type": "string"}, "output": {"type": "string"}, "to": {"type": "string"}, "input": {"type": "string"}, "producer_contract_digest": {"$ref": "#/$defs/digest"}, "consumer_contract_digest": {"$ref": "#/$defs/digest"}, "producer_schema_digest": {"$ref": "#/$defs/digest"}, "consumer_schema_digest": {"$ref": "#/$defs/digest"}, "adapter_digest": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/digest"}]}, "lossless": {"type": "boolean"}}}}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "identity": {"type": "object", "additionalProperties": false, "required": ["digest"], "properties": {"name": {"type": "string"}, "digest": {"$ref": "#/$defs/digest"}}}
+  }
+}

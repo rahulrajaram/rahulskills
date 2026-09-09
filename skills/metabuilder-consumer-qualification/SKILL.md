@@ -120,9 +120,17 @@ checks remain in force under the single-controller run-store contract.
 Do not run concurrent controller writers against the same run root.
 
 When learning records from the review skills exist for this campaign (shared
-shape: `references/learning-record.schema.json`), cite the relevant ones inside
-the retrospective record's findings rather than re-deriving them; a learning
-record is a claim about the work, not controller evidence.
+shape: `references/learning-record.schema.json`), ingest them with the repository's
+`scripts/learning_ingest.py --records RECORDS --context CONTEXT`, adding
+`--previous PREVIOUS` only for the same run, epoch, source and policy. Context
+contains `campaign_id`, positive `epoch`, `run_id`, exact `source_commit`, and
+SHA256 `policy_digest`. Retain the accepted document and cite its digest and
+original findings/evidence references in the actual retrospective record before
+recording it. A rejected batch must be corrected; do not silently omit failures.
+The adapter deduplicates claims and preserves provenance; it does not verify
+references, authenticate authors, promote findings, or turn claims into
+controller observations. The output shape is
+`references/retrospective-learning-input.schema.json`.
 
 Operating notes verified in a real governed campaign:
 
@@ -133,6 +141,12 @@ Operating notes verified in a real governed campaign:
   with "invalid retrospective id: invalid tranche identifier".
 - Author runs with the run root OUTSIDE the target repository. The run's own
   journal dirties the worktree and `harness author` refuses a dirty tree.
+  Apply uses sanitized Git settings without user-global excludes. If local
+  session files make that check dirty, use a clean temporary worktree of the
+  exact authored commit. The sandbox exports source without Git metadata;
+  bind the verified source commit into declared command inputs before compile
+  rather than running Git inside the exported workspace. Compare that input
+  to the controller's authored revision before dispatch.
 - Attestation verdicts are `meets` / `does_not_meet` / `uncertain`, and each
   `consumer_evidence[].digest` must be a real SHA-256 digest (journaled action
   evidence digests are the natural choice).
@@ -301,7 +315,20 @@ whether or not more work is expected. It contains:
 4. standing-delegation budget accounting: units consumed and units remaining
    of the ratified batch M, and whether renewal falls due at this close.
 
-The handoff is a proposal, not continuation authority. Before any next epoch,
+The handoff is a proposal, not continuation authority. At every close, including
+terminal completion, emit the repository's `references/continuation-state.schema.json`
+state when using typed continuation. A freeform terminal summary does not satisfy
+that schema: validate the complete state and require no next action at completion.
+Bind the exact source, run, objective, module, bundle,
+policy, owner, predecessor, budget and proposed action. Assess it through
+`scripts/continuation_state.py` with current controller/repository observations,
+a separately sourced trusted grant and an explicit as-of timestamp. Save both
+inputs and the assessment. Eligibility alone is not an effect grant. Unknown,
+ambiguous or interrupted attempts require controller reconciliation, and a
+duplicate request must not cause another dispatch. A fresh owner follows the
+same checks and retains the same authorized multi-epoch policy.
+
+Before any next epoch,
 complete the current epoch's required report, attestations, controller
 observations, and remaining evidence, and preserve them with the handoff.
 If authorized work remains, the next request is same-envelope, and valid
