@@ -1,0 +1,100 @@
+%%{init: {"theme":"base","themeVariables":{"background":"#ffffff","primaryColor":"#ffffff","primaryTextColor":"#000000","primaryBorderColor":"#000000","lineColor":"#000000","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","clusterBkg":"#ffffff","clusterBorder":"#000000","edgeLabelBackground":"#ffffff"},"flowchart":{"curve":"linear","htmlLabels":true}}}%%
+flowchart TB
+    subgraph ROUTING["Entry and resume skills"]
+        CW["continue-work<br/>MODIFY: validate durable resume state"]
+        WI["work-intake"]
+        HO["handoff"]
+        AL["autonomy-loop"]
+        EX["autonomous-execution-contract"]
+        WI -->|"unknown resume owner"| CW
+        CW -->|"no resumable state; bounded fallback"| WI
+        CW -->|"root handoff"| HO
+        CW -->|"active epic"| AL
+        WI -->|"new bounded epic"| AL
+        WI -->|"new single task"| EX
+        AL -->|"depends on: slice execution"| EX
+    end
+
+    subgraph CORE["Core MetaBuilder skills"]
+        MB["metabuilder"]
+        HD["metabuilder-harness-design<br/>MODIFY: validate input bindings"]
+        QU["metabuilder-consumer-qualification<br/>MODIFY: validate close and learning records"]
+        MB -->|"depends on: design workflow"| HD
+        MB -->|"depends on: qualification workflow"| QU
+        HD -->|"admitted bundle and design packet"| QU
+        QU -->|"design gap"| HD
+        QU -->|"epoch close"| NEXT["Handoff proposes the next epoch;<br/>existing delegation supplies authority"]
+        NEXT -->|"authorized continuation"| HD
+    end
+    MB -->|"when modifying MetaBuilder itself"| MAINT
+    WI -->|"new long-horizon work"| MB
+    CW -->|"qualification continuation"| HD
+    CW -->|"in-run recovery"| QU
+    HO -->|"recorded harness run or checkpoint"| QU
+
+    subgraph PREP["Supporting preparation skills"]
+        FG["frame-goals-constraints"]
+        GR["grilling"]
+        GM["grill-me"]
+        CH["define-operating-charter<br/>MODIFY: bind delegation to state"]
+        DAG["objective-to-dag-decomposition"]
+        GM -->|"alias for"| GR
+    end
+    FG -->|"product thesis when applicable"| HD
+    GR -->|"resolved questions and evidence"| HD
+    CH -->|"ratified authority and budgets"| HD
+    DAG -->|"execution and verification DAG"| HD
+
+    subgraph REVIEW["Supporting review skills and existing entities"]
+        CA["check-antipatterns"]
+        AN["analyze-conversation"]
+        PM["postmortem"]
+        LR["Learning records<br/>EXISTING artifact schema"]
+        CLI["MetaBuilder CLI and controller<br/>RUNTIME, not a skill"]
+        REG["Skill contracts and recipe<br/>EXISTING registry"]
+        MAINT["metabuilder-rust-functional-core<br/>Repository-local maintainer skill"]
+        CA -->|"completed-session review"| AN
+        CA -->|"findings"| LR
+        AN -->|"findings"| LR
+        PM -->|"incident findings"| LR
+        REG -->|"declares phase inputs and outputs"| HD
+    end
+    QU -->|"report for optional review"| CA
+    QU -->|"failure evidence for optional retrospective"| PM
+    HD -->|"depends on: compile and admission"| CLI
+    QU -->|"depends on: execution and observations"| CLI
+
+    subgraph PROPOSED["Proposed additions: components, not new skills"]
+        STATE["NEW: continuation-state schema and validator<br/>identity, owner, grant, budget, next action"]
+        LOCK["NEW: composition lock and edge validator<br/>versions, schemas, producer digests"]
+        INGEST["NEW: learning-record ingestion adapter<br/>validated records into retrospectives"]
+        SUITE["NEW: live continuation qualification suite<br/>resume, renewal, refusal and completion"]
+    end
+    CW -.->|"would depend on"| STATE
+    CH -.->|"would bind delegation into"| STATE
+    QU -.->|"would validate emitted state with"| STATE
+    HD -.->|"would validate consumed state with"| STATE
+    HD -.->|"would depend on"| LOCK
+    LOCK -.->|"would validate and pin"| REG
+    QU -.->|"would depend on"| INGEST
+    INGEST -.->|"would consume"| LR
+    SUITE -.->|"would exercise across fresh sessions"| CW
+    SUITE -.->|"would verify controller-backed chaining"| QU
+
+    subgraph LEGEND["Legend"]
+        L1["Existing component"]
+        L2["MODIFY: proposed further change"]
+        L3["NEW: proposed addition"]
+        L4["Solid: current relationship<br/>Dashed: proposed relationship<br/>Thick border: primary orchestration skill"]
+    end
+
+    classDef existing fill:#ffffff,stroke:#000000,stroke-width:1.5px,color:#000000;
+    classDef major fill:#ffffff,stroke:#000000,stroke-width:3px,color:#000000;
+    classDef modify fill:#ffffff,stroke:#e07000,stroke-width:3px,color:#000000;
+    classDef proposed fill:#ffffff,stroke:#16803c,stroke-width:3px,color:#000000;
+    classDef note fill:#fff8db,stroke:#000000,stroke-width:1.5px,color:#000000;
+    class WI,HO,EX,FG,GR,GM,DAG,CA,AN,PM,LR,CLI,REG,MAINT,L1,L4 existing;
+    class NEXT note;
+    class MB,AL major;
+    class CW,HD,QU,CH,L2 modify;
+    class STATE,LOCK,INGEST,SUITE,L3 proposed;
