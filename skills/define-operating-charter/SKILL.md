@@ -129,6 +129,16 @@ target writes — is never delegated and always returns to the principal.
 Each qualification close's continuation handoff records its budget
 accounting against this clause.
 
+For machine-readable continuation, bind the grant to the campaign, objective,
+source/target scope, policy digest and delegated owner, with explicit budget,
+renewal checkpoint, expiry and revocation fields. The owner supplies the trusted
+grant separately from a proposed `references/continuation-state.schema.json`
+state. Its read-only validator consumes an explicit as-of time and current
+controller observations; a matching actor label or digest is not authentication.
+State what proves a completed checkpoint and who reconciles Unknown outcomes.
+Finite test batches may exercise renewal without replacing the real campaign's
+grant. Completion removes the next action; a report checkpoint alone does not.
+
 ## Output contract
 
 Produce a compact but complete charter with these sections:

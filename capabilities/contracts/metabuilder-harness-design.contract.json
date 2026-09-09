@@ -3,8 +3,8 @@
   "unit": {
     "phase_id": "design-harness",
     "skill": "metabuilder-harness-design",
-    "semantic_version": "1.0.1",
-    "guidance_digest": "94a259549ba40ede50ef56b7bd32ef2c01319934ba1572be2408e98e69a1d7dd"
+    "semantic_version": "1.1.0",
+    "guidance_digest": "9777298d85a548e2838304a0b2248e7019f77ef50dcbeecef445e487984b0303"
   },
   "inputs": [
     {
@@ -43,7 +43,16 @@
       "epistemic_class": "artifact",
       "required": false,
       "cardinality": "zero-or-one",
-      "schema_digest": null
+      "schema_digest": "740a656e490f038e09bcf54df25b6fde90d1ce9bc25d4da8441e7b75a1464519",
+      "schema_path": "../../references/continuation-state.schema.json"
+    },
+    {
+      "name": "routing_context",
+      "epistemic_class": "diagnostic",
+      "required": false,
+      "cardinality": "zero-or-one",
+      "schema_path": "../ports/routing-diagnostic.schema.json",
+      "schema_digest": "13045567de1dfc1a9c8c74775d037de10200ef1633fad01d2a35ec3687e33026"
     }
   ],
   "outputs": [
@@ -51,7 +60,9 @@
       "name": "design_packet",
       "epistemic_class": "claim",
       "cardinality": "one",
-      "artifact_kind": "brief + intent source + module + bundle identities + stop decisions"
+      "artifact_kind": "brief + intent source + module + bundle identities + stop decisions",
+      "schema_path": "../ports/design-packet.schema.json",
+      "schema_digest": "a0b8df7148f95b75e8d1258919e41ea4f059e144ff9acc49ebe3d68824c579dc"
     }
   ],
   "preconditions": {

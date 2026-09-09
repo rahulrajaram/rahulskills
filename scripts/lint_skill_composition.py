@@ -15,6 +15,11 @@ import sys
 import tomllib
 from pathlib import Path
 
+try:
+    from .composition_lock import create_lock
+except ImportError:
+    from composition_lock import create_lock
+
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS_DIR = ROOT / "capabilities" / "contracts"
 RECIPES_DIR = ROOT / "capabilities" / "recipes"
@@ -31,7 +36,7 @@ REQUIRED_TOP = [
     "failures", "effects", "determinism", "resources", "authority",
     "evidence", "compatibility",
 ]
-INPUT_CLASSES = {"artifact", "observation", "claim", "human_decision"}
+INPUT_CLASSES = {"artifact", "observation", "claim", "human_decision", "diagnostic"}
 OUTPUT_CLASSES = {"claim", "diagnostic", "controller_evidence", "rendering"}
 CARDINALITY = {"one", "zero-or-one", "many"}
 FAILURE_TYPES = {"invalid_input", "denied_effect", "conclusive_failure",
@@ -246,6 +251,11 @@ def main() -> int:
 
     for path in sorted(RECIPES_DIR.glob("*.recipe.json")):
         lint_recipe(path, contracts, set(skills), errors, warnings)
+        if "selected_roles" in load_json(path):
+            admission = create_lock(path, CATALOG, CONTRACTS_DIR,
+                                    CONTRACTS_DIR / "skill-contract.schema.json")
+            errors.extend(f"{path.name}: {issue.code} at {issue.path}: {issue.message}"
+                          for issue in admission.issues)
 
     lint_catalog(skills, errors, warnings)
 

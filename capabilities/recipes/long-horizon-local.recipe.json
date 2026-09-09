@@ -7,51 +7,73 @@
   "required_roles": [
     {
       "role": "horizon_intake",
-      "resolve_to": ["classify-work-horizon"]
+      "resolve_to": [
+        "classify-work-horizon"
+      ]
     },
     {
       "role": "product_thesis",
-      "resolve_to": ["frame-goals-constraints"],
+      "resolve_to": [
+        "frame-goals-constraints"
+      ],
       "optional": true,
       "when": "the objective is a product or platform direction, not a pure repair"
     },
     {
       "role": "decision_grilling",
-      "resolve_to": ["grilling"],
-      "alternatives": ["grill-me"],
+      "resolve_to": [
+        "grilling"
+      ],
+      "alternatives": [
+        "grill-me"
+      ],
       "optional": true,
       "when": "material questions remain that preparation artifacts and the design workflow's own grilling do not already cover"
     },
     {
       "role": "charter",
-      "resolve_to": ["define-operating-charter"],
+      "resolve_to": [
+        "define-operating-charter"
+      ],
       "optional": true,
       "when": "the campaign introduces a new orchestrator/harness operating envelope or changes authority"
     },
     {
       "role": "decomposition",
-      "resolve_to": ["objective-to-dag-decomposition"],
+      "resolve_to": [
+        "objective-to-dag-decomposition"
+      ],
       "optional": true,
       "when": "the objective does not already carry an accepted execution DAG"
     },
     {
       "role": "harness_design",
-      "resolve_to": ["design-harness"]
+      "resolve_to": [
+        "design-harness"
+      ]
     },
     {
       "role": "qualification",
-      "resolve_to": ["qualify-harness"]
+      "resolve_to": [
+        "qualify-harness"
+      ]
     },
     {
       "role": "independent_review",
-      "resolve_to": ["check-antipatterns"],
-      "alternatives": ["analyze-conversation"],
+      "resolve_to": [
+        "check-antipatterns"
+      ],
+      "alternatives": [
+        "analyze-conversation"
+      ],
       "optional": true,
       "when": "a review/self-improvement loop is part of the campaign"
     },
     {
       "role": "retrospective",
-      "resolve_to": ["postmortem"],
+      "resolve_to": [
+        "postmortem"
+      ],
       "optional": true,
       "when": "a campaign failure or material gap needs a durable learning record"
     }
@@ -61,7 +83,7 @@
       "from": "classify-work-horizon",
       "output": "routing_decision",
       "to": "design-harness",
-      "input": "objective_request",
+      "input": "routing_context",
       "note": "routing line is recorded context, not an effect grant"
     },
     {
@@ -106,7 +128,12 @@
       "output": "continuation_handoff",
       "to": "design-harness",
       "input": "continuation_handoff",
-      "note": "Continuation returns directly to design under valid same-envelope delegation and renewal policy; cross-shell discovery belongs to continue-work. The handoff cites the proposed objective and authority; it is not a fresh effect grant or horizon classification."
+      "note": "Continuation returns directly to design under valid same-envelope delegation and renewal policy; cross-shell discovery belongs to continue-work. The handoff cites the proposed objective and authority; it is not a fresh effect grant or horizon classification.",
+      "kind": "lifecycle_backedge",
+      "termination": {
+        "max_epochs": 4,
+        "proof": "Each completed epoch consumes one unit of the admitted batch. At four, stop or apply an already-ratified renewal after report verification; completion removes the next action. The lock never grants renewal."
+      }
     }
   ],
   "completeness_checks": [
@@ -120,5 +147,10 @@
     "stop if any phase boundary cannot be stated without mixing effects or authority",
     "stop at unratified effect widening; prepare the exact request and hold only dependent work",
     "zero tolerance for unauthorized effects, replay mismatch, forged or stale admission, or blind Unknown redispatch"
+  ],
+  "selected_roles": [
+    "horizon_intake",
+    "harness_design",
+    "qualification"
   ]
 }

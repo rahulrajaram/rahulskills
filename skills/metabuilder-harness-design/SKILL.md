@@ -110,6 +110,25 @@ digest must be recomputed and recorded in the prepared brief.
 
 ## Workflow
 
+When using the repository's contract recipe, resolve required roles and explicitly
+selected optional roles, then create a composition lock with
+`scripts/composition_lock.py create --recipe RECIPE --catalog CATALOG
+--contracts CONTRACTS_DIR --schema CONTRACT_SCHEMA --output LOCK`. Retain the
+lock with the design packet. Recreate it from current files and check the saved
+lock against it before reuse. Missing typed bindings, incompatible ports, or a
+changed identity require resolution and review; never fill a schema digest with
+an arbitrary value. A lifecycle backedge must declare its finite bound and
+termination condition. The lock checks declared compatibility, not authority or
+the semantic truth of an artifact. Intake routing remains a diagnostic input;
+the objective and construction approval come from their named owners.
+
+For typed handoffs, use `capabilities/ports/design-packet.schema.json` to bind
+the agreed brief, module and admitted bundle digests and their evidence paths.
+A continuation-state input additionally requires the read-only assessment
+described in `scripts/continuation_state.py`, using separately inspected current
+observations and a trusted owner grant. Reconcile uncertain attempts before
+dispatch; a valid same-envelope renewal does not require another approval.
+
 1. Establish the requester, consumer, product decision owner, technical owner,
    controller, required approvers, exact target repository, objective, and
    explicit stop conditions.

@@ -92,6 +92,20 @@ do not manufacture work after the objective is complete.
 
 ## Conflict and staleness rules
 
+For a campaign carrying `continuation-state.json`, discovery passes that file
+and its provenance to the selected owner. The owner runs the repository's
+`scripts/continuation_state.py --state STATE --observation OBSERVATION
+--grant GRANT --as-of RFC3339` before dependent execution. Observations must
+come from current repository/controller inspection and the grant from the
+trusted owner binding, separately from the proposed state. A successful
+assessment is eligibility only; it neither grants authority nor dispatches.
+Unknown or ambiguous attempts return to controller reconciliation; duplicate,
+stale, terminal, revoked, expired or exhausted state cannot start another action.
+Preserve the existing policy, including permitted renewal, across fresh sessions.
+Legacy prose handoffs still route to their owner, which validates their decisive
+facts and prepares typed state when using this contract; absence of the new
+format alone must not erase existing authorization or restart intake.
+
 The newer explicit instruction wins: live request over handoff artifact
 over plan over memory. Handoff facts, branch claims, and completion
 claims are hints — validate the decisive one (branch/HEAD, run state,
