@@ -1,6 +1,6 @@
 ---
 name: metabuilder
-description: "Use MetaBuilder to design, agree, compile, inspect, run, qualify, recover, or improve a governed engineering harness. This is the global entry point for building a new harness in an arbitrary target repository and routes fresh design through metabuilder-harness-design before metabuilder-consumer-qualification."
+description: "Use MetaBuilder to design, agree, compile, inspect, run, qualify, recover, or improve a governed engineering harness. This is the global entry point for building a new harness in an arbitrary target repository and routes fresh design through metabuilder-harness-design before metabuilder-consumer-qualification, while routing existing-harness repair through metabuilder-harness-improvement."
 ---
 
 # Use MetaBuilder
@@ -73,6 +73,19 @@ Use the companion skills as the detailed operating procedures:
 5. When modifying MetaBuilder itself, use the repository-local
    `metabuilder-rust-functional-core` skill and repository authority. That
    maintainer discipline is not part of a target project's consumer workflow.
+6. For an epoch effectiveness assessment or improvement diagnosis, follow
+   [metabuilder-assess](../metabuilder-assess/SKILL.md). It consumes existing
+   evidence and recommends an owner, change, and validation method.
+7. For `$metabuilder repair existing harness`, read and follow
+   [metabuilder-harness-improvement](../metabuilder-harness-improvement/SKILL.md).
+   It owns same-objective repair, prior qualification evidence, gap
+   classification, bounded candidate revision, and matched requalification.
+   Use `metabuilder-assess` as the assessor when the selected workflow calls for
+   that role. Route a missing generic capability to `metabuilder-assess`, a
+   missing qualification baseline to
+   `metabuilder-consumer-qualification`, and a changed brief/objective to
+   `metabuilder-harness-design` with lineage preserved. Do not invent runtime
+   assessment flags; inspect the current runtime scaffold.
 
 Design states what should be tested. The Harness Module commits to executable
 checks. Qualification records what the controller observed and leaves semantic

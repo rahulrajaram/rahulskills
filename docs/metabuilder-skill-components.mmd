@@ -16,13 +16,25 @@ flowchart TB
     end
 
     subgraph CORE["Core MetaBuilder skills"]
-        MB["metabuilder"]
+        MB["metabuilder<br/>MODIFIED: assessment and repair routing"]
+        AS["metabuilder-assess<br/>NEW: evidence-based epoch assessment"]
+        HI["metabuilder-harness-improvement<br/>NEW: global repair adapter"]
+        LOCALHI["metabuilder-harness-improvement<br/>Existing repository-local workflow"]
+        MB -->|"assessment request"| AS
+        MB -->|"repair existing harness"| HI
+        HI -->|"depends on: authoritative repair lifecycle"| LOCALHI
+        QU -->|"epoch evidence"| AS
+        AS -->|"same-objective harness shortfall"| HI
+        AS -->|"changed objective"| HD
+        AS -->|"runtime capability gap"| MAINT
+        AS -->|"advisory recommendation; no authority grant"| NEXT
+        HI -->|"matched requalification"| QU
         HD["metabuilder-harness-design<br/>MODIFIED: validate input bindings"]
         QU["metabuilder-consumer-qualification<br/>MODIFIED: validate close and learning records"]
         MB -->|"depends on: design workflow"| HD
         MB -->|"depends on: qualification workflow"| QU
         HD -->|"admitted bundle and design packet"| QU
-        QU -->|"design gap"| HD
+        QU -->|"changed objective"| HD
         QU -->|"epoch close"| NEXT["Handoff proposes the next epoch;<br/>existing delegation supplies authority"]
         NEXT -->|"authorized continuation"| HD
     end
@@ -100,7 +112,12 @@ flowchart TB
     classDef note fill:#fff8db,stroke:#000000,stroke-width:1.5px,color:#000000;
     class WI,HO,EX,FG,GR,GM,DAG,CA,AN,PM,LR,CLI,REG,MAINT,L1,L4 existing;
     class NEXT note;
-    class MB,AL major;
-    class CW,HD,QU,CH,L2 modify;
+    class AL major;
+    class MB,CW,HD,QU,CH,L2 modify;
     class STATE,LOCK,INGEST,SUITE,CR,L3 proposed;
-    class RP existing;
+    class RP,LOCALHI existing;
+    class AS,HI proposed;
+    AS -->|"selected session analysis"| CA
+    AS -->|"selected durable retrospective"| AN
+    AS -->|"selected source review"| CR
+    AS -->|"consumes"| LR
