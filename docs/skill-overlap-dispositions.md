@@ -47,7 +47,9 @@ decision; a stale cited artifact is not valid reuse.
 | `autonomy-loop` governed profile → MetaBuilder | router (new) | When an epic is long-horizon, the governed runtime is the MetaBuilder lifecycle; the loop consumes controller receipts rather than reconstructing them. |
 | `handoff` ↔ MetaBuilder checkpoints | boundary (new) | In-run recovery belongs to harness durable attempts; `handoff` owns human cross-shell resume and records harness run/checkpoint identities for re-entry. |
 | `metabuilder-consumer-qualification` → `metabuilder-harness-design` | producer-consumer (new) | Every close emits a continuation handoff (leftover checkpoint + proposed next ObjectiveRequest + envelope class + delegation budget accounting). Same-envelope handoffs with budget remaining return directly to design; cross-shell discovery belongs to `continue-work`; exhaustion or expansion exits to the principal. Batch size M and renewal policy are fixed once in the charter's continuation standing delegation. |
-| `check-antipatterns` → `analyze-conversation` | router | Completed sessions route to retrospective analysis. |
+| `check-antipatterns` → `analyze-conversation` | router | Focused session-execution checks stay with check-antipatterns, including completed sessions. A requested durable retrospective report routes to analyze-conversation. |
+| `check-antipatterns` → `code-review` | distinct use cases | Explicit source-code review routes to code-review; session execution inspection does not acquire a source-audit phase. |
+| `code-review` → local codereview package | consumer adapter | Select only needed perspectives and stages; package protocols, source bindings and controller receipts govern completed reviews. Full epoch review is opt-in. |
 | `clean-code-refine` ↔ `fp-refine` | router | Mutual routing with veto, unchanged. |
 | `system-memory-audit` → `memleak-investigate` | router | Named-process longitudinal analysis routes onward. |
 | `humanize` ← `frame-goals-constraints` | producer-consumer | The thesis is the explicit semantic source. |

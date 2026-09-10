@@ -66,7 +66,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (52)
+### Package-managed skills (53)
 
 Authored in this package and available for explicit selection on Pi, Codex, and
 Claude Code. The default `core` profile omits the optional design skills
@@ -79,9 +79,10 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `archdiagram` | Generate architecture diagrams from context or codebase |
 | `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |
 | `autonomy-loop` | Drive an epic as a principal-architect loop with bounded execution and controlled reactor chaining |
-| `check-antipatterns` | Read-only transcript anti-pattern checks plus evidence-backed review of active code changes |
+| `check-antipatterns` | Inspect agent-session execution for evidence-backed antipatterns and course corrections |
 | `clear-writing` | Edit dense, awkward, repetitive, or AI-generated prose into clear, direct, readable writing as an editor, not a ghostwriter; default and grill modes |
 | `clean-code-refine` | Review or refactor code across behavior, idiom, size, complexity, dataflow, testability, and simplicity |
+| `code-review` | Run focused evidence-led source reviews through the existing codereview package, selecting only needed perspectives and workflow stages |
 | `commit` | Smart commit with file triage, artifact filtering, and secret detection |
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
 | `define-operating-charter` | Define and ratify authority, lifecycle, evidence, and stop rules for long-running agentic systems |

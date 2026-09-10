@@ -46,20 +46,25 @@ flowchart TB
     DAG -->|"execution and verification DAG"| HD
 
     subgraph REVIEW["Supporting review skills and existing entities"]
-        CA["check-antipatterns"]
+        CA["check-antipatterns<br/>Agent-session execution review"]
+        CR["code-review<br/>Selected source-review perspectives"]
+        RP["codereview package<br/>Review protocol and evidence adapters"]
         AN["analyze-conversation"]
         PM["postmortem"]
         LR["Learning records<br/>EXISTING artifact schema"]
         CLI["MetaBuilder CLI and controller<br/>RUNTIME, not a skill"]
         REG["Skill contracts and recipe<br/>EXISTING registry"]
         MAINT["metabuilder-rust-functional-core<br/>Repository-local maintainer skill"]
-        CA -->|"completed-session review"| AN
+        CA -->|"durable retrospective when requested"| AN
+        CR -->|"depends on: selected review operations"| RP
+        CR -->|"source findings"| LR
         CA -->|"findings"| LR
         AN -->|"findings"| LR
         PM -->|"incident findings"| LR
         REG -->|"declares phase inputs and outputs"| HD
     end
-    QU -->|"report for optional review"| CA
+    QU -->|"report context plus bound source for optional code review"| CR
+    QU -->|"session evidence for optional execution review"| CA
     QU -->|"failure evidence for optional retrospective"| PM
     HD -->|"depends on: compile and admission"| CLI
     QU -->|"depends on: execution and observations"| CLI
@@ -97,4 +102,5 @@ flowchart TB
     class NEXT note;
     class MB,AL major;
     class CW,HD,QU,CH,L2 modify;
-    class STATE,LOCK,INGEST,SUITE,L3 proposed;
+    class STATE,LOCK,INGEST,SUITE,CR,L3 proposed;
+    class RP existing;

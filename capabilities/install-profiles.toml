@@ -10,6 +10,7 @@ core = [
   "autonomy-loop",
   "check-antipatterns",
   "clean-code-refine",
+  "code-review",
   "clear-writing",
   "commit",
   "continue-work",
