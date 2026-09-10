@@ -66,7 +66,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (53)
+### Package-managed skills (55)
 
 Authored in this package and available for explicit selection on Pi, Codex, and
 Claude Code. The default `core` profile omits the optional design skills
@@ -104,6 +104,8 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `max-columns` | Keep output within a user-specified column width |
 | `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
 | `metabuilder` | Define, compile, inspect, run, recover, and improve governed MetaBuilder harnesses |
+| `metabuilder-assess` | Assess epoch evidence and route justified improvements to the owning workflow |
+| `metabuilder-harness-improvement` | Repair an existing harness against the same objective and requalify it through the MetaBuilder package |
 | `metabuilder-consumer-qualification` | Run and assess an already designed consumer harness without conflating controller evidence with product judgment |
 | `metabuilder-harness-design` | Turn a target objective into an agreed brief and typed MetaBuilder harness design |
 | `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |

@@ -174,7 +174,17 @@ dispatch; a valid same-envelope renewal does not require another approval.
    or authority: requirements state the claims; `evidence_actions` name the
    exact checks; actions declare direct argv, cwd, toolchain, timeout, inputs,
    outputs, and auxiliary-directory digests; the workflow preserves the
-   approved topology; bounds and retrospectives are explicit. The source
+   approved topology; bounds and retrospectives are explicit. Include the
+   current epoch assessment template in every new harness, including one-shot
+   work. It consumes the existing retrospective evidence, selects assessment
+   depth to fit observed risk and uncertainty, and records a justified
+   improvement or no-change recommendation plus advisory stop, continue, or
+   seek-authority guidance. Bind the actual template supported by the package;
+   do not silently fall back to a legacy template that lacks this contract.
+   `metabuilder-assess` supplies the assessment procedure. Recommendations
+   cannot grant effects or continuation. Failure, interruption, and Unknown
+   remain incomplete and must not be closed with a fabricated success record.
+   The source
    language itself never contains commands, providers, credentials, or grants.
 8. Preflight every requested effect against current MetaBuilder enforcement.
    Prefer the read-only Linux-local consumer profile. If a requirement needs an

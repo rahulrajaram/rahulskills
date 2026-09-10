@@ -318,7 +318,25 @@ effect = "local-write"
 effects = ["readonly", "local-process", "local-write"]
 approval_boundaries = ["target-write", "network", "credential-use", "dependency-install", "external-state", "provider-dispatch"]
 layer = "composer"
-overlaps = ["metabuilder-harness-design", "metabuilder-consumer-qualification"]
+overlaps = ["metabuilder-harness-design", "metabuilder-consumer-qualification", "metabuilder-assess", "metabuilder-harness-improvement"]
+overlap_kind = "router"
+
+[skills.metabuilder-assess]
+commands = ["metabuilder"]
+effect = "local-write"
+effects = ["readonly", "local-process", "local-write"]
+approval_boundaries = ["target-write", "network", "credential-use", "external-state", "provider-dispatch"]
+layer = "workflow"
+overlaps = ["metabuilder", "metabuilder-consumer-qualification", "metabuilder-harness-improvement", "check-antipatterns", "analyze-conversation", "code-review"]
+overlap_kind = "producer-consumer"
+
+[skills.metabuilder-harness-improvement]
+commands = ["metabuilder"]
+effect = "local-write"
+effects = ["readonly", "local-process", "local-write"]
+approval_boundaries = ["target-write", "network", "credential-use", "dependency-install", "external-state", "provider-dispatch"]
+layer = "workflow"
+overlaps = ["metabuilder", "metabuilder-assess", "metabuilder-harness-design", "metabuilder-consumer-qualification"]
 overlap_kind = "router"
 
 [skills.metabuilder-consumer-qualification]

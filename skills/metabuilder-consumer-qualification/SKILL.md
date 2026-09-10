@@ -65,6 +65,21 @@ A model's assessment or a passing report cannot supply human ratification.
   semantics and do not trigger a failed-attempt retrospective. Only referenced
   built-in templates are embedded.
 
+At each epoch close, use `metabuilder-assess` to consume the exact run's
+retrospectives and qualification evidence. New harnesses include a typed epoch
+assessment; obtain its actual shape from `run retrospectives scaffold` and
+record it through the existing intervention route. Select only the review
+depth and evidence needed, then give a justified improvement or no-change
+recommendation and advisory stop/continue/seek-authority guidance. A legacy
+run may lack the typed assessment: report that limit without rewriting its
+history. For failed, interrupted, or Unknown execution, assess the available
+evidence as incomplete outside a successful-stage record; preserve the
+controller blocker and recovery rules. Recommendations do not supply proof,
+grants, or permission for another epoch. Continue through the owning workflow
+when existing authority covers it, without an extra approval per epoch.
+Same-objective harness shortfalls route to `metabuilder-harness-improvement`;
+changed objectives route to design with their prior evidence preserved.
+
 The v1 qualification profile is intentionally narrow: the current Linux host,
 local sandboxed commands, read-only target source, no credentials, no network,
 no external-state or target-source writes, no telemetry, and consumer-owned

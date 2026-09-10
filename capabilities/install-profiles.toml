@@ -32,6 +32,8 @@ core = [
   "max-columns",
   "memleak-investigate",
   "metabuilder",
+  "metabuilder-assess",
+  "metabuilder-harness-improvement",
   "metabuilder-consumer-qualification",
   "metabuilder-harness-design",
   "next-todos",
