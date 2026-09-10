@@ -61,13 +61,10 @@
     {
       "role": "independent_review",
       "resolve_to": [
-        "check-antipatterns"
-      ],
-      "alternatives": [
-        "analyze-conversation"
+        "code-review"
       ],
       "optional": true,
-      "when": "a review/self-improvement loop is part of the campaign"
+      "when": "source-code review is selected for the campaign; bind the source revision, objective and only the needed perspectives"
     },
     {
       "role": "retrospective",
@@ -119,9 +116,9 @@
     {
       "from": "qualify-harness",
       "output": "qualification_report",
-      "to": "check-antipatterns",
-      "input": "campaign_artifacts",
-      "note": "review loop consumes the report; findings route to the learning record"
+      "to": "code-review",
+      "input": "review_context",
+      "note": "qualification report supplies context only; code-review separately binds target source, scope and selected perspectives; findings remain review claims"
     },
     {
       "from": "qualify-harness",

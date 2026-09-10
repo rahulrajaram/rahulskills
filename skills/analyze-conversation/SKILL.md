@@ -1,6 +1,6 @@
 ---
 name: analyze-conversation
-description: "Analyze a completed conversation retrospectively for anti-patterns, tooling gaps, and durable learnings, then generate a markdown report. Use for postmortems of finished sessions or when the user explicitly says /analyze-conversation. Do not use for live, in-progress checks; use check-antipatterns instead."
+description: "Analyze a completed conversation retrospectively for anti-patterns, tooling gaps, and durable learnings, then generate a markdown report. Use for retrospective reports on finished sessions or when the user explicitly says /analyze-conversation. For a focused execution-antipattern check of a given session, use check-antipatterns."
 argument-hint: "[conversation-id]"
 ---
 

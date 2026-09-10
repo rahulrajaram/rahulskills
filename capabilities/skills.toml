@@ -146,9 +146,6 @@ effect = "local-write"
 commands = ["git"]
 optional_commands = ["gh"]
 
-[skills.check-antipatterns.modes.source]
-effect = "readonly"
-
 [skills.check-antipatterns.modes.transcript]
 effect = "readonly"
 commands = ["python3"]
@@ -158,6 +155,30 @@ commands = ["python3"]
 effect = "local-process"
 effects = ["local-process", "audio-output"]
 layer = "workflow"
+
+[skills.code-review]
+platforms = ["linux"]
+commands = ["python3", "git"]
+optional_commands = ["opencode"]
+effect = "local-write"
+effects = ["readonly", "local-write", "local-process", "external-call"]
+approval_boundaries = ["provider-execution", "source-snapshot", "installation"]
+layer = "composer"
+
+[skills.code-review.modes.import]
+commands = ["python3"]
+effect = "local-write"
+effects = ["readonly", "local-write"]
+
+[skills.code-review.modes.native]
+commands = ["python3", "git"]
+effect = "local-write"
+effects = ["readonly", "local-write", "local-process"]
+
+[skills.code-review.modes.opencode]
+commands = ["python3", "git", "opencode"]
+effect = "external-call"
+effects = ["readonly", "local-write", "local-process", "external-call"]
 
 [skills.check-antipatterns]
 effect = "readonly"
