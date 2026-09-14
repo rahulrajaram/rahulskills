@@ -1,7 +1,8 @@
 ---
 name: analyze-conversation
-description: "Analyze a completed conversation retrospectively for anti-patterns, tooling gaps, and durable learnings, then generate a markdown report. Use for retrospective reports on finished sessions or when the user explicitly says /analyze-conversation. For a focused execution-antipattern check of a given session, use check-antipatterns."
+description: "Analyze a completed conversation retrospectively for anti-patterns, tooling gaps, and durable learnings, then generate a markdown report. Use for postmortems of finished sessions or when the user explicitly says /analyze-conversation. Do not use for live, in-progress checks; use check-antipatterns instead."
 argument-hint: "[conversation-id]"
+allowed-tools: "Bash(python3:*)"
 ---
 
 # Conversation Analyzer
@@ -32,6 +33,30 @@ python ~/.codex/skills/analyze-conversation/generate_report.py --id <conversatio
 python ~/.codex/skills/analyze-conversation/generate_report.py <conversation-jsonl>
 ```
 
+### opencode runtime (SQLite sessions)
+
+opencode stores sessions in SQLite (`~/.local/share/opencode/opencode.db`),
+not JSONL. Use the `--opencode` flag; the selected session is exported to
+the normalized shape and analyzed by the standard pipeline. The analyzed
+session identity is printed in the output — never assume which session ran.
+
+```bash
+# most recently updated opencode session
+python ~/.claude/skills/analyze-conversation/generate_report.py --opencode
+
+# by session id or slug (exact, then substring match)
+python ~/.claude/skills/analyze-conversation/generate_report.py --opencode <session-id-or-slug>
+
+# list candidate sessions
+python ~/.claude/skills/analyze-conversation/opencode_adapter.py --list
+```
+
+Adapter: `opencode_adapter.py` (exports message+part rows to normalized
+JSONL: text parts → text items, tool parts → tool-call items with bash
+commands; reasoning/step parts omitted for Codex-parity). Sessions that
+export zero supported messages are refused with an explicit error rather
+than producing an empty report.
+
 Other runtimes may install the same scripts beside their own manifest; invoke
 the script from the active skill directory.
 
@@ -54,10 +79,6 @@ The selected directory is created on first successful run.
 Treat `check-antipatterns/rules.json` as the canonical live rule taxonomy when
 both skills are installed. This retrospective may add longitudinal and tooling
 findings, but it must not redefine the shared rule meanings.
-
-Findings that warrant durable follow-up are emitted as learning records in the
-shared shape (`references/learning-record.schema.json`); a MetaBuilder campaign
-retrospective or the friction ledger consumes them from there.
 
 ## What It Analyzes
 
