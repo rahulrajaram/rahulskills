@@ -995,6 +995,53 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 2 and sys.argv[1] == "--opencode":
+        # opencode runtime: sessions live in SQLite, not JSONL. Export the
+        # selected session to a temp normalized transcript, then reuse the
+        # standard pipeline. The exported session identity is printed loudly
+        # so the analyzed session is never ambiguous.
+        import tempfile
+
+        from opencode_adapter import export_session, default_db
+
+        selector = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("--") else None
+        db_override = None
+        if "--db" in sys.argv:
+            db_override = Path(sys.argv[sys.argv.index("--db") + 1])
+        db_path = db_override or default_db()
+        if not db_path.exists():
+            print(f"error: opencode.db not found at {db_path}", file=sys.stderr)
+            sys.exit(1)
+        identity = {}
+        with tempfile.TemporaryDirectory() as tmp:
+            slug = "session"
+            try:
+                pre = export_session(db_path, selector, Path(tmp) / "probe.jsonl")
+                slug = pre["slug"]
+            except SystemExit as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                sys.exit(1)
+            except Exception as exc:
+                print(f"error: opencode export failed: {exc}", file=sys.stderr)
+                sys.exit(1)
+            out_path = Path(tmp) / f"{pre['id']}_{slug}.jsonl"
+            identity = export_session(db_path, selector, out_path)
+            if identity["messages"] == 0:
+                print(
+                    "error: selected session exported zero supported messages "
+                    "(empty or unsupported input) — refusing to emit a report",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            print(
+                f"Analyzing opencode session {identity['id']} ({identity['slug']}): "
+                f"{identity['title']}"
+            )
+            output_file = generate_markdown_report(str(out_path))
+        print("\nRetrospective analysis complete!")
+        print(f"Report: {output_file}")
+        sys.exit(0)
+
     if len(sys.argv) < 2:
         conversation_file = find_conversation_file()
 
