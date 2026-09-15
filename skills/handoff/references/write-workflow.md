@@ -82,6 +82,21 @@ layout.
 
 ## 6. Verify and report
 
+Before reporting, validate the draft's negative claims against the filesystem
+(stale-claim class f-2030: an assertion that evidence is "still missing" while
+the artifacts already exist):
+
+```bash
+python3 "$SKILL_DIR/scripts/validate_handoff_claims.py" \
+  "$REPO_ROOT/NEXT_SHELL_PROMPT.md" --repo "$REPO_ROOT" --strict
+```
+
+- Every SUSPECT finding (a reported-missing path that exists) must be resolved
+  or rewritten before publishing.
+- UNRESOLVED evidence claims (no resolvable path) must gain the evidence path
+  or be rewritten as unverified.
+- Record the validator exit code in the handoff's verification section.
+
 Verify that the artifact:
 
 - exists at the repository root;

@@ -16,6 +16,16 @@ then write a verified continuation artifact; this mode includes commit triage.
 Read [references/write-workflow.md](references/write-workflow.md)
 completely and run the write workflow.
 
+## Claim verification (required)
+
+A handoff's negative claims ("missing", "not done", "still needs") are
+assertions about filesystem state and must be checked before publishing.
+Run `scripts/validate_handoff_claims.py <draft> --repo <root> --strict`
+as part of the write workflow: SUSPECT findings mean a path reported missing
+actually exists (stale-claim class, f-2030); UNRESOLVED evidence claims must
+gain their evidence path or be rewritten as unverified. Record the validator
+exit code in the handoff.
+
 ## Boundary with governed harness runs
 
 For work executing inside a MetaBuilder harness, in-run recovery belongs to
