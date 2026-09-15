@@ -91,6 +91,6 @@ Verify that the artifact:
   `NEXT_SHELL_PROMPT.md`.
 
 Return the commit hash and message (or no-op), canonical document status, the
-absolute artifact path, `$handoff extract`, and `$handoff print`. Also give Pi's
-equivalents: `/skill:handoff extract` and `/skill:handoff print`. Do not include
-the handoff document contents in the response.
+absolute artifact path, and `$handoff-extract` (or `print`). Also give Pi's
+equivalents: `/skill:handoff-extract` and `/skill:handoff-extract print`. Do
+not include the handoff document contents in the response.

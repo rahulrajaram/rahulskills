@@ -24,6 +24,7 @@ core = [
   "grill-me",
   "grilling",
   "handoff",
+  "handoff-extract",
   "humanize",
   "ideate",
   "install-commithooks",

@@ -289,8 +289,16 @@ commands = ["git"]
 effect = "local-write"
 effects = ["local-write"]
 layer = "composer"
-overlaps = ["commit"]
+overlaps = ["commit", "handoff-extract"]
 overlap_kind = "composer"
+
+[skills.handoff-extract]
+commands = ["git"]
+effect = "local-write"
+effects = ["local-write"]
+layer = "workflow"
+overlaps = ["handoff"]
+overlap_kind = "producer-consumer"
 
 [skills.install-commithooks]
 commands = ["git"]
