@@ -1,6 +1,6 @@
 ---
 name: continue-work
-description: "Single resume/continue entry point: find the most specific resumable state — handoff artifact, governed MetaBuilder campaign, active epic plan, or pinned human gate — and force the owning workflow (handoff extract, metabuilder continuation, autonomy-loop, or work-intake when nothing is resumable). Use when the user says continue, resume, keep going, next epoch/tranche, or re-enters a project mid-campaign."
+description: "Single resume/continue entry point: find the most specific resumable state — handoff artifact, governed MetaBuilder campaign, active epic plan, or pinned human gate — and force the owning workflow (handoff-extract, metabuilder continuation, autonomy-loop, or work-intake when nothing is resumable). Use when the user says continue, resume, keep going, next epoch/tranche, or re-enters a project mid-campaign."
 argument-hint: "[scope-or-repo-path]"
 ---
 
@@ -51,10 +51,10 @@ conditions (including exhaustion, expiry or revocation, envelope expansion,
 a reserved decision, recovery failure, or a ratified terminal milestone);
 do not manufacture work after the objective is complete.
 
-- Handoff artifact present → `handoff` extract mode. Its activation
+- Handoff artifact present → `handoff-extract`. Its activation
   protocol governs. If the artifact records harness run or checkpoint
   identities, re-enter through `metabuilder-consumer-qualification`
-  exactly as the handoff skill's boundary section directs.
+  exactly as the handoff-extract skill's boundary section directs.
 - Qualification continuation handoff → `metabuilder-harness-design`, already
   long-horizon and without re-classification. Carry the handoff's existing
   campaign scope, continuation policy, standing delegation, remaining budget,
@@ -109,7 +109,7 @@ format alone must not erase existing authorization or restart intake.
 The newer explicit instruction wins: live request over handoff artifact
 over plan over memory. Handoff facts, branch claims, and completion
 claims are hints — validate the decisive one (branch/HEAD, run state,
-open tranches) before acting; the handoff skill mandates this for
+open tranches) before acting; the handoff-extract skill mandates this for
 artifacts. A campaign whose plan shows all tranches complete and
 qualification closed is not resumable; return the same bounded
 `no_resumable_state` result to `work-intake`. When two
