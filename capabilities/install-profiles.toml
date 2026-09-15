@@ -51,6 +51,7 @@ core = [
   "skill-creator",
   "speak",
   "squash-commits",
+  "supervised-dispatch",
   "system-memory-audit",
   "test",
   "whitepaper",
