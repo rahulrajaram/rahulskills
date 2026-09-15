@@ -71,16 +71,18 @@ the authorized work.
    implementation, credential, tool-discovery, and destructive-operation
    checks inspect the full normalized transcript; retry and preflight checks
    inspect only the last `lookback` normalized messages.
-3. Interpret the output as prompts for evidence review. The five implemented
+3. Interpret the output as prompts for evidence review. The six implemented
    checks are `RETRY_WITHOUT_DIAGNOSIS`, `CREDENTIAL_ASSUMPTION`,
-   `MISSING_PREFLIGHT`, `TOOL_DISCOVERY_GAP`, and
-   `DESTRUCTIVE_OPERATION_WITHOUT_EXACT_GUARD`.
+   `MISSING_PREFLIGHT`, `TOOL_DISCOVERY_GAP`,
+   `DESTRUCTIVE_OPERATION_WITHOUT_EXACT_GUARD`, and
+   `IDLE_WITH_PENDING_WORK` (a turn that ends right after a non-blocking
+   supervised-task status probe instead of a terminal-event wait).
 4. Review the session sequence against the user's actual objective, grants and
    stop conditions: actions taken, evidence obtained, and claims made. Look for
    consequential execution failures such as repeated work without diagnosis,
    premature completion, lost authorization, unnecessary approval loops or
    scope drift where the transcript supports them. Separate this contextual
-   judgment from the five automated heuristics; a zero heuristic score does not
+   judgment from the six automated heuristics; a zero heuristic score does not
    establish good execution.
 5. Where needed, inspect nearby source or repository evidence solely to
    corroborate a recorded session action, keeping the result read-only and
@@ -100,7 +102,7 @@ Return the actual transcript path or runtime identity, source format, event and
 normalized-message counts, and the analyzed window. Include heuristic
 candidates with evidence locations, uncertainty, and a review step; observed
 practices; recommendations relevant to current execution; and the bounded
-heuristic signal score. The score is computed across the five implemented
+heuristic signal score. The score is computed across the six implemented
 checks only and is not a compliance, correctness, or completeness score.
 
 Never print credential values or other transcript secrets; retain the

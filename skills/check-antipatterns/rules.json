@@ -118,6 +118,13 @@
       "keywords": ["rm -rf", "find -delete", "git clean", "reset --hard", "rmtree"],
       "detection": "Destructive command detected; inspect prior authorization, target checks, and recovery rather than inferring missing guards",
       "severity": "HIGH"
+    },
+    {
+      "id": 7,
+      "rule": "Hold on a terminal-event wait instead of yielding mid-supervision",
+      "keywords": ["still running", "status", "supervised", "pending"],
+      "detection": "A supervised-task status probe was among the final actions before the turn ended; a blocking wait (events --follow / wait=true) is the correction",
+      "severity": "MEDIUM"
     }
   ],
   "interpretation": "Review heuristics, not independent authority. Confirm candidates against active instructions and prior authorization; absence of a keyword does not prove a missing check."
