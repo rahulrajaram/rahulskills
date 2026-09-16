@@ -116,6 +116,8 @@ optional_commands = ["overwatch"]
 effect = "local-process"
 effects = ["local-process"]
 layer = "workflow"
+overlaps = ["supervised-dispatch"]
+overlap_kind = "composer"
 
 [skills.markdown-to-pdf]
 commands = ["pandoc", "weasyprint"]
@@ -164,6 +166,8 @@ effect = "local-write"
 effects = ["readonly", "local-write", "local-process", "external-call"]
 approval_boundaries = ["provider-execution", "source-snapshot", "installation"]
 layer = "composer"
+overlaps = ["metabuilder-assess"]
+overlap_kind = "producer-consumer"
 
 [skills.code-review.modes.import]
 commands = ["python3"]
@@ -184,7 +188,7 @@ effects = ["readonly", "local-write", "local-process", "external-call"]
 effect = "readonly"
 effects = ["readonly"]
 layer = "primitive"
-overlaps = ["analyze-conversation"]
+overlaps = ["analyze-conversation", "metabuilder-assess"]
 overlap_kind = "router"
 
 [skills.analyze-conversation]
@@ -192,7 +196,7 @@ commands = ["python3"]
 effect = "local-write"
 effects = ["local-write"]
 layer = "workflow"
-overlaps = ["check-antipatterns"]
+overlaps = ["check-antipatterns", "metabuilder-assess"]
 overlap_kind = "router"
 
 [skills.archdiagram]
@@ -204,7 +208,7 @@ layer = "workflow"
 effect = "local-write"
 effects = ["local-write"]
 layer = "composer"
-overlaps = ["autonomy-loop", "define-operating-charter"]
+overlaps = ["autonomy-loop", "define-operating-charter", "supervised-dispatch"]
 overlap_kind = "composer"
 overlap_kinds = { autonomy-loop = "composer", define-operating-charter = "producer-consumer" }
 
@@ -353,7 +357,7 @@ effect = "local-write"
 effects = ["readonly", "local-process", "local-write"]
 approval_boundaries = ["target-write", "network", "credential-use", "dependency-install", "external-state"]
 layer = "workflow"
-overlaps = ["metabuilder"]
+overlaps = ["metabuilder", "metabuilder-assess", "metabuilder-harness-improvement"]
 overlap_kind = "router"
 
 [skills.metabuilder-harness-design]
@@ -362,7 +366,7 @@ effect = "local-write"
 effects = ["readonly", "local-process", "local-write"]
 approval_boundaries = ["artifact-write", "network", "credential-use", "dependency-install", "external-state", "provider-dispatch"]
 layer = "composer"
-overlaps = ["metabuilder", "grilling", "frame-goals-constraints", "objective-to-dag-decomposition"]
+overlaps = ["metabuilder", "grilling", "frame-goals-constraints", "objective-to-dag-decomposition", "metabuilder-harness-improvement"]
 overlap_kind = "producer-consumer"
 
 [skills.next-todos]
@@ -424,6 +428,14 @@ effect = "destructive"
 effects = ["destructive"]
 layer = "workflow"
 overlaps = ["pr-lifecycle"]
+overlap_kind = "composer"
+
+[skills.supervised-dispatch]
+commands = ["overwatch"]
+effect = "local-process"
+effects = ["readonly", "local-process"]
+layer = "workflow"
+overlaps = ["autonomous-execution-contract", "test"]
 overlap_kind = "composer"
 
 [skills.system-memory-audit]

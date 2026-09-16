@@ -38,8 +38,8 @@ citing the commit, contract, or qualification that removed it.
 Append one line per closed long-horizon campaign: date, campaign, gaps hit
 (backlog ids or new entries), records filed.
 
-| 2026-09-08 | Front-door continuation diagnosis (no campaign close claimed) | 15 | `docs/learning-records/front-door-routing-2026-09-08.json` |
+| 2026-09-08 | Front-door continuation diagnosis (no campaign close claimed) | 15 | Haake memory `90aad826` (migrated from git; see `docs/learning-records/README.md`) |
 
-- 2026-09-08 — Front-door routing validation (no campaign close claimed): gaps 12–14 recorded; gap 11 remains unqualified for live epoch chaining. Records: `docs/learning-records/front-door-routing-2026-09-08.json`; findings: `docs/front-door-validation.md`.
+- 2026-09-08 — Front-door routing validation (no campaign close claimed): gaps 12–14 recorded; gap 11 remains unqualified for live epoch chaining. Records: Haake memory ledger (see `docs/learning-records/README.md`); findings: `docs/front-door-validation.md`.
 
 - 2026-09-09 — Approved local continuation campaign completed: gaps 3, 8, 9, 11 and 15 closed within the stated scope; gap 14 partially covered. Source: `d8a3949`, `ab0c856`. Evidence: [qualification report](metabuilder-continuation-qualification.md). Tool friction routed as f-2822 and f-2823.
