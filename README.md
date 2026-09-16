@@ -44,7 +44,7 @@ rahulskills/
   overlays/claude/<name>.yml  # Claude-only overrides (allowed-tools, etc.)
   overlays/codex/.gitkeep  # Codex overrides (empty for now)
   build/                   # Gitignored — assembled output from stitch step
-  bin/                     # Shared assistant shell helpers
+  bin/                     # Shared assistant shell helpers (symlink or copy into ~/.local/bin)
   audit-skills.sh          # Pre-commit guard against private reference leaks
   install-pi-skills.sh       # Symlink repo skills into ~/.pi/agent/skills for Pi
   install-opencode-skills.sh # Symlink repo skills into ~/.config/opencode/skills for opencode

@@ -1,0 +1,386 @@
+#!/usr/bin/env python3
+"""campaign-driver — run a queue of supervised tasks unattended.
+
+Dispatches each queue entry under Overwatch (the task registry), blocks on
+its canonical lifecycle events until the terminal event, and records a
+durable result line plus the raw event stream. The interactive agent is a
+decision console; this script is the continuation heartbeat (plan item C7).
+
+Queue JSON:
+
+    {
+      "name": "b-slices",
+      "entries": [
+        {
+          "id": "b01",
+          "command": ["<agent-cli>", "run", "..."],
+          "cwd": "/path/to/project",
+          "env": {"PATH": "...", "HOME": "..."},
+          "env_mode": "caller_only",
+          "soft_timeout_sec": 10800,
+          "silent_timeout_sec": 2400,
+          "depends_on": []
+        }
+      ]
+    }
+
+Contract notes:
+- `env_mode` defaults to `caller_only` when `env` is non-empty (reproducible
+  child environment), else the daemon default (ambient_merge).
+- Entries whose dependencies did not succeed are recorded `blocked_dependency`
+  and never dispatched.
+- Already-succeeded entries from a previous run are skipped (resume by
+  default); `--only a,b` narrows the run set.
+- The driver never cancels a running task on interrupt; it records the
+  task_id and exits so the operator can collect or cancel deliberately.
+
+State (default `~/.local/state/campaign-driver/<name>/`):
+    results.jsonl        append-only one line per finished entry
+    events/<id>.jsonl    canonical lifecycle events
+    status/<id>.json     final status snapshot
+    driver.log           this driver's own progress log
+    summary.json         final counts (written at exit)
+
+Exit codes: 0 all requested entries succeeded; 1 any failed/blocked/
+interrupted; 2 usage or queue error.
+"""
+from __future__ import annotations
+
+import argparse
+import datetime
+import json
+import os
+import sys
+import time
+
+try:
+    from overwatch import CommandRequest, TaskRunnerClient
+except ImportError:  # pragma: no cover - deployment guard
+    sys.stderr.write(
+        "campaign-driver: cannot import overwatch. Install it in the "
+        "interpreter that runs this script (pip install -e <overwatch repo>).\n"
+    )
+    sys.exit(2)
+
+TERMINAL_KINDS = {"terminal"}
+POLL_INTERVAL_SEC = 2.0
+
+
+def utc_now() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class Driver:
+    def __init__(
+        self,
+        queue_path: str,
+        state_dir: str,
+        service_url: str,
+        dry_run: bool,
+        only: set[str] | None,
+    ) -> None:
+        with open(queue_path) as handle:
+            self.queue = json.load(handle)
+        self.name = self.queue.get("name") or os.path.splitext(
+            os.path.basename(queue_path)
+        )[0]
+        self.entries = self.queue.get("entries", [])
+        self.state_dir = state_dir
+        self.service_url = service_url
+        self.dry_run = dry_run
+        self.only = only
+        self.results_path = os.path.join(state_dir, "results.jsonl")
+        self.log_path = os.path.join(state_dir, "driver.log")
+        self._validate()
+
+    # -- validation ---------------------------------------------------
+    def _validate(self) -> None:
+        ids = [e.get("id") for e in self.entries]
+        if not ids or any(not i for i in ids):
+            raise SystemExit("campaign-driver: every entry needs a non-empty id")
+        if len(ids) != len(set(ids)):
+            raise SystemExit("campaign-driver: duplicate entry ids")
+        known = set(ids)
+        for entry in self.entries:
+            if not entry.get("command"):
+                raise SystemExit(f"campaign-driver: entry {entry.get('id')} has no command")
+            if entry.get("env_mode") == "caller_only" and not entry.get("env"):
+                raise SystemExit(
+                    f"campaign-driver: entry {entry.get('id')} uses caller_only "
+                    "without an env mapping"
+                )
+            for dep in entry.get("depends_on", []):
+                if dep not in known:
+                    raise SystemExit(
+                        f"campaign-driver: entry {entry.get('id')} depends on "
+                        f"unknown id {dep}"
+                    )
+        self._assert_acyclic()
+
+    def _assert_acyclic(self) -> None:
+        deps = {e["id"]: set(e.get("depends_on", [])) for e in self.entries}
+        resolved: set[str] = set()
+        while len(resolved) < len(deps):
+            ready = {i for i, d in deps.items() if d <= resolved and i not in resolved}
+            if not ready:
+                raise SystemExit("campaign-driver: dependency cycle detected")
+            resolved |= ready
+
+    # -- state --------------------------------------------------------
+    def prior_results(self) -> dict:
+        results = {}
+        if os.path.exists(self.results_path):
+            with open(self.results_path) as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                        results[record["id"]] = record
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+        return results
+
+    def log(self, message: str) -> None:
+        line = f"{utc_now()} {message}"
+        print(line, flush=True)
+        with open(self.log_path, "a") as handle:
+            handle.write(line + "\n")
+
+    def append_result(self, record: dict) -> None:
+        with open(self.results_path, "a") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+
+    # -- execution ----------------------------------------------------
+    def run(self) -> int:
+        os.makedirs(os.path.join(self.state_dir, "events"), exist_ok=True)
+        os.makedirs(os.path.join(self.state_dir, "status"), exist_ok=True)
+        prior = self.prior_results()
+        outcomes: dict[str, str] = {}
+        requested = [
+            e
+            for e in self.entries
+            if self.only is None or e["id"] in self.only or e["id"] in prior
+        ]
+        if self.only:
+            missing = self.only - {e["id"] for e in self.entries}
+            if missing:
+                raise SystemExit(f"campaign-driver: --only names unknown ids: {sorted(missing)}")
+
+        for entry in requested:
+            entry_id = entry["id"]
+            if entry_id in prior and prior[entry_id].get("outcome") == "succeeded":
+                outcomes[entry_id] = "succeeded"
+        self.log(
+            f"queue={self.name} requested={len(requested)} "
+            f"already_succeeded={sum(1 for v in outcomes.values() if v == 'succeeded')}"
+        )
+
+        pending = [e for e in requested if e["id"] not in outcomes]
+        ordered = self._topological(pending)
+        if self.dry_run:
+            for entry in ordered:
+                print(f"DRY-RUN {entry['id']}: {' '.join(entry['command'])}")
+            return 0
+
+        client = TaskRunnerClient(mode="service", base_url=self.service_url)
+
+        for entry in ordered:
+            entry_id = entry["id"]
+            failed_deps = [
+                d
+                for d in entry.get("depends_on", [])
+                if outcomes.get(d) != "succeeded"
+            ]
+            if failed_deps:
+                record = self._result(entry_id, "blocked_dependency", None, None, None)
+                record["blocked_by"] = failed_deps
+                self.append_result(record)
+                outcomes[entry_id] = "blocked_dependency"
+                self.log(f"{entry_id}: BLOCKED by {failed_deps}")
+                continue
+
+            env = entry.get("env") or None
+            env_mode = entry.get("env_mode") or ("caller_only" if env else None)
+            request = CommandRequest(
+                command=list(entry["command"]),
+                cwd=entry.get("cwd"),
+                env=env,
+                env_mode=env_mode,
+                soft_timeout_sec=entry.get("soft_timeout_sec"),
+                silent_timeout_sec=entry.get("silent_timeout_sec"),
+            )
+            self.log(f"{entry_id}: submitting env_mode={env_mode or 'default'}")
+            try:
+                handle = client.start_command(request)
+            except Exception as exc:
+                record = self._result(entry_id, "submit_failed", None, None, None)
+                record["error"] = str(exc)
+                self.append_result(record)
+                outcomes[entry_id] = "submit_failed"
+                self.log(f"{entry_id}: SUBMIT FAILED: {exc}")
+                continue
+
+            task_id = handle.task_id
+            self.log(f"{entry_id}: task_id={task_id}")
+            events_path = os.path.join(self.state_dir, "events", f"{entry_id}.jsonl")
+            cursor = 0
+            terminal_event = None
+            deadline = time.time() + float(entry.get("watchdog_sec") or 24 * 3600)
+            with open(events_path, "w") as events_handle:
+                while terminal_event is None:
+                    try:
+                        events = client.get_task_events(task_id, after_sequence=cursor)
+                    except Exception as exc:
+                        self.log(f"{entry_id}: event poll error: {exc}")
+                        time.sleep(POLL_INTERVAL_SEC)
+                        continue
+                    for event in events:
+                        events_handle.write(json.dumps(event, sort_keys=True) + "\n")
+                        events_handle.flush()
+                        seq = event.get("sequence")
+                        if isinstance(seq, int):
+                            cursor = max(cursor, seq)
+                        if event.get("kind") in TERMINAL_KINDS:
+                            terminal_event = event
+                    if terminal_event is None:
+                        if time.time() > deadline:
+                            record = self._result(
+                                entry_id, "watchdog_expired", task_id, None, None
+                            )
+                            self.append_result(record)
+                            outcomes[entry_id] = "watchdog_expired"
+                            self.log(
+                                f"{entry_id}: WATCHDOG EXPIRED after {deadline}; "
+                                f"task still running: {task_id}"
+                            )
+                            break
+                        time.sleep(POLL_INTERVAL_SEC)
+
+            if terminal_event is None:
+                continue
+
+            status = client.get_status(task_id)
+            status_path = os.path.join(self.state_dir, "status", f"{entry_id}.json")
+            from dataclasses import asdict
+
+            with open(status_path, "w") as status_handle:
+                json.dump(asdict(status), status_handle, indent=2, sort_keys=True)
+
+            data = terminal_event.get("data", {})
+            exit_code = data.get("exit_code")
+            state = data.get("terminal_state")
+            outcome = "succeeded" if state == "COMPLETED" and exit_code == 0 else "failed"
+            record = self._result(entry_id, outcome, task_id, state, exit_code)
+            record["runtime_sec"] = data.get("runtime_sec") or status.runtime_sec
+            record["events"] = os.path.relpath(events_path, self.state_dir)
+            self.append_result(record)
+            outcomes[entry_id] = outcome
+            self.log(
+                f"{entry_id}: {outcome.upper()} state={state} exit={exit_code} "
+                f"task={task_id}"
+            )
+
+        summary = {
+            "queue": self.name,
+            "finished_utc": utc_now(),
+            "outcomes": outcomes,
+            "counts": {
+                "succeeded": sum(1 for v in outcomes.values() if v == "succeeded"),
+                "failed": sum(1 for v in outcomes.values() if v == "failed"),
+                "other": sum(
+                    1
+                    for v in outcomes.values()
+                    if v not in ("succeeded", "failed")
+                ),
+            },
+        }
+        with open(os.path.join(self.state_dir, "summary.json"), "w") as handle:
+            json.dump(summary, handle, indent=2, sort_keys=True)
+        self.log(f"summary: {json.dumps(summary['counts'], sort_keys=True)}")
+
+        requested_ids = outcomes.keys()
+        if all(outcomes.get(i) == "succeeded" for i in requested_ids):
+            return 0
+        return 1
+
+    def _topological(self, entries: list[dict]) -> list[dict]:
+        by_id = {e["id"]: e for e in entries}
+        ordered: list[dict] = []
+        resolved: set[str] = set()
+        remaining = dict(by_id)
+        while remaining:
+            # Dependencies outside the pending set were either satisfied in an
+            # earlier run or will be recorded blocked_dependency by the run
+            # loop; they must not stall ordering (resume-hang fix).
+            ready = [
+                e
+                for e in remaining.values()
+                if {d for d in e.get("depends_on", []) if d in by_id} <= resolved
+            ]
+            ready.sort(key=lambda e: e["id"])
+            for entry in ready:
+                ordered.append(entry)
+                resolved.add(entry["id"])
+                del remaining[entry["id"]]
+        return ordered
+
+    @staticmethod
+    def _result(entry_id, outcome, task_id, state, exit_code) -> dict:
+        return {
+            "id": entry_id,
+            "outcome": outcome,
+            "task_id": task_id,
+            "state": state,
+            "exit_code": exit_code,
+            "recorded_utc": utc_now(),
+        }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog="campaign-driver")
+    parser.add_argument("queue", help="Queue JSON path")
+    parser.add_argument(
+        "--state",
+        default=None,
+        help="State dir (default: ~/.local/state/campaign-driver/<queue-name>)",
+    )
+    parser.add_argument("--service-url", default="http://127.0.0.1:8765/")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--only", default=None, help="Comma-separated entry ids")
+    args = parser.parse_args()
+
+    state_default = os.path.expanduser("~/.local/state/campaign-driver")
+    try:
+        with open(args.queue) as handle:
+            name = json.load(handle).get("name") or os.path.splitext(
+                os.path.basename(args.queue)
+            )[0]
+    except Exception as exc:
+        print(f"campaign-driver: cannot read queue: {exc}", file=sys.stderr)
+        return 2
+    state_dir = args.state or os.path.join(state_default, name)
+    os.makedirs(state_dir, exist_ok=True)
+
+    try:
+        driver = Driver(
+            args.queue,
+            state_dir,
+            args.service_url,
+            args.dry_run,
+            set(args.only.split(",")) if args.only else None,
+        )
+        return driver.run()
+    except KeyboardInterrupt:
+        print("campaign-driver: interrupted; running tasks left untouched", file=sys.stderr)
+        return 130
+    except SystemExit:
+        raise
+    except Exception as exc:
+        print(f"campaign-driver: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
