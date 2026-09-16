@@ -168,6 +168,17 @@ print(
 PY
 }
 
+validate_skill_composition() {
+    local linter="$SKILLS_DIR/scripts/lint_skill_composition.py"
+
+    [[ -f "$linter" ]] || {
+        echo "ERROR: composition linter not found: $linter" >&2
+        return 1
+    }
+
+    python3 "$linter"
+}
+
 validate_skill_manifests() {
     local validator="$REPO_SKILLS_DIR/skill-creator/scripts/quick_validate.py"
     local skill_dir
@@ -351,6 +362,9 @@ do_check() {
         rc=1
     fi
     if [[ $rc -eq 0 ]] && ! validate_package_inventory; then
+        rc=1
+    fi
+    if [[ $rc -eq 0 ]] && ! validate_skill_composition; then
         rc=1
     fi
     if [[ $rc -eq 0 ]] && ! validate_markdown_links; then

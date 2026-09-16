@@ -1,135 +1,128 @@
 ---
 name: check-antipatterns
-description: "Check an in-progress conversation and active code changes for anti-patterns, evidence-backed review findings, and immediate course corrections. Use for live checks, code review during active work, before risky operations, or when work feels stuck. Do not use for completed-session postmortems; use analyze-conversation."
-argument-hint: "[conversation-jsonl] [--code PATH | --conversation-only]"
+description: "Inspect a supplied live or completed agentic session for execution anti-patterns, evidence-backed findings, and immediate course corrections. Use when checking how work was carried out or when execution feels stuck. For direct source/code review, use the separate code-review skill. Use analyze-conversation when a completed-session retrospective, durable markdown report, or longitudinal tooling analysis is wanted."
+argument-hint: "[conversation-jsonl] [--lookback N]"
 ---
 
 # Anti-Pattern Checker
 
 ## Intent and applicability
 
-Perform a read-only check of the requested live conversation, source changes,
-or both. A live conversation check does not automatically select code review.
-An explicit source review does not require a transcript. Use `analyze-conversation`
-for completed-session retrospectives.
+Inspect the execution of a supplied agentic session, whether it is still in
+progress or already complete. Identify heuristic anti-pattern candidates,
+observed practices, evidence limits, and useful course corrections. This is a
+session check; it does not become a durable retrospective merely because the
+session has ended.
 
 ## Inputs and local bindings
 
-Select the target from the request: transcript path/runtime session identity,
-`--code PATH`, or both when explicitly requested or needed for a specific
-cross-cutting finding. For a bare live check, use the current conversation.
+Use the supplied readable JSONL transcript path. When the runtime provides the
+current session transcript, use that path for a live check. If no path is
+provided, identify the current runtime session when available; otherwise list
+newest candidates under `~/.codex/sessions` without displaying transcript
+contents. If multiple candidates are plausible, ask the user to select one.
+
+The implementation is `checker.py` beside this manifest. It accepts one
+positional transcript path and the optional positive integer `--lookback`
+(default `50`):
+
+```bash
+python3 "$SKILL_DIR/checker.py" <conversation-jsonl> [--lookback N]
+```
+
+The checker normalizes current and legacy Codex event streams and Claude
+message streams. It prints to stdout and does not create a report file.
 
 ## Non-goals
 
-This check does not select repairs, a complete source audit, retrospective
-artifact generation, tool installation or external model review. Necessary
-read-only context gathering remains within scope.
+This check does not repair files, perform a source/code audit, generate a
+durable retrospective report, install tools, or invoke external model review.
+Read-only inspection of relevant source or repository state may be used only
+to corroborate what a session action did or what evidence means. Such
+inspection must not produce code-review findings or expand the check into a
+source review. Use the separate code-review skill for direct code-review
+requests; it does not require a transcript.
 
 ## Must not
 
-Do not infer authority, a violation or comprehensive coverage from a keyword,
-score or missing event. Do not print transcript secrets or fabricate unavailable
-transcript context. A HIGH label alone cannot require stopping authorized work.
+Do not infer authority, a violation, or comprehensive coverage from a keyword,
+score, or missing event. Do not print transcript secrets or fabricate
+unavailable transcript context. A HIGH label alone cannot require stopping
+authorized work. Do not claim that unsupported detector modules, automatic
+periodic execution, scope expansion detection, or every taxonomy rule is
+implemented.
 
 ## Interaction and authority
 
-Proceed with available target evidence. Resolve ambiguous session identity only
-when transcript checking is selected; independent source review can continue.
-Pause an affected action when evidence establishes an applicable authority or
-safety boundary, carrying valid user decisions forward. Findings do not grant
-permission for remediation; an existing implementation request may already do so.
+Proceed with the supplied session evidence. Report a missing, unreadable,
+malformed, or unsupported transcript as an exact coverage limitation. Preserve
+valid user decisions and existing task authority. Findings do not grant
+permission for remediation or change the authority of the underlying task.
+If evidence establishes an applicable authority or safety boundary, state the
+affected action and the corresponding pause or correction; otherwise continue
+the authorized work.
 
 ## Procedure
 
-## Preconditions and invocation
+1. Select the requested session transcript and establish its path, event
+   format, normalized message count, and coverage window without exposing raw
+   transcript contents.
+2. Run `checker.py` with the supplied `--lookback` when one was given. In the
+   implementation, credential, tool-discovery, and destructive-operation
+   checks inspect the full normalized transcript; retry and preflight checks
+   inspect only the last `lookback` normalized messages.
+3. Interpret the output as prompts for evidence review. The six implemented
+   checks are `RETRY_WITHOUT_DIAGNOSIS`, `CREDENTIAL_ASSUMPTION`,
+   `MISSING_PREFLIGHT`, `TOOL_DISCOVERY_GAP`,
+   `DESTRUCTIVE_OPERATION_WITHOUT_EXACT_GUARD`, and
+   `IDLE_WITH_PENDING_WORK` (a turn that ends right after a non-blocking
+   supervised-task status probe instead of a terminal-event wait).
+4. Review the session sequence against the user's actual objective, grants and
+   stop conditions: actions taken, evidence obtained, and claims made. Look for
+   consequential execution failures such as repeated work without diagnosis,
+   premature completion, lost authorization, unnecessary approval loops or
+   scope drift where the transcript supports them. Separate this contextual
+   judgment from the six automated heuristics; a zero heuristic score does not
+   establish good execution.
+5. Where needed, inspect nearby source or repository evidence solely to
+   corroborate a recorded session action, keeping the result read-only and
+   explicitly bounded.
+6. Report findings with message locations, redacted evidence, uncertainty, and
+   a concrete review or course-correction step. Include observed practices and
+   the score's limits. Do not mutate files or turn this check into a
+   completed-session retrospective.
 
-The implementation is `checker.py` beside this manifest and requires one
-readable JSONL transcript path **only for transcript mode**:
-
-```bash
-python3 "$SKILL_DIR/checker.py" <conversation-jsonl>
-```
-
-`--code` and `--conversation-only` are skill-routing hints for the agent, not
-arguments to `checker.py`; the script performs only transcript normalization
-and heuristics. The agent performs the read-only code-review phase described
-below.
-
-In transcript mode only, use the runtime-provided current transcript path when available. Otherwise list
-the newest candidates under `~/.codex/sessions` without displaying transcript
-contents. If more than one is plausible, ask the user to select; do not guess.
-The checker normalizes current and legacy Codex event streams as well as Claude
-message streams. It prints to stdout and does not create a report file.
-
-When transcript mode is selected and the transcript is missing, unreadable, malformed, or uses an unsupported
-event shape, report the exact path and error and recommend
-`analyze-conversation` only after the session is complete.
-
-## Canonical rules
-
-`rules.json` beside the checker is the human-facing rule taxonomy, with stable
-`DIAG-*` identities and evidence categories mirrored in
-`references/diagnostic-taxonomy.json` when the corpus is available. The current
-implementation analyzes the full normalized transcript for credentials, tool
-discovery, and destructive operations, and the last 50 normalized messages for
-retry and preflight signals. The reported heuristic signal score covers only
-those five implemented checks. It is not a compliance or completeness score.
-
-Do not claim that separate detector modules, `config.json`, automatic periodic
-execution, scope expansion detection, or every rule in the taxonomy is
-executable unless the code gains those features.
-
-Interpret heuristic findings as prompts to inspect evidence, not proof of a
-violation. Never print credential values or other transcript secrets in output.
-
-## Code-review phase
-
-Run this phase when the user requested source review, supplied `--code PATH`,
-or selected both modes. Active workspace changes alone do not select it.
-Read [references/code-review.md](references/code-review.md) completely before
-that phase.
-
-- With `--code PATH`, review that path in its repository context.
-- With an explicit branch/commit range, review that diff even if the worktree
-  is clean; resolve the requested base from local evidence.
-- Otherwise use staged and unstaged changes as focus hints, then inspect their
-  callers, sibling implementations, configuration, and relevant tests.
-- If the repository is clean and no path or ref range was supplied, state that the code phase
-  was skipped; do not invent a target.
-- Do not install an indexer, dispatch another model, or spawn reviewers merely
-  because code review is enabled. Use an already-present source index only when
-  it materially improves evidence.
-- Keep the review phase read-only. A separately authorized implementation task
-  may act on findings after the check is complete.
+`rules.json` is the canonical heuristic taxonomy; its stable `DIAG-*` IDs
+correspond to the shared diagnostic taxonomy. Do not invent an implemented
+detector for a contextual finding.
 
 ## Completion and evidence
 
-Return only the selected result groups, separated when both modes ran. Identify
-the actual transcript/path and coverage window. Missing or unsupported inputs
-are coverage limits, not a no-findings result. Disclose when reviewing your own changes.
+Return the actual transcript path or runtime identity, source format, event and
+normalized-message counts, and the analyzed window. Include heuristic
+candidates with evidence locations, uncertainty, and a review step; observed
+practices; recommendations relevant to current execution; and the bounded
+heuristic signal score. The score is computed across the six implemented
+checks only and is not a compliance, correctness, or completeness score.
 
-For the transcript check:
+Never print credential values or other transcript secrets; retain the
+implementation's redaction behavior. Missing or unsupported inputs are
+coverage limits, not a no-findings result. If a durable markdown report and
+longitudinal/tooling analysis are wanted after completion, route explicitly to
+`analyze-conversation`.
 
-- heuristic candidates with evidence locations, uncertainty and a concrete review step;
-- observed practices, without assuming authorization or effectiveness;
-- recommendations relevant to the current work; and
-- the bounded heuristic signal score, labeled as non-comprehensive.
-
-For the code review:
-
-- actionable findings ordered by severity;
-- exact file and line, review lens, concrete defect, and failure scenario;
-- expected versus observed behavior and a focused remedy or test; and
-- one review miss-cause tag per finding, or an explicit no-supported-findings
-  statement.
-
-State any evidence-backed correction or unresolved boundary; otherwise continue
-the active authorized task. Severity alone does not create a gate. Do not mutate files, run remediation commands, or turn a
-live check into a completed-session postmortem.
+When findings need durable follow-through, record them using the shared
+[learning-record schema](../../references/learning-record.schema.json), citing
+session evidence and the applicable diagnostic ID (or null when none applies).
+This preserves a finding for a consumer without turning the whole check into
+a retrospective report.
 
 ## Routing
 
-- Use this skill during active work.
-- Use `--conversation-only` when no source review is desired.
-- Use `analyze-conversation` after a session is complete when a durable markdown
-  report and longitudinal/tooling analysis are wanted.
+- Use this skill for live or completed execution inspection of a supplied
+  agentic session.
+- Use `analyze-conversation` for a completed-session retrospective and durable
+  report, when explicitly requested; session completion alone does not force
+  that route.
+- Use the separate `code-review` skill for direct source/code review. No
+  transcript is required for that skill.

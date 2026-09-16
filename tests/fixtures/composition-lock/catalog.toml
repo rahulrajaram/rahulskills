@@ -1,0 +1,7 @@
+schema_version = 2
+
+[skills.alpha]
+effect = "readonly"
+
+[skills.beta]
+effect = "readonly"

@@ -79,7 +79,55 @@ are structurally valid so the Rust gate can demonstrate the full shape, but
 they are not evidence. Replace every placeholder with the digest of the exact
 answer, policy, investigation, or approval record it cites before agreement.
 
+## Consume preparation artifacts
+
+Before grilling from scratch, look for artifacts already produced by the
+preparation skills and consume them as cited inputs:
+
+- A `frame-goals-constraints` product thesis fills the brief's goals,
+  non-goals, constraints, and risks. Cite the thesis artifact and its digest;
+  do not re-derive or silently paraphrase it.
+- A `grilling` or `grill-me` resolved-question record maps directly into the
+  brief's `grilling.resolved_questions` with its original basis and evidence
+  digest. Grill only the material questions those records do not cover.
+- A ratified `define-operating-charter` charter is authoritative for the
+  brief's actors and authority boundaries; the brief restates, never
+  re-decides, them.
+- An `objective-to-dag-decomposition` execution DAG feeds the typed intent
+  and workflow topology: obligations come from its task and verification
+  nodes, and ordering follows its `depends_on` projection.
+
+When preparation records do not cover a material unknown, convene an
+autonomous grilling by default (`grilling` speculative mode with its bounded
+internal debate) to resolve TECHNICAL unknowns before asking the principal;
+record its resolved questions with basis and evidence digest like any other.
+Product, authority, and approval decisions are never resolved this way —
+they still require the named owner.
+
+Reuse stays subject to the freshness rule above: changed actors, effect
+scope, or evidence reopen the affected decision, and each cited artifact's
+digest must be recomputed and recorded in the prepared brief.
+
 ## Workflow
+
+When using the repository's contract recipe, resolve required roles and explicitly
+selected optional roles, then create a composition lock with
+`scripts/composition_lock.py create --recipe RECIPE --catalog CATALOG
+--contracts CONTRACTS_DIR --schema CONTRACT_SCHEMA --output LOCK`. Retain the
+lock with the design packet. Recreate it from current files and check the saved
+lock against it before reuse. Missing typed bindings, incompatible ports, or a
+changed identity require resolution and review; never fill a schema digest with
+an arbitrary value. A lifecycle backedge must declare its finite bound and
+termination condition. The lock checks declared compatibility, not authority or
+the semantic truth of an artifact. Intake routing remains a diagnostic input;
+the objective and construction approval come from their named owners.
+
+For typed handoffs, use `capabilities/ports/design-packet.schema.json` to bind
+the agreed brief, module and admitted bundle digests and their evidence paths.
+A continuation-state input additionally requires the read-only assessment
+described in `scripts/continuation_state.py`, using separately inspected current
+observations and a trusted owner grant. Reconcile uncertain attempts before
+dispatch; a valid same-envelope renewal does not require another approval.
 
 1. Establish the requester, consumer, product decision owner, technical owner,
    controller, required approvers, exact target repository, objective, and
@@ -126,7 +174,17 @@ answer, policy, investigation, or approval record it cites before agreement.
    or authority: requirements state the claims; `evidence_actions` name the
    exact checks; actions declare direct argv, cwd, toolchain, timeout, inputs,
    outputs, and auxiliary-directory digests; the workflow preserves the
-   approved topology; bounds and retrospectives are explicit. The source
+   approved topology; bounds and retrospectives are explicit. Include the
+   current epoch assessment template in every new harness, including one-shot
+   work. It consumes the existing retrospective evidence, selects assessment
+   depth to fit observed risk and uncertainty, and records a justified
+   improvement or no-change recommendation plus advisory stop, continue, or
+   seek-authority guidance. Bind the actual template supported by the package;
+   do not silently fall back to a legacy template that lacks this contract.
+   `metabuilder-assess` supplies the assessment procedure. Recommendations
+   cannot grant effects or continuation. Failure, interruption, and Unknown
+   remain incomplete and must not be closed with a fabricated success record.
+   The source
    language itself never contains commands, providers, credentials, or grants.
 8. Preflight every requested effect against current MetaBuilder enforcement.
    Prefer the read-only Linux-local consumer profile. If a requirement needs an

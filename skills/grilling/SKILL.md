@@ -117,3 +117,8 @@ presence is not evidence that its runtime is installed, and manual review is
 not automated proof. Resumability, when selected, requires verified state
 reconstruction and dependency/ratification checks even when all state stays
 private. Keep user prose readable without requiring any protocol knowledge.
+
+When a MetaBuilder harness campaign follows, transfer each resolved question
+into the harness brief's `grilling.resolved_questions` with its basis and
+evidence digest; `metabuilder-harness-design` then grills only what remains
+uncovered.

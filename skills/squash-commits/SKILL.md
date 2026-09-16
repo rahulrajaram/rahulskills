@@ -7,6 +7,17 @@ description: "Analyze Git history and safely squash contiguous thematic commits 
 
 Analyze first and rewrite only after the user approves an exact plan.
 
+## Default-branch protection (hard rule)
+
+Never propose, plan, or execute a rewrite of the repository's default
+branch — `master`, `main`, or the branch that tracks the remote default —
+even when its commits are unpushed, and even when the user answers a
+generic approval prompt. Squash targets are feature branches the user
+identifies. If the current branch is the default branch and the user did
+not explicitly name it as the target in this request, stop before analysis
+becomes execution and ask which branch they mean. Every plan and approval
+prompt must name the exact branch and commit range it will rewrite.
+
 Before any mutation, read and follow
 [`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md)
 completely. That shared contract governs clean-tree checks, shared-history
@@ -89,7 +100,9 @@ Stop before analysis becomes execution when:
 - a rebase is already in progress;
 - `.git/index.lock` or a ref lock exists and another Git process may be active;
 - HEAD changes during planning;
-- repository ownership, target branch, or requested range is ambiguous.
+- repository ownership, target branch, or requested range is ambiguous;
+- the current branch is the default branch and the user did not
+  explicitly name it as the squash target.
 
 Determine the analysis range:
 
@@ -131,7 +144,9 @@ For each proposed group, show:
 | Risk | Normal or a concrete high-risk reason |
 
 Then list every analyzed commit not included in a group. This makes omissions
-and accidental grouping visible.
+and accidental grouping visible. The plan, and the approval question itself,
+must state the exact branch name and commit range being rewritten — an
+approval that does not name the branch is not authorization.
 
 Mark a group high risk when it:
 

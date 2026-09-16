@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rahulskills.local/references/learning-record.schema.json",
+  "title": "Learning Record",
+  "description": "Minimal shared record connecting the review and diagnostic skills to MetaBuilder retrospectives and the tool-ecosystem friction ledger. A record is a finding plus provenance plus a disposition; it is never controller evidence by itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["record_schema", "finding", "source_skill", "evidence_refs", "disposition"],
+  "properties": {
+    "record_schema": {
+      "const": 1
+    },
+    "finding": {
+      "type": "string",
+      "description": "One concrete sentence: what was observed, not what should be done about the task."
+    },
+    "rule_id": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "pattern": "^DIAG-[0-9]{3}$" }
+      ],
+      "description": "Shared diagnostic-taxonomy rule when the finding instantiates one."
+    },
+    "source_skill": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Skill that produced the finding."
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Paths, digests, or transcript references that locate the evidence."
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "enum": ["recorded", "promoted", "routed", "dismissed"]
+        },
+        "target": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string" }
+          ],
+          "description": "Where the finding went: a metabuilder retrospective record, the friction ledger, or null when merely recorded."
+        }
+      }
+    },
+    "promotion_contract": {
+      "type": "string",
+      "description": "What must be true to promote this finding into a harness/module change or a tooling change."
+    }
+  }
+}

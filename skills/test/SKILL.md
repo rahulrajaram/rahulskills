@@ -41,6 +41,21 @@ required infrastructure blocks its dependent check, not independent preparation.
 
 ## Procedure
 
+## Prefer MCP tools when available
+
+If this harness exposes Overwatch MCP tools (check for `overwatch_run` in the available tools), prefer them for supervised runs; they use a replay-proof delivery cursor and never touch the CLI streaming path.
+
+```text
+overwatch_run(command=[...], profile_name="pytest", wait=false) -> task_id
+overwatch_output(task_id, after=cursor) -> chunks, next_cursor   # repeat while state is RUNNING
+overwatch_status(task_id) -> terminal state, exit_code, reason
+# for delegable/idempotent work use overwatch_submit(idempotency_key=...) then overwatch_receipt(task_id) when terminal
+```
+
+Pass `env` explicitly only for secrets or overrides; PATH and HOME are forwarded from this session automatically; use `overwatch_doctor` to inspect the daemon's effective child PATH before diagnosing environment mismatches.
+
+Fall back to the CLI commands below only when the MCP tools are unavailable in this harness.
+
 ## Why Use This
 
 - **Streaming output**: See test progress in real-time instead of waiting for completion

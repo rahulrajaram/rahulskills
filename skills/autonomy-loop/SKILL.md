@@ -26,11 +26,16 @@ verification commands, authority, and budgets from current instructions and
 observed project state. Reuse valid decisions; ask only about a material unresolved
 scope or effect after independent preparation makes the choice concrete.
 
-Select evidence and continuation separately. **Standalone evidence** uses the
-project's ordinary plan, command outputs, relevant source/environment identity,
+Select evidence and continuation separately. **Standalone evidence** uses
+the project's ordinary plan, command outputs, relevant source/environment identity,
 and checkpoints; it needs no synthetic epic digest, receipt, or controller.
 **Governed-runtime evidence** applies only when an actual selected runtime
 provides the compiled contract, proof policy, receipt checks, and durable events.
+**Selecting the governed runtime:** when the epic qualifies as long-horizon
+(see `work-intake`), prefer the MetaBuilder lifecycle as that runtime —
+compile the epic through `metabuilder-harness-design` and consume controller
+receipts from `metabuilder-consumer-qualification` rather than reconstructing
+equivalent guarantees by hand.
 The compiled-contract/receipt sections below specify that profile. For standalone
 work their corresponding steps use the ordinary plan, observed verification, and
 project checkpoint. Do not fabricate runtime guarantees, IDs, digests, receipts,
@@ -88,12 +93,19 @@ Default loop:
 8. Commit when the tranche is coherent and the compiled proof schedule says
    the commit or milestone gate is satisfied. A slice need not equal a commit.
 9. Rescore the affected frontier and either stop at a clean checkpoint or
-   continue if the prompt explicitly grants multi-slice/reactor execution.
+   continue if the inherited policy or prompt grants multi-slice/reactor
+   execution.
 
-For ordinary "continue" prompts, complete one coherent loop iteration. For
-explicit multi-slice, epic-completion, "chain", or "reactor" prompts,
-keep looping across bounded tasks until a stop rule, budget, or clean milestone
-triggers.
+For ordinary "continue" prompts with no valid inherited multi-slice grant,
+complete one coherent loop iteration. When a valid inherited campaign or epic
+authorization grants multiple slices or epochs, preserve that grant and keep
+looping across bounded tasks under its continuation policy until an inherited
+stop rule, budget, or ratified terminal milestone triggers. Explicit
+multi-slice, epic-completion, "chain", or "reactor" prompts also keep looping
+under their selected envelope. A checkpoint is not terminal by itself:
+complete required reporting and evidence before starting the next slice or
+epoch. Stop when work is exhausted or the objective is complete; do not
+invent another task to consume remaining budget.
 
 ## Reactor Mode
 
@@ -425,8 +437,8 @@ Stop and report clearly when:
 - The next decision changes product/API/release/security/privacy strategy.
 - Required infrastructure, credentials, or system resources are unavailable.
 - Resource cleanup would require broad destructive action.
-- The loop reaches a coherent checkpoint and no explicit multi-loop/timebox was
-  provided.
+- The loop reaches a coherent checkpoint and neither a valid inherited grant
+  nor the live request authorizes continued multi-slice execution.
 - Reactor mode reaches its slice, commit, time, or failure budget.
 - Repeated failures trigger the executor circuit breaker.
 - The remaining work is a new epic rather than the current epic.

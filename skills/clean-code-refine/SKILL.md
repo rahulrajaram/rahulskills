@@ -11,6 +11,10 @@ style preference dominate. Functional refactoring is one useful lens, but it
 must not override behavior preservation, language idiom, small functions,
 complexity reduction, cohesion, testability, or simplicity.
 
+For an evidence-led source review using independent perspectives and the
+existing review pipeline, use `code-review`. This skill owns focused
+maintainability assessment and authorized refactoring.
+
 ## Mode routing
 
 - If the user asks for a **review**, **audit**, **assessment**, or explicitly says

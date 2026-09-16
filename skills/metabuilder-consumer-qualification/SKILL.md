@@ -65,6 +65,21 @@ A model's assessment or a passing report cannot supply human ratification.
   semantics and do not trigger a failed-attempt retrospective. Only referenced
   built-in templates are embedded.
 
+At each epoch close, use `metabuilder-assess` to consume the exact run's
+retrospectives and qualification evidence. New harnesses include a typed epoch
+assessment; obtain its actual shape from `run retrospectives scaffold` and
+record it through the existing intervention route. Select only the review
+depth and evidence needed, then give a justified improvement or no-change
+recommendation and advisory stop/continue/seek-authority guidance. A legacy
+run may lack the typed assessment: report that limit without rewriting its
+history. For failed, interrupted, or Unknown execution, assess the available
+evidence as incomplete outside a successful-stage record; preserve the
+controller blocker and recovery rules. Recommendations do not supply proof,
+grants, or permission for another epoch. Continue through the owning workflow
+when existing authority covers it, without an extra approval per epoch.
+Same-objective harness shortfalls route to `metabuilder-harness-improvement`;
+changed objectives route to design with their prior evidence preserved.
+
 The v1 qualification profile is intentionally narrow: the current Linux host,
 local sandboxed commands, read-only target source, no credentials, no network,
 no external-state or target-source writes, no telemetry, and consumer-owned
@@ -119,6 +134,19 @@ and uses the existing workflow reducer, so selector, current-head, and replay
 checks remain in force under the single-controller run-store contract.
 Do not run concurrent controller writers against the same run root.
 
+When learning records from the review skills exist for this campaign (shared
+shape: `references/learning-record.schema.json`), ingest them with the repository's
+`scripts/learning_ingest.py --records RECORDS --context CONTEXT`, adding
+`--previous PREVIOUS` only for the same run, epoch, source and policy. Context
+contains `campaign_id`, positive `epoch`, `run_id`, exact `source_commit`, and
+SHA256 `policy_digest`. Retain the accepted document and cite its digest and
+original findings/evidence references in the actual retrospective record before
+recording it. A rejected batch must be corrected; do not silently omit failures.
+The adapter deduplicates claims and preserves provenance; it does not verify
+references, authenticate authors, promote findings, or turn claims into
+controller observations. The output shape is
+`references/retrospective-learning-input.schema.json`.
+
 Operating notes verified in a real governed campaign:
 
 - Every worker action is followed by a `retrospective_required` blocker that
@@ -128,6 +156,12 @@ Operating notes verified in a real governed campaign:
   with "invalid retrospective id: invalid tranche identifier".
 - Author runs with the run root OUTSIDE the target repository. The run's own
   journal dirties the worktree and `harness author` refuses a dirty tree.
+  Apply uses sanitized Git settings without user-global excludes. If local
+  session files make that check dirty, use a clean temporary worktree of the
+  exact authored commit. The sandbox exports source without Git metadata;
+  bind the verified source commit into declared command inputs before compile
+  rather than running Git inside the exported workspace. Compare that input
+  to the controller's authored revision before dispatch.
 - Attestation verdicts are `meets` / `does_not_meet` / `uncertain`, and each
   `consumer_evidence[].digest` must be a real SHA-256 digest (journaled action
   evidence digests are the natural choice).
@@ -140,7 +174,9 @@ Operating notes verified in a real governed campaign:
   directory may not overlap committed source.
 
 Here “epoch” means one root-workflow incarnation; autonomous multi-epoch
-self-rebuild remains deferred.
+self-rebuild remains deferred. The continuation-at-close protocol below is
+orchestrator-side re-entry through design and qualification under existing
+authority; it does not add an autonomous self-rebuild capability to the core.
 
 ## Declared file outputs
 
@@ -279,6 +315,51 @@ record was constructed, not that the product passed or is production-ready.
 The subject binds the package version and digest of the MetaBuilder executable
 that reconstructed the report. This identifies the reporter; it does not claim
 that every earlier run command used those same executable bytes.
+
+## Continuation handoff at close
+
+Every qualification close emits a continuation handoff alongside the report,
+whether or not more work is expected. It contains:
+
+1. the leftover-work checkpoint: controller-observed remaining obligations,
+   unfinished workflow nodes, and unmet acceptance checks;
+2. a proposed next ObjectiveRequest for the next epoch, ready for
+   `metabuilder-harness-design` as a cited input;
+3. the envelope classification: same-envelope (no new effect classes, spend,
+   or target writes) or envelope-expanding, with the exact expansion named;
+4. standing-delegation budget accounting: units consumed and units remaining
+   of the ratified batch M, and whether renewal falls due at this close.
+
+The handoff is a proposal, not continuation authority. At every close, including
+terminal completion, emit the repository's `references/continuation-state.schema.json`
+state when using typed continuation. A freeform terminal summary does not satisfy
+that schema: validate the complete state and require no next action at completion.
+Bind the exact source, run, objective, module, bundle,
+policy, owner, predecessor, budget and proposed action. Assess it through
+`scripts/continuation_state.py` with current controller/repository observations,
+a separately sourced trusted grant and an explicit as-of timestamp. Save both
+inputs and the assessment. Eligibility alone is not an effect grant. Unknown,
+ambiguous or interrupted attempts require controller reconciliation, and a
+duplicate request must not cause another dispatch. A fresh owner follows the
+same checks and retains the same authorized multi-epoch policy.
+
+Before any next epoch,
+complete the current epoch's required report, attestations, controller
+observations, and remaining evidence, and preserve them with the handoff.
+If authorized work remains, the next request is same-envelope, and valid
+standing delegation and budget cover it, immediately re-enter the existing
+MetaBuilder lifecycle through `metabuilder-harness-design`, then
+`metabuilder-consumer-qualification`. Preserve the ratified renewal policy;
+perform an authorized automatic renewal when due, or hold for the principal
+when that policy requires approval. Do not invent an additional approval
+for continuation already covered by the grant. If the objective is complete
+or no authorized work remains, close without inventing a next epoch. An
+exhausted or expired/revoked delegation, an expanding envelope, a reserved
+decision, recovery failure, or a ratified terminal milestone stops or routes
+the prepared request to the principal as applicable. Preserve the existing
+reactor envelope and policy on resume. Never declare an epoch final by
+convergence alone, and do not create synthetic controller evidence or
+automatically rebuild the core to force continuation.
 
 ## Report back to MetaBuilder
 

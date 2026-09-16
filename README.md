@@ -12,6 +12,7 @@ This repo collects skills (prompt-based automation units) for two AI coding assi
 
 - **Codex** (`~/.codex/skills/`) -- OpenAI Codex CLI skills
 - **Claude Code** (`~/.claude/skills/`) -- Claude Code skills
+- **opencode** (`~/.config/opencode/skills/`) -- opencode CLI skill links
 
 Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `skills/` directory in this repo is the single source of truth, synced to both locations.
 
@@ -22,6 +23,14 @@ profile changes do not prune optional copies. Invoke a skill explicitly in Pi as
 `/skill:<name>`; for example, `/skill:handoff extract` reviews
 `NEXT_SHELL_PROMPT.md`, adopts it as the current request, and immediately
 executes its authorized work.
+
+opencode resolves selected links from `~/.config/opencode/skills/`. Run
+[`install-opencode-skills.sh`](#install-opencode-skills.sh) with the desired
+profile; it follows the same conservative linking and ownership rules as the
+Pi installer. opencode also auto-discovers `~/.claude/skills/` by default, so
+the linked install and the Claude install can surface the same skill names;
+export `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1` before starting opencode to
+suppress the Claude scan if that duplication is unwanted.
 
 Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yore vocabulary curation).
 
@@ -35,9 +44,10 @@ rahulskills/
   overlays/claude/<name>.yml  # Claude-only overrides (allowed-tools, etc.)
   overlays/codex/.gitkeep  # Codex overrides (empty for now)
   build/                   # Gitignored — assembled output from stitch step
-  bin/                     # Shared assistant shell helpers
+  bin/                     # Shared assistant shell helpers (symlink or copy into ~/.local/bin)
   audit-skills.sh          # Pre-commit guard against private reference leaks
-  install-pi-skills.sh     # Symlink repo skills into ~/.pi/agent/skills for Pi
+  install-pi-skills.sh       # Symlink repo skills into ~/.pi/agent/skills for Pi
+  install-opencode-skills.sh # Symlink repo skills into ~/.config/opencode/skills for opencode
   stitch-skills.sh         # Assemble skills + overlays, install to CLI locations
   runtime-exclusions/      # Runtime-owned names that must not be installed twice
   scripts/audit_catalog.py # Audit resolved roots for collisions and portability
@@ -56,7 +66,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (50)
+### Package-managed skills (57)
 
 Authored in this package and available for explicit selection on Pi, Codex, and
 Claude Code. The default `core` profile omits the optional design skills
@@ -69,9 +79,10 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `archdiagram` | Generate architecture diagrams from context or codebase |
 | `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |
 | `autonomy-loop` | Drive an epic as a principal-architect loop with bounded execution and controlled reactor chaining |
-| `check-antipatterns` | Read-only transcript anti-pattern checks plus evidence-backed review of active code changes |
+| `check-antipatterns` | Inspect agent-session execution for evidence-backed antipatterns and course corrections |
 | `clear-writing` | Edit dense, awkward, repetitive, or AI-generated prose into clear, direct, readable writing as an editor, not a ghostwriter; default and grill modes |
 | `clean-code-refine` | Review or refactor code across behavior, idiom, size, complexity, dataflow, testability, and simplicity |
+| `code-review` | Run focused evidence-led source reviews through the existing codereview package, selecting only needed perspectives and workflow stages |
 | `commit` | Smart commit with file triage, artifact filtering, and secret detection |
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
 | `define-operating-charter` | Define and ratify authority, lifecycle, evidence, and stop rules for long-running agentic systems |
@@ -84,7 +95,8 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
 | `grilling` | Hard, dependency-aware questions with human-first rendering; speculative factory research, internal debate, and a plain-language orchestrator close |
 | `grill-me` | Alias trigger that invokes the grilling skill |
-| `handoff` | Commit and write `NEXT_SHELL_PROMPT.md`, or review and execute it as resumed work |
+| `handoff` | Prepare a coherent commit and write a verified `NEXT_SHELL_PROMPT.md` handoff |
+| `handoff-extract` | Activate an existing `NEXT_SHELL_PROMPT.md`: adopt it as the current request and execute its authorized work |
 | `humanize` | Rewrite rigorous narratives for human readers without weakening their truth |
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
 | `install-commithooks` | Install shared commithooks framework into a project |
@@ -93,6 +105,8 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `max-columns` | Keep output within a user-specified column width |
 | `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
 | `metabuilder` | Define, compile, inspect, run, recover, and improve governed MetaBuilder harnesses |
+| `metabuilder-assess` | Assess epoch evidence and route justified improvements to the owning workflow |
+| `metabuilder-harness-improvement` | Repair an existing harness against the same objective and requalify it through the MetaBuilder package |
 | `metabuilder-consumer-qualification` | Run and assess an already designed consumer harness without conflating controller evidence with product judgment |
 | `metabuilder-harness-design` | Turn a target objective into an agreed brief and typed MetaBuilder harness design |
 | `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |
@@ -109,10 +123,13 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `skill-creator` | Create or update scoped skills and their supporting resources across the package runtimes |
 | `speak` | Read text out loud using Kokoro TTS |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
+| `supervised-dispatch` | Launch and monitor Overwatch worker runs with env recipes, preflight, cursor-driven monitoring, and blocking terminal waits |
 | `system-memory-audit` | Audit Linux system-wide memory health, swap, PSI, and top consumers |
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
 | `whitepaper` | Author an investor-facing enterprise whitepaper (case for building a product) with YC-flavored, un-theatrical voice, cost/revenue model, naming/branding, and a branded PDF with embedded fonts |
+| `continue-work` | Resume-first front door: find the most specific resumable state (handoff artifact, governed campaign, active plan, human gate) and force its owning workflow |
+| `work-intake` | Classify work by horizon and route it: bounded work to autonomy-loop or the execution contract, long-horizon work to the MetaBuilder lifecycle |
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
 
@@ -144,6 +161,20 @@ Existing package-owned links can be updated and explicitly removed with
 ownership is recorded in `.rahulskills-ownership.json` under the Pi runtime.
 No optional profile selection activates MCPs, commands, or other dependencies.
 Runtime exclusions and `.exclude-skills` are honored.
+
+### `install-opencode-skills.sh`
+
+Symlink the selected profile or explicitly named skills into opencode's
+global skill directory. Selection defaults to `core` and preserves unrelated
+entries; it shares the Pi installer's migration, ownership ledger, and
+runtime-exclusion rules.
+
+```bash
+./install-opencode-skills.sh                   # Link the core profile
+./install-opencode-skills.sh --profile all     # Select every package profile
+./install-opencode-skills.sh --skill grilling  # Select one skill only
+./install-opencode-skills.sh --preview --opencode-root /tmp/opencode  # Isolated preview
+```
 
 ### `stitch-skills.sh`
 

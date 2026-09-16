@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "state_id": "c748274ba3042349ad44fd05c1088d1f88f6a50be92d986d5beb507414742b18",
+  "campaign_id": "camp-1",
+  "epoch": 1,
+  "source_run_id": "run-1",
+  "repository_identity": "repo@abc",
+  "source_commit": "ffffffffffffffffffffffffffffffffffffffff",
+  "predecessor_state_id": "0000000000000000000000000000000000000000000000000000000000000000",
+  "objective_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "module_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "bundle_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "policy_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "owner": {"kind": "workflow", "id": "owner-1"},
+  "authority": {"envelope_class": "local-read", "effect_ceiling": ["none"]},
+  "delegation": {"grant_id": "1111111111111111111111111111111111111111111111111111111111111111", "decision_class": "same-envelope-continuation"},
+  "budget": {"batch_limit": 4, "consumed": 0, "remaining": 4, "total_consumed": 0, "total_ceiling": 8},
+  "next_action": {"kind": "run", "owner": "owner-1", "action_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+  "status": {"phase": "running", "terminal": false},
+  "evidence_refs": ["obs-1"],
+  "created_at": "2026-09-08T20:00:00Z",
+  "updated_at": "2026-09-08T20:01:00Z"
+}

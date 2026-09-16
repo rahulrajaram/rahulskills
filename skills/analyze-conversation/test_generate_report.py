@@ -45,7 +45,21 @@ class CodexNormalizationTests(unittest.TestCase):
     def test_saved_reports_redact_before_each_lossy_transformation(self) -> None:
         cases = (
             ([message("user", boundary("do it ", 220))], "User Signals"),
-            ([message("assistant", boundary("Should I do it? ", 220))], "Assistant Routing Questions"),
+            (
+                [message("user", boundary("you have seemingly stopped ", 220))],
+                "User Signals",
+            ),
+            (
+                [
+                    message("assistant", "Should I do it?"),
+                    message("user", boundary("do it ", 220)),
+                ],
+                "Assistant Routing Questions",
+            ),
+            (
+                [message("assistant", boundary("Should I do it? ", 220))],
+                "Low-Confidence Question Candidates",
+            ),
             ([command(boundary("deploy ", 100))] * 2, "1. Command:"),
             ([command(boundary("deploy ", 80))] * 3, "Repeated 3x"),
             ([message("user", "Inspect only"), message("assistant", "I will also create " + synthetic_url("u:SYNTHETIC_TAIL.more"))], "Expansion:"),
