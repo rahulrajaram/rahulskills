@@ -1,8 +1,14 @@
 import copy
 import json
+import sys
 import unittest
+from pathlib import Path
 
-from scripts.bind_qualification_source import SOURCE_MARKER, bind_source
+sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
+import bind_qualification_source
+
+SOURCE_MARKER = bind_qualification_source.SOURCE_MARKER
+bind_source = bind_qualification_source.bind_source
 
 
 class SourceBindingTests(unittest.TestCase):

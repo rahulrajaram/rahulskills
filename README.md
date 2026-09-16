@@ -66,7 +66,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (55)
+### Package-managed skills (57)
 
 Authored in this package and available for explicit selection on Pi, Codex, and
 Claude Code. The default `core` profile omits the optional design skills
@@ -95,7 +95,8 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
 | `grilling` | Hard, dependency-aware questions with human-first rendering; speculative factory research, internal debate, and a plain-language orchestrator close |
 | `grill-me` | Alias trigger that invokes the grilling skill |
-| `handoff` | Commit and write `NEXT_SHELL_PROMPT.md`, or review and execute it as resumed work |
+| `handoff` | Prepare a coherent commit and write a verified `NEXT_SHELL_PROMPT.md` handoff |
+| `handoff-extract` | Activate an existing `NEXT_SHELL_PROMPT.md`: adopt it as the current request and execute its authorized work |
 | `humanize` | Rewrite rigorous narratives for human readers without weakening their truth |
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
 | `install-commithooks` | Install shared commithooks framework into a project |
@@ -122,6 +123,7 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `skill-creator` | Create or update scoped skills and their supporting resources across the package runtimes |
 | `speak` | Read text out loud using Kokoro TTS |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
+| `supervised-dispatch` | Launch and monitor Overwatch worker runs with env recipes, preflight, cursor-driven monitoring, and blocking terminal waits |
 | `system-memory-audit` | Audit Linux system-wide memory health, swap, PSI, and top consumers |
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |

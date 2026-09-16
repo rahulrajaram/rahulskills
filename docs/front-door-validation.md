@@ -26,7 +26,13 @@ The fixture confirms the intended handoff boundary: extract mode reviews and val
 
 Read-only evidence supplied by a consumer project adds a bounded state check. It supports revalidating and preserving the current governed owner; it is not a live run or verified controller success.
 
-Learning records are in [`docs/learning-records/front-door-routing-2026-09-08.json`](learning-records/front-door-routing-2026-09-08.json), each conforming to [`references/learning-record.schema.json`](../references/learning-record.schema.json). Backlog gaps and the engagement entry are appended to [`docs/metabuilder-maturity-backlog.md`](metabuilder-maturity-backlog.md).
+Learning records were migrated out of version control to the local Haake
+memory ledger for this project (memory id `90aad826-a331-44b4-bf3f-1ed5ecb60614`,
+tags `learning-records`, `migrated-from-git`); see
+[`docs/learning-records/README.md`](learning-records/README.md). Each conformed
+to [`references/learning-record.schema.json`](../references/learning-record.schema.json).
+Backlog gaps and the engagement entry are appended to
+[`docs/metabuilder-maturity-backlog.md`](metabuilder-maturity-backlog.md).
 
 The D-4–D-8 pending-adjudication premise was also stale. Read-only review found D-4 approved/implemented, D-5 approved/measured with follow-up deferred, D-6 approved/resolved, D-7 approved with observations 1–4 of 5 recorded, and D-8 approved/executed. Evidence is in the sibling `sandboxing` repository: `pen-test/FINDINGS.md:418-491`, `pen-test/decision-packets/2026-09-08-d7-d8-plans.md:24-62`, and `pen-test/evidence/d7-residence-ledger.json`. These are recorded statuses, not fresh operational verification; no live pending-adjudication gate was exercised.
 
