@@ -1,0 +1,4 @@
+interface:
+  display_name: "Handoff extract"
+  short_description: "Resume an existing handoff as active work."
+  default_prompt: "Use $handoff-extract to review NEXT_SHELL_PROMPT.md, adopt it as the current request, and immediately execute its authorized work."

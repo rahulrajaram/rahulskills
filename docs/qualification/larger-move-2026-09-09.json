@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "kind": "consumer-qualification-evidence-summary",
+  "source_commit": "ab0c8569b9c15a9e0fc9263ebf270097a6760eb5",
+  "runtime_sha256": "1ad531430d8f8556433fa8e2279e1bb598cbe93e936eed8a024a35993b5d2da8",
+  "oracle_sha256": "80c434f5e40267cc25b62bd7a0b4052d5cfc2b3bb95c19c94494e9e96a0aa3a0",
+  "epochs": [
+    {
+      "epoch": 1,
+      "run_id": "baseline-epoch-1",
+      "source_commit": "ab0c8569b9c15a9e0fc9263ebf270097a6760eb5",
+      "workflow_status": "complete",
+      "action_count": 1,
+      "action_outcome": "succeeded",
+      "action_evidence_id": "a28d6b2cb259d55944a8e56e9be7bab07387230fc46553a884a2354b2dee4ef9",
+      "output_sha256": "bf970b9011345b8c103ca0e99bab9da778d36007a4652daa8068f401422b4278",
+      "component_tests_passed": 37,
+      "learning_records": 8,
+      "learning_input_digest": "5abcb22bf21b4e9c5c6fc088c815c65f0a79710f46feea67a06ecfb318cdbefe",
+      "retrospective_learning_reference": "learning-document-digest",
+      "retrospective_count": 2,
+      "report_id": "27f9fbc81b4537f80dc1c16f002e365888e4e87c5c10947e448d21fff3b3d6b7",
+      "report_sha256": "79885c34c524cc809486697c4e9d68ebbb21a9ba5ac205daa26be6314f9a0b88",
+      "report_replay_byte_identical": true,
+      "journal_sha256": "5a6c8df22644f3e8978200fb09fa3a26f9d2e9f0d477ea411eadcc0d97eaee03",
+      "journal_head": "46d0a3400395d8f2b7c92a4c7f679720abee0d2dca498e8ee0f435aa4bf9beb8",
+      "journal_sequence": 6
+    },
+    {
+      "epoch": 2,
+      "run_id": "baseline-epoch-2",
+      "source_commit": "ab0c8569b9c15a9e0fc9263ebf270097a6760eb5",
+      "workflow_status": "complete",
+      "action_count": 1,
+      "action_outcome": "succeeded",
+      "action_evidence_id": "c681405743bc58b89cebdc95aafb2bcb9724e9b4d54a21b1ed6118bfc9b7b214",
+      "output_sha256": "b23886c6267a3f3a5f92908599de6c2ca2ae58bf6380d9faa379a99140b91460",
+      "component_tests_passed": 37,
+      "learning_records": 8,
+      "learning_input_digest": "e0b983d7cce4d814c29f431126ca4c30b61055669a719f71204899ed761808cb",
+      "retrospective_learning_reference": "learning-document-digest",
+      "retrospective_count": 2,
+      "report_id": "0bea67f8b2641d0cb974071164c8644b71f3437c98e70e3958e0fcc36f644b82",
+      "report_sha256": "9669c35cd8043ac138ef5bc3ffa87a4ec0dcb65db1af5a7f4d28e34a5ae80178",
+      "report_replay_byte_identical": true,
+      "journal_sha256": "9ec77a57a3315436fec1243f33ade7aa194b552345674c263aa3307cbaf63a52",
+      "journal_head": "9b3e98459ae61e9f86cbe33d474bb63dd5bdcfb066e601740bef7d61844625c4",
+      "journal_sequence": 6
+    },
+    {
+      "epoch": 3,
+      "run_id": "baseline-epoch-3",
+      "source_commit": "ab0c8569b9c15a9e0fc9263ebf270097a6760eb5",
+      "workflow_status": "complete",
+      "action_count": 1,
+      "action_outcome": "succeeded",
+      "action_evidence_id": "0cbb83dc6bd1a49c675dd5850d96a42a4ef46258f8fc9f3a02b146523a733b48",
+      "output_sha256": "4e311099de7bde8f6a5833f0b8a682cfe8b10903d27c72eb6b99347e105e1ad7",
+      "component_tests_passed": 37,
+      "learning_records": 8,
+      "learning_input_digest": "a4676705cd7a017b7541d7f28fb1c9c024f1d523d0ed344021cd48cb369ffdb2",
+      "retrospective_learning_reference": "enclosing-qualification-output-only",
+      "retrospective_count": 2,
+      "report_id": "d744ad236adffd520daec8b81c56a3a4631561f8174cc548016848a75c9ba7ba",
+      "report_sha256": "0ddecb9a7682c2567aaf78b2fd22dc858e971a9c38cfdf19a6f2de3b5f853de0",
+      "report_replay_byte_identical": true,
+      "journal_sha256": "dd0a5e16c281f31115621b95c3427b883d533b3624f574c182fa95d6d21d2377",
+      "journal_head": "29f0c7bf307e7fd60950f397dfe97dda62e3e70b7279f14041c72a1fb6c5c94d",
+      "journal_sequence": 6
+    }
+  ],
+  "native_sessions": {
+    "epoch1": "parent owner /root",
+    "epoch2": "native collaboration agent /root/baseline_epoch_2",
+    "epoch3": "separate Codex thread 01a08444-d584-7352-98c9-8e1f9d0432de"
+  },
+  "evidence_boundary": "Controller observes sandbox commands, not model session execution or semantic correctness. Native session metadata and consumer assessments are separate.",
+  "status": "accepted-local-qualification",
+  "final_source_verification": {
+    "focused_tests": 44,
+    "command": "/usr/bin/python3 -B -S -m unittest tests.test_continuation_state tests.test_composition_lock tests.test_learning_ingest tests.test_larger_move_qualification tests.test_bind_qualification_source",
+    "result": "passed",
+    "source_delta": "After the frozen live checkpoint: optional-field type refusal and schema/guidance identity clarifications. These did not change valid continuation behavior."
+  },
+  "renewal": {
+    "after_epoch": 2,
+    "scenario_batch_consumed": 2,
+    "scenario_total_consumed": 2,
+    "scenario_total_ceiling": 3,
+    "eligible": true,
+    "proposed_next_batch_limit": 1
+  },
+  "terminal": {
+    "disposition": "complete",
+    "next_action": null,
+    "total_consumed": 3,
+    "state_id": "53f72ef355cc7bf1b683c0cb71029d7d7c46538490621f7f9bc2ed1c3e26de3d"
+  },
+  "negative_cases": [
+    {
+      "case": "fixed-budget-exhausted",
+      "observed_disposition": "budget_exhausted",
+      "new_effects": 0,
+      "assessment_sha256": "dab839c847187a32ad5a9131a9cb87db9d0abae3ececac1fb5b2e893e14599bc",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    },
+    {
+      "case": "renewal-approval-required",
+      "observed_disposition": "budget_exhausted",
+      "new_effects": 0,
+      "assessment_sha256": "845f609808dedf644c2dda9edf4670bba7d5d87696fb28db87f690bbda125055",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    },
+    {
+      "case": "revoked-grant",
+      "observed_disposition": "revoked",
+      "new_effects": 0,
+      "assessment_sha256": "1742257af4dc279b83b468c839305a7d0c6f543d9030ec5d37b48f8b1b1c8932",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    },
+    {
+      "case": "expired-grant",
+      "observed_disposition": "expired",
+      "new_effects": 0,
+      "assessment_sha256": "1857c04005ef4db9d53b2be45a87e5aaec35aa2b1caabeecc5300d7d6d8b491f",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    },
+    {
+      "case": "stale-source-or-policy",
+      "observed_disposition": "invalid_state",
+      "new_effects": 0,
+      "assessment_sha256": "d00cc66c0e140ff680880e164cb5b76623b1800a24a63f725ba5850333719df8",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    },
+    {
+      "case": "malformed-state",
+      "observed_disposition": "invalid_state",
+      "new_effects": 0,
+      "assessment_sha256": "2df772dd0e435ad9466d7c1172bd1cc9b07788a489f2460d434790b780884a8a",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    },
+    {
+      "case": "completed-state",
+      "observed_disposition": "complete",
+      "new_effects": 0,
+      "assessment_sha256": "05a290deb015550ef535bd3039835c83f7fc0ec2c5c612d5a9b0388ba36e6b15",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    },
+    {
+      "case": "duplicate-observed-attempt",
+      "observed_disposition": "duplicate_replay",
+      "new_effects": 0,
+      "assessment_sha256": "d02b6941db192c1d3cd7966efb6cd6676fe2cff85050940fc2806c22c3d334dd",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    },
+    {
+      "case": "ambiguous-attempt",
+      "observed_disposition": "concurrent_or_ambiguous",
+      "new_effects": 0,
+      "assessment_sha256": "b2533b0926ff1a5aefc06e9c2420d3267975809e34d4b4ab9f42da592c446c0c",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    },
+    {
+      "case": "effect-expansion",
+      "observed_disposition": "authority_expansion",
+      "new_effects": 0,
+      "assessment_sha256": "be7ce281cfca9d8104966b3895769c37f49ffdb48338266aaab4b9b906a1c5f2",
+      "input_kind": "controlled negative variation of real checkpoint identities; not a controller observation"
+    }
+  ],
+  "reconciliation": {
+    "scenario": "Old owner checkpoint without a post-dispatch result, reconciled against the actual completed epoch3 journal. No controller Unknown event was injected.",
+    "before_disposition": "unknown",
+    "controller_action_outcome": "succeeded",
+    "after_disposition": "duplicate_replay",
+    "observed_action_count": 1,
+    "new_effects": 0,
+    "journal_sha256_before": "dd0a5e16c281f31115621b95c3427b883d533b3624f574c182fa95d6d21d2377",
+    "journal_sha256_after": "dd0a5e16c281f31115621b95c3427b883d533b3624f574c182fa95d6d21d2377"
+  },
+  "retained_failure": {
+    "run_id": "epoch-1",
+    "source_commit": "d8a39490395d1cc69d2e22b47e5ad83467497767",
+    "outcome": "failed",
+    "reason": "Exported source lacks Git metadata; repaired by binding the committed source before compilation. Not counted as a baseline success."
+  },
+  "limits": [
+    "Only the finite local single-controller scenario is qualified.",
+    "Native owners were supervised by the parent; this does not qualify unassisted model execution or controller-governed agent dispatch.",
+    "Negative input variations are controlled scenarios; no controller Unknown event was fabricated.",
+    "Epochs one and two directly consumed learning document digests in retrospectives; epoch three references the enclosing declared output.",
+    "Incorrect provisional handoff and terminal-summary artifacts were retained and corrected through owner validation.",
+    "Optional composition roles remain inactive until typed contracts exist; arbitrary schema migration requires review."
+  ],
+  "independent_review": "All four deliverables accepted within the declared local/controller-backed scope; frozen live source and later focused-tested guards are distinguished."
+}

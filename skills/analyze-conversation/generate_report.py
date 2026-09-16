@@ -26,6 +26,59 @@ from patterns import (
 )
 
 
+def find_assistant_routing_signals(messages):
+    """Split assistant question-like matches into (signals, low_confidence).
+
+    High-confidence routing signals require BOTH that the assistant message
+    ends with a question mark AND that the next message in the transcript is
+    from the user — i.e., the assistant actually yielded the turn and asked.
+    Keyword-only matches (e.g. narration containing "which" plus a question
+    mark mid-paragraph) are retained separately as low-confidence candidates
+    instead of inflating the autonomy-break count (f-2065).
+    """
+    ordered = []
+    for msg in messages:
+        msg_type = msg.get("type")
+        if msg_type not in ("user", "assistant"):
+            continue
+        content = msg.get("message", {}).get("content", "")
+        text = patterns_extract_text(content)
+        if text:
+            ordered.append((msg_type, text))
+
+    signals, low_confidence = [], []
+    for index, (msg_type, text) in enumerate(ordered):
+        if msg_type != "assistant":
+            continue
+        lowered = text.lower()
+        if not any(marker in lowered for marker in AUTONOMY_ASSISTANT_MARKERS):
+            continue
+        if "?" not in text:
+            continue
+        ends_with_question = text.rstrip().endswith("?")
+        next_is_user = index + 1 < len(ordered) and ordered[index + 1][0] == "user"
+        if ends_with_question and next_is_user:
+            signals.append(text)
+        else:
+            low_confidence.append(text)
+    return signals, low_confidence
+
+
+def patterns_extract_text(content):
+    """Extract readable text from a normalized message content value."""
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts = []
+    for item in content:
+        if isinstance(item, dict) and item.get("type") == "text":
+            text = item.get("text")
+            if isinstance(text, str) and text:
+                parts.append(text)
+    return "\n".join(parts)
+
+
 AUTONOMY_USER_MARKERS = (
     "autonom",
     "break and ask",
@@ -40,6 +93,10 @@ AUTONOMY_USER_MARKERS = (
     "are you going to execute",
     "should we use",
     "should i kick",
+    "seemingly stopped",
+    "you've stopped",
+    "you have stopped",
+    "stopped again",
 )
 
 AUTONOMY_ASSISTANT_MARKERS = (
@@ -564,12 +621,9 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         for msg in stats.user_messages
         if any(marker in msg.lower() for marker in AUTONOMY_USER_MARKERS)
     ]
-    autonomy_assistant_signals = [
-        msg
-        for msg in stats.assistant_messages
-        if "?" in msg
-        and any(marker in msg.lower() for marker in AUTONOMY_ASSISTANT_MARKERS)
-    ]
+    autonomy_assistant_signals, autonomy_assistant_low_confidence = (
+        find_assistant_routing_signals(messages)
+    )
 
     # Generate report
     report_lines = []
@@ -673,6 +727,11 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     )
     report_lines.append(
         f"- **Assistant routing questions**: {len(autonomy_assistant_signals)}"
+        + (
+            f" (+ {len(autonomy_assistant_low_confidence)} low-confidence question candidates)"
+            if autonomy_assistant_low_confidence
+            else ""
+        )
     )
     report_lines.append("")
     if autonomy_user_signals:
@@ -687,7 +746,19 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         for signal in autonomy_assistant_signals[:10]:
             report_lines.append(f"- {redact_sensitive_text(signal).replace(chr(10), ' ')[:220]}")
         report_lines.append("")
-    if autonomy_user_signals or autonomy_assistant_signals:
+    if autonomy_assistant_low_confidence:
+        report_lines.append("### Low-Confidence Question Candidates")
+        report_lines.append("")
+        report_lines.append(
+            "Question-like keyword matches without a following user reply — usually "
+            "investigation narration, not a yielded turn. Review only if the turn also "
+            "ended there."
+        )
+        report_lines.append("")
+        for signal in autonomy_assistant_low_confidence[:10]:
+            report_lines.append(f"- {redact_sensitive_text(signal).replace(chr(10), ' ')[:220]}")
+        report_lines.append("")
+    if autonomy_user_signals or autonomy_assistant_signals or autonomy_assistant_low_confidence:
         report_lines.append("### Recommended Operating Rule")
         report_lines.append("")
         report_lines.append(
@@ -995,6 +1066,53 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 2 and sys.argv[1] == "--opencode":
+        # opencode runtime: sessions live in SQLite, not JSONL. Export the
+        # selected session to a temp normalized transcript, then reuse the
+        # standard pipeline. The exported session identity is printed loudly
+        # so the analyzed session is never ambiguous.
+        import tempfile
+
+        from opencode_adapter import export_session, default_db
+
+        selector = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("--") else None
+        db_override = None
+        if "--db" in sys.argv:
+            db_override = Path(sys.argv[sys.argv.index("--db") + 1])
+        db_path = db_override or default_db()
+        if not db_path.exists():
+            print(f"error: opencode.db not found at {db_path}", file=sys.stderr)
+            sys.exit(1)
+        identity = {}
+        with tempfile.TemporaryDirectory() as tmp:
+            slug = "session"
+            try:
+                pre = export_session(db_path, selector, Path(tmp) / "probe.jsonl")
+                slug = pre["slug"]
+            except SystemExit as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                sys.exit(1)
+            except Exception as exc:
+                print(f"error: opencode export failed: {exc}", file=sys.stderr)
+                sys.exit(1)
+            out_path = Path(tmp) / f"{pre['id']}_{slug}.jsonl"
+            identity = export_session(db_path, selector, out_path)
+            if identity["messages"] == 0:
+                print(
+                    "error: selected session exported zero supported messages "
+                    "(empty or unsupported input) — refusing to emit a report",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            print(
+                f"Analyzing opencode session {identity['id']} ({identity['slug']}): "
+                f"{identity['title']}"
+            )
+            output_file = generate_markdown_report(str(out_path))
+        print("\nRetrospective analysis complete!")
+        print(f"Report: {output_file}")
+        sys.exit(0)
+
     if len(sys.argv) < 2:
         conversation_file = find_conversation_file()
 

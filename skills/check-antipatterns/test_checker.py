@@ -322,5 +322,64 @@ class FileLoadingTests(unittest.TestCase):
                 checker.read_conversation(path)
 
 
+class IdleWithPendingWorkTests(unittest.TestCase):
+    def test_probe_then_yield_is_flagged(self) -> None:
+        messages = (
+            checker._message("", "user", [{"type": "text", "text": "go"}]),
+            checker._message(
+                "",
+                "assistant",
+                [{"name": "Bash", "input": {"command": "overwatch status abc-123"}}],
+            ),
+        )
+        findings = checker.check_idle_with_pending_work(messages)
+        self.assertEqual(1, len(findings))
+        self.assertEqual("IDLE_WITH_PENDING_WORK", findings[0].kind)
+
+    def test_blocking_follow_wait_is_accepted(self) -> None:
+        messages = (
+            checker._message("", "user", [{"type": "text", "text": "go"}]),
+            checker._message(
+                "",
+                "assistant",
+                [
+                    {
+                        "name": "Bash",
+                        "input": {
+                            "command": "overwatch events abc-123 --follow --json"
+                        },
+                    }
+                ],
+            ),
+        )
+        self.assertEqual((), checker.check_idle_with_pending_work(messages))
+
+    def test_wait_after_probe_is_accepted(self) -> None:
+        messages = (
+            checker._message("", "user", [{"type": "text", "text": "go"}]),
+            checker._message(
+                "",
+                "assistant",
+                [{"name": "Bash", "input": {"command": "overwatch status abc-123"}}],
+            ),
+            checker._message(
+                "",
+                "assistant",
+                [
+                    {
+                        "name": "overwatch_overwatch_run",
+                        "input": {"command": ["x"], "wait": True},
+                    }
+                ],
+            ),
+        )
+        self.assertEqual((), checker.check_idle_with_pending_work(messages))
+
+    def test_score_counts_six_checks(self) -> None:
+        self.assertEqual(6, len(checker.IMPLEMENTED_CHECKS))
+        finding = checker.Finding("IDLE_WITH_PENDING_WORK", "MEDIUM", "1", "x", "y")
+        self.assertEqual(83, checker.heuristic_signal_score((finding,)))
+
+
 if __name__ == "__main__":
     unittest.main()

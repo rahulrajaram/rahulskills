@@ -93,6 +93,7 @@ IMPLEMENTED_CHECKS = frozenset(
         "MISSING_PREFLIGHT",
         "TOOL_DISCOVERY_GAP",
         "DESTRUCTIVE_OPERATION_WITHOUT_EXACT_GUARD",
+        "IDLE_WITH_PENDING_WORK",
     }
 )
 
@@ -773,6 +774,94 @@ def check_destructive_command_safety(
     return tuple(findings)
 
 
+TASK_STATUS_PROBE_MARKERS = (
+    "overwatch status",
+    "overwatch_overwatch_status",
+    "overwatch_events",
+    "overwatch_overwatch_events",
+    "overwatch_output",
+    "overwatch_overwatch_output",
+    "overwatch_receipt",
+    "overwatch_overwatch_receipt",
+)
+
+TASK_WAIT_MARKERS = (
+    "--follow",
+    "wait=true",
+    '"wait": true',
+    "'wait': true",
+    "wait_timeout",
+)
+
+
+def check_idle_with_pending_work(
+    messages: Sequence[dict[str, Any]],
+) -> tuple[Finding, ...]:
+    """Flag turns that end right after a non-blocking supervised-task probe.
+
+    Reporting a still-running task and yielding leaves a human to supply the
+    next pulse (f-2062). The corrected pattern is a blocking terminal-event
+    wait (events --follow / wait=true) inside the turn. Only probes among the
+    final two calls of the turn are candidates. Tool outputs are not part of
+    the normalized transcript, so a flagged probe requires review to confirm
+    the task was non-terminal at yield time.
+    """
+    calls_by_index: dict[int, list[str]] = {}
+    for index, name, tool_input in extract_tool_calls(messages):
+        if name == "Bash":
+            evidence = str(tool_input.get("command") or tool_input.get("cmd") or "")
+        else:
+            evidence = name + " " + json.dumps(tool_input, sort_keys=True, default=str)
+        calls_by_index.setdefault(index, []).append(evidence)
+
+    findings: list[Finding] = []
+    turn_calls: list[str] = []
+
+    def is_probe(call: str) -> bool:
+        lowered = call.lower()
+        return any(marker in lowered for marker in TASK_STATUS_PROBE_MARKERS)
+
+    def is_wait(call: str) -> bool:
+        lowered = call.lower()
+        return any(marker in lowered for marker in TASK_WAIT_MARKERS)
+
+    def close_turn(end_index: int) -> None:
+        if turn_calls:
+            probe_positions = [
+                position for position, call in enumerate(turn_calls) if is_probe(call)
+            ]
+            if probe_positions:
+                last_probe = probe_positions[-1]
+                waits_after_probe = any(
+                    is_wait(call) for call in turn_calls[last_probe:]
+                )
+                if last_probe >= len(turn_calls) - 2 and not waits_after_probe:
+                    findings.append(
+                        Finding(
+                            "IDLE_WITH_PENDING_WORK",
+                            "MEDIUM",
+                            str(end_index),
+                            turn_calls[last_probe][:160],
+                            "A supervised-task probe was among the last actions "
+                            "before the turn ended. Hold on a blocking "
+                            "terminal-event wait (events --follow / wait=true), or "
+                            "advance an independent slice, instead of yielding "
+                            "while the task is non-terminal; tool outputs are not "
+                            "in this transcript, so confirm the probed task's "
+                            "state.",
+                        )
+                    )
+        turn_calls.clear()
+
+    for index, message in enumerate(messages):
+        if message.get("type") == "user":
+            close_turn(index)
+        else:
+            turn_calls.extend(calls_by_index.get(index, []))
+    close_turn(len(messages) - 1)
+    return tuple(findings)
+
+
 def identify_good_practices(
     messages: Sequence[dict[str, Any]],
 ) -> tuple[GoodPractice, ...]:
@@ -902,6 +991,7 @@ def analyze(
         *check_credential_usage(data.messages),
         *check_tool_discovery(data.messages),
         *check_destructive_command_safety(data.messages),
+        *check_idle_with_pending_work(recent),
     )
     return tuple(findings), identify_good_practices(recent)
 

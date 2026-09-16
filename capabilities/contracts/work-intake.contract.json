@@ -1,0 +1,122 @@
+{
+  "contract_schema": 1,
+  "unit": {
+    "phase_id": "classify-work-horizon",
+    "skill": "work-intake",
+    "semantic_version": "1.1.0",
+    "guidance_digest": "9bd0645391f02332489da105470e2f13561ea18b28ae216022a2f5b1a4198fd8"
+  },
+  "inputs": [
+    {
+      "name": "work_description",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one",
+      "size_bound": "one conversation request"
+    },
+    {
+      "name": "project_state",
+      "epistemic_class": "observation",
+      "required": false,
+      "cardinality": "zero-or-one"
+    },
+    {
+      "name": "authorized_effect_classes",
+      "epistemic_class": "observation",
+      "required": false,
+      "cardinality": "zero-or-one"
+    },
+    {
+      "name": "continuation_handoff",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one",
+      "schema_digest": null
+    },
+    {
+      "name": "resume_discovery",
+      "epistemic_class": "artifact",
+      "required": false,
+      "cardinality": "zero-or-one",
+      "size_bound": "one invocation-local no_resumable_state result bound to the checked repository and scope",
+      "schema_digest": null
+    }
+  ],
+  "outputs": [
+    {
+      "name": "routing_decision",
+      "epistemic_class": "diagnostic",
+      "cardinality": "one",
+      "schema_digest": "13045567de1dfc1a9c8c74775d037de10200ef1633fad01d2a35ec3687e33026",
+      "schema_path": "../ports/routing-diagnostic.schema.json"
+    }
+  ],
+  "preconditions": {
+    "prior_stages": [],
+    "approvals": [],
+    "toolchains": [],
+    "platforms": [],
+    "accepted_contract_versions": []
+  },
+  "failures": [
+    {
+      "failure_type": "invalid_input",
+      "retryable": true,
+      "recovery": "Ask for the missing decisive signal only when it changes the route."
+    },
+    {
+      "failure_type": "conclusive_failure",
+      "retryable": false,
+      "recovery": "Report bounded classification with the open signal recorded."
+    }
+  ],
+  "effects": [
+    {
+      "kind": "none",
+      "mode": "read",
+      "ceiling": "in-context reasoning only; no side effects"
+    }
+  ],
+  "determinism": {
+    "status": "pure",
+    "canonical_serialization": "one recorded classification line: horizon, decisive signals, route, profile boundary",
+    "replay_inputs": true,
+    "nondeterminism_notes": "Model judgment over ambiguous requests; ambiguity resolves to bounded unless a durable-evidence signal is present."
+  },
+  "resources": {
+    "time_budget": "seconds"
+  },
+  "authority": {
+    "attenuate_only": true,
+    "author": "rahulskills",
+    "human_gates": [
+      "Escalate only when stated outcome and observed effect classes conflict, or when ratifying a design-only boundary."
+    ],
+    "ceiling": [
+      "classification and routing statements; no execution"
+    ]
+  },
+  "evidence": {
+    "acceptance_checks": [
+      "Continuation routing preserves the existing scope, policy, budget and stop conditions without reducing a multi-epoch grant to one iteration.",
+      "Routing decision names horizon, decisive signals, selected route, and any profile-check boundary.",
+      "Fast path is owned by continue-work: a supplied continuation handoff is delegated there and its direct design-owner decision preserves scope, policy, budget and stop conditions; an exhausted batch or expanding envelope routes to the principal.",
+      "Resume discovery is delegated to continue-work exactly once; intake consumes a same-repository/scope no_resumable_state result to classify a genuine new statement or ask once when none exists, and never cycles back without changed relevant state or a new invocation."
+    ],
+    "artifact_provenance": [
+      "one recorded line in the session, reusable by downstream skills"
+    ],
+    "journal_events": [],
+    "report_boundary": "A route is a recommendation to the caller, not an effect grant."
+  },
+  "compatibility": {
+    "breaking_widenings": [
+      "effect",
+      "authority",
+      "confinement",
+      "resource",
+      "recovery",
+      "output_meaning"
+    ]
+  }
+}

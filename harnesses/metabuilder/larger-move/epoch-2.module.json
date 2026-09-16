@@ -1,0 +1,141 @@
+{
+  "schema_version": 2,
+  "harness_id": "larger-move-qualification-epoch-2",
+  "objective": "Run bounded local consumer qualification epoch 2 under the approved larger-move scope.",
+  "requirements": [
+    {
+      "id": "continuation-contract",
+      "statement": "The qualification suite checks continuation state identity, budget, authority, terminal and reconciliation distinctions.",
+      "acceptance": [
+        "Valid, complete, blocked, invalid or stale, and unknown or reconcile outcomes are deterministic.",
+        "Renewal, budget exhaustion, revoked or expired grants, duplicate requests and terminal no-dispatch are exercised.",
+        "The result does not authenticate actor labels or grant continuation authority."
+      ],
+      "depends_on": [],
+      "evidence_actions": [
+        "run-qualification-epoch"
+      ]
+    },
+    {
+      "id": "composition-locks",
+      "statement": "The qualification suite checks exact composition identity and typed compatibility without unreviewed widening.",
+      "acceptance": [
+        "Pinned identities and typed ports are accepted.",
+        "Stale, incompatible or widening changes are refused with deterministic reports.",
+        "Unknown compatibility remains review-required."
+      ],
+      "depends_on": [],
+      "evidence_actions": [
+        "run-qualification-epoch"
+      ]
+    },
+    {
+      "id": "learning-ingestion",
+      "statement": "The qualification suite checks learning records as provenance-preserving retrospective claims.",
+      "acceptance": [
+        "Records are validated, deduplicated and retained with original evidence references.",
+        "Malformed records and provenance conflicts are surfaced.",
+        "Ingestion does not promote claims into evidence, approval or authority."
+      ],
+      "depends_on": [],
+      "evidence_actions": [
+        "run-qualification-epoch"
+      ]
+    },
+    {
+      "id": "continuation-trace",
+      "statement": "Retain the frozen expected trace for the owner to compare against separate live controller and fresh-session evidence.",
+      "acceptance": [
+        "The consumer report retains expected outcomes and component refusal tests; it does not claim that later live epochs or fresh sessions occurred.",
+        "Controller observations and consumer claims remain distinct.",
+        "Multi-epoch orchestration remains a separate owner operation."
+      ],
+      "depends_on": [
+        "continuation-contract",
+        "composition-locks",
+        "learning-ingestion"
+      ],
+      "evidence_actions": [
+        "run-qualification-epoch"
+      ]
+    }
+  ],
+  "plan": {
+    "root_workflow": "qualification",
+    "workflows": {
+      "workflows": [
+        {
+          "id": "qualification",
+          "root": {
+            "kind": "action",
+            "action": "run-qualification-epoch"
+          }
+        }
+      ]
+    }
+  },
+  "actions": [
+    {
+      "id": "run-qualification-epoch",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-S",
+          "tests/larger_move_qualification.py",
+          "--epoch",
+          "2",
+          "--campaign-id",
+          "rahulskills-continuation-composition",
+          "--run-id",
+          "larger-move-epoch-2",
+          "--policy-digest",
+          "7ad319481d9dfdc1f1210ddcd167c637184203bcd2db7ea518a0fefe0585f789",
+          "--source-commit",
+          "SOURCE_COMMIT_TO_BIND"
+        ],
+        "cwd": ".",
+        "toolchains": [
+          {
+            "id": "system-python3",
+            "provider": "system",
+            "executables": [
+              "/usr/bin/python3"
+            ]
+          }
+        ],
+        "outputs": [
+          {
+            "id": "qualification-report",
+            "path": "qualification.json",
+            "media_type": "application/json",
+            "max_bytes": 262144
+          }
+        ]
+      },
+      "timeout_seconds": 900
+    }
+  ],
+  "retrospectives": {
+    "epoch": {
+      "intent": "Review epoch 2 evidence, original learning claims and continuation limits.",
+      "template_id": "metabuilder-epoch-retrospective-v1"
+    },
+    "workers": [
+      {
+        "worker_id": "qualification-suite",
+        "intent": "Record checks attempted and evidence observed.",
+        "actions": [
+          "run-qualification-epoch"
+        ],
+        "template_id": "metabuilder-worker-retrospective-v1"
+      }
+    ]
+  },
+  "bounds": {
+    "max_epochs": 1,
+    "max_elapsed_seconds": 900,
+    "max_blocked_requirements": 0,
+    "max_concurrent_external_actions": 1
+  }
+}

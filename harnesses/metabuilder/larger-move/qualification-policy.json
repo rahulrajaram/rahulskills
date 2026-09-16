@@ -1,0 +1,25 @@
+{
+  "policy_schema": 1,
+  "campaign_id": "rahulskills-continuation-composition",
+  "scope": [
+    "continuation-state",
+    "composition-lock",
+    "learning-ingestion",
+    "three-local-consumer-epochs"
+  ],
+  "effects": [
+    "read committed source",
+    "execute existing system Python",
+    "write declared qualification output and local controller run evidence"
+  ],
+  "batch_limit": 4,
+  "renewal": "automatic after completed evidence/report checkpoint while approved objective remains unmet",
+  "stop_conditions": [
+    "objective complete",
+    "revoked or expired grant",
+    "unapproved scope or effect expansion",
+    "reserved owner decision",
+    "three unchanged proof failures without progress"
+  ],
+  "authority_boundary": "This policy describes the qualification scenario; live principal approval and controller admission remain separate required inputs."
+}

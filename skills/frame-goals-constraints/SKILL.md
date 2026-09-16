@@ -215,6 +215,11 @@ When planning is requested, preserve the customer outcome, horizon-to-wedge
 logic, principles, constraints, bets, maturity, and unresolved decisions in the
 issue tree or execution DAG.
 
+When the work is long-horizon and routes to a MetaBuilder harness campaign,
+preserve the thesis as a durable artifact the harness brief can cite by
+digest; `metabuilder-harness-design` consumes it instead of re-deriving
+goals, constraints, and risks.
+
 When marketing language is requested, derive it from the customer and product
 layers. Keep the technical layer as the truth source and flag any claim whose
 evidence is not yet strong enough for external use.

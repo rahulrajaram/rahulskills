@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "kind": "consumer-semantic-oracle",
+  "authority": "none; this artifact specifies expected behavior only",
+  "baseline": [
+    {"epoch": 1, "owner_session": 1, "expected_action_count": 1, "expected_report": "reconstructable", "expected_next": "continue"},
+    {"epoch": 2, "owner_session": 2, "expected_action_count": 1, "expected_report": "reconstructable", "expected_next": "renew-authorized-scenario-batch"},
+    {"epoch": 3, "owner_session": 3, "expected_action_count": 1, "expected_report": "reconstructable", "expected_next": "complete"}
+  ],
+  "negative_variants": [
+    {"case": "fixed-budget-exhausted", "expected": "blocked", "new_effects": 0},
+    {"case": "renewal-approval-required", "expected": "blocked", "new_effects": 0},
+    {"case": "revoked-grant", "expected": "blocked", "new_effects": 0},
+    {"case": "expired-grant", "expected": "blocked", "new_effects": 0},
+    {"case": "stale-source-or-policy", "expected": "invalid", "new_effects": 0},
+    {"case": "malformed-state", "expected": "invalid", "new_effects": 0},
+    {"case": "completed-state", "expected": "complete", "new_effects": 0},
+    {"case": "duplicate-observed-attempt", "expected": "no-redispatch", "new_effects": 0},
+    {"case": "ambiguous-attempt", "expected": "reconcile", "new_effects": 0},
+    {"case": "effect-expansion", "expected": "blocked", "new_effects": 0}
+  ],
+  "separate_evidence": {
+    "controller": "Exact run status, action observations, output digests, retrospectives and reconstructed report",
+    "session": "Native agent session identity, invoked owner and observations; never claimed as controller-governed agent dispatch",
+    "consumer": "Comparison against this oracle, limits, failure disposition and semantic assessment"
+  }
+}

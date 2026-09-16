@@ -1,0 +1,17 @@
+{
+  "campaign_id": "camp-1",
+  "epoch": 1,
+  "source_run_id": "run-1",
+  "repository_identity": "repo@abc",
+  "source_commit": "ffffffffffffffffffffffffffffffffffffffff",
+  "objective_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "module_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "bundle_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "policy_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "action_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "attempt_status": "ready",
+  "current_state_id": "c748274ba3042349ad44fd05c1088d1f88f6a50be92d986d5beb507414742b18",
+  "evidence_refs": ["obs-1"]
+  ,"predecessor_state_id": "0000000000000000000000000000000000000000000000000000000000000000"
+  ,"budget": {"batch_limit": 4, "consumed": 0, "remaining": 4, "total_consumed": 0, "total_ceiling": 8}
+}

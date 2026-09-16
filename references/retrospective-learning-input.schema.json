@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rahulskills.local/references/retrospective-learning-input.schema.json",
+  "title": "Retrospective Learning Input",
+  "description": "A deterministic, provenance-bound set of learning claims. It is not controller evidence, authority, or a promotion decision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "context", "entries", "digest"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "retrospective-learning-input"},
+    "context": {
+      "type": "object", "additionalProperties": false,
+      "required": ["campaign_id", "epoch", "run_id", "source_commit", "policy_digest"],
+      "properties": {
+        "campaign_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+        "epoch": {"type": "integer", "minimum": 1},
+        "run_id": {"type": "string", "minLength": 1},
+        "source_commit": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+        "policy_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "entries": {
+      "type": "array", "maxItems": 10000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["entry_id", "record_digest", "epistemic_class", "record"],
+        "properties": {
+          "entry_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "record_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "epistemic_class": {"const": "claim"},
+          "record": {"$ref": "learning-record.schema.json"}
+        }
+      }
+    },
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
