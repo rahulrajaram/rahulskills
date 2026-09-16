@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+"""gate-run — run a gate command and emit a durable, identity-bound receipt.
+
+Captures argv, exit code, git commit/tree identity, Cargo.lock and toolchain
+identity, executed-vs-cached freshness evidence, and artifact digests, so a
+green log cannot masquerade as a fresh gate run (f-2032: cached cargo clippy
+reruns produced 72-byte "Finished" logs that were cited as twice-green).
+
+Usage:
+    gate-run <name> [--out DIR] [--require-executed] [--artifacts GLOB ...]
+             -- <command...>
+
+Exit codes:
+    0                 command succeeded (and, with --require-executed, its
+                      evidence shows real execution)
+    <command's code>  command failed
+    3                 command succeeded but evidence was cached-only and
+                      --require-executed was set
+    2                 usage error
+    4                 internal error while writing the receipt
+"""
+from __future__ import annotations
+
+import argparse
+import datetime
+import glob as globmod
+import hashlib
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+import time
+
+
+def utc_now() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def sha256_file(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def git_info(cwd: str) -> dict:
+    def run(*args: str):
+        try:
+            result = subprocess.run(
+                ["git", "-C", cwd, *args],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if result.returncode != 0:
+                return None
+            return result.stdout.strip()
+        except Exception:
+            return None
+
+    porcelain = run("status", "--porcelain")
+    return {
+        "commit": run("rev-parse", "HEAD"),
+        "tree": run("rev-parse", "HEAD^{tree}"),
+        "dirty": bool(porcelain) if porcelain is not None else None,
+    }
+
+
+def tool_versions() -> dict:
+    versions = {}
+    for name in ("rustc", "cargo"):
+        try:
+            result = subprocess.run(
+                [name, "--version"], capture_output=True, text=True, timeout=15
+            )
+            versions[name] = result.stdout.strip() if result.returncode == 0 else None
+        except Exception:
+            versions[name] = None
+    return versions
+
+
+def freshness(log_text: str) -> dict:
+    """Classify executed-vs-cached evidence from cargo-style output.
+
+    `executed` is True only when the log shows real work this run
+    (Checking/Compiling/Running/Doc-tests lines); False when the log shows
+    a fingerprint-cached rerun (Finished without those markers); None when
+    no cargo-style markers are present at all (unknown, not evidence of
+    execution).
+    """
+    work = re.search(
+        r"^\s*(Checking|Compiling|Running|Doc-tests|Fresh)", log_text, re.M
+    )
+    finished = re.search(r"^\s*Finished", log_text, re.M)
+    if work:
+        return {"executed": True, "evidence": "work lines present (Checking/Compiling/...)"}
+    if finished:
+        return {
+            "executed": False,
+            "evidence": "cached rerun: Finished without Checking/Compiling lines",
+        }
+    return {"executed": None, "evidence": "no cargo-style freshness markers observed"}
+
+
+def write_receipt(out_dir: str, name: str, receipt: dict) -> str:
+    path = os.path.join(out_dir, f"{name}.receipt.json")
+    tmp = path + ".tmp"
+    with open(tmp, "w") as handle:
+        json.dump(receipt, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+    os.replace(tmp, path)
+    return path
+
+
+def main() -> int:
+    if "--" not in sys.argv:
+        print("gate-run: missing '-- <command>'", file=sys.stderr)
+        return 2
+    split = sys.argv.index("--")
+    left, command = sys.argv[1:split], sys.argv[split + 1 :]
+    if not command:
+        print("gate-run: empty command after '--'", file=sys.stderr)
+        return 2
+
+    parser = argparse.ArgumentParser(prog="gate-run")
+    parser.add_argument("name", help="Receipt name (file stem)")
+    parser.add_argument(
+        "--out",
+        default=os.path.join(os.getcwd(), ".gate-receipts"),
+        help="Receipt/log directory (default: ./.gate-receipts)",
+    )
+    parser.add_argument(
+        "--require-executed",
+        action="store_true",
+        help="Exit 3 when a successful command's evidence is cached-only",
+    )
+    parser.add_argument(
+        "--artifacts",
+        nargs="*",
+        default=[],
+        help="Glob patterns whose files are digested into the receipt",
+    )
+    args = parser.parse_args(left)
+
+    try:
+        os.makedirs(args.out, exist_ok=True)
+    except Exception as exc:
+        print(f"gate-run: cannot create {args.out}: {exc}", file=sys.stderr)
+        return 4
+
+    cwd = os.getcwd()
+    log_path = os.path.join(args.out, f"{args.name}.log")
+
+    started = time.time()
+    started_utc = utc_now()
+    captured = []
+    try:
+        proc = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            cwd=cwd,
+        )
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            captured.append(line)
+            sys.stdout.write(line)
+            sys.stdout.flush()
+        exit_code = proc.wait()
+    except FileNotFoundError as exc:
+        print(f"gate-run: command not found: {exc}", file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        proc.kill()
+        exit_code = 130
+    log_text = "".join(captured)
+    with open(log_path, "w") as handle:
+        handle.write(log_text)
+
+    artifacts = []
+    for pattern in args.artifacts:
+        for match in sorted(globmod.glob(pattern, recursive=True)):
+            if os.path.isfile(match):
+                try:
+                    artifacts.append(
+                        {
+                            "path": os.path.relpath(match, cwd),
+                            "sha256": sha256_file(match),
+                            "bytes": os.path.getsize(match),
+                        }
+                    )
+                except OSError:
+                    continue
+
+    lock_path = os.path.join(cwd, "Cargo.lock")
+    receipt = {
+        "schema": "gate-run.receipt.v1",
+        "name": args.name,
+        "command": command,
+        "cwd": cwd,
+        "host": socket.gethostname(),
+        "started_utc": started_utc,
+        "ended_utc": utc_now(),
+        "duration_sec": round(time.time() - started, 3),
+        "exit_code": exit_code,
+        "git": git_info(cwd),
+        "cargo_lock_sha256": sha256_file(lock_path) if os.path.exists(lock_path) else None,
+        "tool_versions": tool_versions(),
+        "freshness": freshness(log_text),
+        "artifacts": artifacts,
+        "log": os.path.relpath(log_path, cwd),
+        "log_sha256": sha256_file(log_path),
+        "env": {
+            "path_dirs": len([p for p in os.environ.get("PATH", "").split(os.pathsep) if p]),
+            "vars": sorted(os.environ.keys()),
+        },
+    }
+    try:
+        receipt_path = write_receipt(args.out, args.name, receipt)
+    except Exception as exc:
+        print(f"gate-run: cannot write receipt: {exc}", file=sys.stderr)
+        return 4
+
+    fresh = receipt["freshness"]["executed"]
+    verdict = "executed" if fresh else ("cached" if fresh is False else "unknown")
+    print(
+        f"gate-run: exit={exit_code} freshness={verdict} receipt={os.path.relpath(receipt_path, cwd)}"
+    )
+    if exit_code != 0:
+        return exit_code
+    if args.require_executed and fresh is False:
+        print(
+            "gate-run: rejected — evidence is cached-only and --require-executed was set",
+            file=sys.stderr,
+        )
+        return 3
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
