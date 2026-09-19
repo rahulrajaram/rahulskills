@@ -166,8 +166,9 @@ effect = "local-write"
 effects = ["readonly", "local-write", "local-process", "external-call"]
 approval_boundaries = ["provider-execution", "source-snapshot", "installation"]
 layer = "composer"
-overlaps = ["metabuilder-assess"]
+overlaps = ["metabuilder-assess", "leaky-abstractions"]
 overlap_kind = "producer-consumer"
+overlap_kinds = { leaky-abstractions = "router" }
 
 [skills.code-review.modes.import]
 commands = ["python3"]
@@ -237,7 +238,7 @@ layer = "primitive"
 effect = "local-write"
 effects = ["local-write"]
 layer = "composer"
-overlaps = ["fp-refine"]
+overlaps = ["fp-refine", "leaky-abstractions"]
 overlap_kind = "router"
 
 [skills.leaky-abstractions]
