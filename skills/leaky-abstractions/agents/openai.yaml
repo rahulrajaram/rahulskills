@@ -1,0 +1,4 @@
+interface:
+  display_name: "Leaky Abstractions"
+  short_description: "Review code, plans, and designs for consequential abstraction leaks."
+  default_prompt: "Use $leaky-abstractions to review the requested code, plan, or design document for evidence-backed abstraction leakage, consumer burden, and contract uniformity; do not modify the target unless explicitly asked."

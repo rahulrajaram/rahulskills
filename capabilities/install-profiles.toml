@@ -29,6 +29,7 @@ core = [
   "ideate",
   "install-commithooks",
   "invokellm",
+  "leaky-abstractions",
   "markdown-to-pdf",
   "max-columns",
   "memleak-investigate",

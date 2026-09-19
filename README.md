@@ -66,7 +66,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (57)
+### Package-managed skills (58)
 
 Authored in this package and available for explicit selection on Pi, Codex, and
 Claude Code. The default `core` profile omits the optional design skills
@@ -101,6 +101,7 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `ideate` | Evolutionary ideation across multiple AI models via gptengage |
 | `install-commithooks` | Install shared commithooks framework into a project |
 | `invokellm` | Invoke one or more AI CLIs via gptengage, defaulting to gemini, claude, and codex |
+| `leaky-abstractions` | Review code, plans, and design documents for consequential abstraction leakage and consumer burden |
 | `markdown-to-pdf` | Convert markdown to PDF via pandoc + weasyprint |
 | `max-columns` | Keep output within a user-specified column width |
 | `memleak-investigate` | Investigate memory leaks using /proc, eBPF, and system tools |
