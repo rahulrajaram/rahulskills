@@ -240,6 +240,13 @@ layer = "composer"
 overlaps = ["fp-refine"]
 overlap_kind = "router"
 
+[skills.leaky-abstractions]
+effect = "local-write"
+effects = ["readonly", "local-write"]
+layer = "workflow"
+overlaps = ["code-review", "clean-code-refine"]
+overlap_kind = "router"
+
 [skills.ecosystem-borrow-audit]
 commands = ["git", "gptengage"]
 effect = "external-call"
