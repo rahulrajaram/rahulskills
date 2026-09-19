@@ -7,16 +7,36 @@ description: "Analyze Git history and safely squash contiguous thematic commits 
 
 Analyze first and rewrite only after the user approves an exact plan.
 
-## Default-branch protection (hard rule)
+## Default-branch rewrites (controlled exception)
 
-Never propose, plan, or execute a rewrite of the repository's default
-branch — `master`, `main`, or the branch that tracks the remote default —
-even when its commits are unpushed, and even when the user answers a
-generic approval prompt. Squash targets are feature branches the user
-identifies. If the current branch is the default branch and the user did
-not explicitly name it as the target in this request, stop before analysis
-becomes execution and ask which branch they mean. Every plan and approval
-prompt must name the exact branch and commit range it will rewrite.
+Feature branches remain the preferred squash targets. The repository's default
+branch — `master`, `main`, or the branch matching the locally recorded remote
+default — may be analyzed and rewritten only through this additional gate:
+
+- The user must explicitly name the exact default branch as the squash target.
+  If they did not, ask which branch they intend before including it in a plan.
+- Naming the branch authorizes analysis only. After the user approves the exact
+  plan, create and verify the required recovery artifacts, then always stop and
+  ask for a separate, immediate confirmation before starting the rewrite.
+  Earlier, standing, or generic permission does not satisfy this final gate.
+- The final confirmation prompt must name the fully qualified branch, original
+  HEAD, exact commit range, groups and replacement messages, expected
+  commit-count reduction, whether any selected commit is published or otherwise
+  shared, the exact private bundle path and backup ref already created, and the
+  fact that no push will occur.
+- The user's confirming response must unambiguously name the default branch and
+  range being approved. A bare `yes`, `continue`, or approval of an unnamed plan
+  is insufficient.
+- If selected commits are reachable from a remote-tracking ref or otherwise
+  known to be shared, the same response must explicitly acknowledge that the
+  local rewrite will diverge from published history. It still does not authorize
+  a force-push, which always requires separate approval.
+- Confirmation is valid only while HEAD, the clean-tree result, selected refs,
+  commit range, and publication status remain unchanged. Re-plan and re-prompt
+  after any relevant change.
+
+Every plan and approval prompt, including feature-branch plans, must name the
+exact branch and commit range it will rewrite.
 
 Before any mutation, read and follow
 [`../../references/history-rewrite-safety.md`](../../references/history-rewrite-safety.md)
@@ -27,8 +47,11 @@ execution rules.
 
 ## Arguments
 
-`$squash-commits [N] [--all] [--batch] [--max-passes M]`
+`$squash-commits [<branch>] [N] [--all] [--batch] [--max-passes M]`
 
+- `<branch>` selects the target branch. It is optional for feature branches but
+  required when the target is a default branch. The target must be checked out
+  in the current worktree before execution.
 - `N` limits analysis to the most recent N eligible commits; default to 20.
 - Without `--all`, analyze only commits ahead of the upstream tracking branch.
 - `--all` may include pushed commits in the preview. It does not authorize
@@ -101,8 +124,8 @@ Stop before analysis becomes execution when:
 - `.git/index.lock` or a ref lock exists and another Git process may be active;
 - HEAD changes during planning;
 - repository ownership, target branch, or requested range is ambiguous;
-- the current branch is the default branch and the user did not
-  explicitly name it as the squash target.
+- the current branch is a default branch and the user did not explicitly name
+  that exact branch as the squash target.
 
 Determine the analysis range:
 
@@ -127,7 +150,10 @@ git lfs env 2>/dev/null
 
 Also identify merge commits, signed commits or tags, branch protection
 implications, repeated hotspot files, auto-repair or conflict-fix commits, and
-the number of later commits that a deeper rewrite would replay.
+the number of later commits that a deeper rewrite would replay. Determine
+whether each selected commit is reachable from any local remote-tracking ref;
+do not infer that a repository or package is local-only merely because it has
+no configured upstream.
 
 ### 2. Present an Exact Plan
 
@@ -162,6 +188,12 @@ until the user explicitly approves the exact groups and messages. Offer a
 conservative choice that keeps only groups of at least three commits when the
 range is large or replay-sensitive.
 
+For a default branch, approval of the plan authorizes only recovery preparation,
+not the rewrite. After approval, continue through revalidation and verified
+backup creation, then issue the mandatory final confirmation prompt described
+in the controlled-exception section. Do this even when the initial request
+already named the branch or requested immediate execution.
+
 For batch mode, approval must also fix:
 
 - the maximum number of passes;
@@ -171,9 +203,12 @@ For batch mode, approval must also fix:
 
 ### 3. Revalidate and Create a Backup Ref
 
+For a default branch, enter this step only after the user approves the exact
+plan. That approval authorizes recovery preparation but not history rewriting.
+
 Immediately before execution, confirm that the tree is still clean, HEAD still
 equals the recorded original HEAD, and the approved range still resolves to
-the same commits.
+the same commits. Revalidate publication status and the selected refs too.
 
 Create a collision-safe ref without moving or overwriting an existing ref:
 
@@ -187,7 +222,19 @@ git rev-parse --verify "$backup_ref"
 Record the unchanged base SHA as well as the backup ref. In batch mode, create
 a distinct backup ref before every pass.
 
+After both the shared contract's independent bundle and this backup ref have
+been created and verified for a default branch, present the mandatory final
+confirmation prompt with their exact locations and wait. Do not combine the
+prompt with another unresolved choice. If the response does not name the exact
+default branch and range, ask again without starting the rewrite. If the user
+declines or stops, leave the recovery artifacts intact and report them.
+
 ### 4. Execute the Smallest Approved Rewrite
+
+For a default branch, enter this step only after the mandatory confirmation in
+the immediately preceding exchange. Recheck that HEAD, the clean-tree result,
+selected refs, commit range, and publication status still match the confirmed
+facts. If any differ, return to planning and obtain a fresh confirmation.
 
 Prefer one contiguous group per pass. Build a deterministic sequence editor in
 a directory created with `mktemp -d`:
