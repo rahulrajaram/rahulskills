@@ -55,6 +55,7 @@ core = [
   "supervised-dispatch",
   "system-memory-audit",
   "test",
+  "translate-output",
   "whitepaper",
   "work-intake",
   "yore-vocabulary-harvest",
