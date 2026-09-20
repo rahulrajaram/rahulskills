@@ -25,8 +25,8 @@ truth, and the sandbox workspace is a working copy.
   `/var/lib/incus/storage-pools/chasm/custom/default_agent-sandbox-workspace-sandbox-<name>`
   (Incus prefixes the project name `default_`). Writes on either side appear
   on the other instantly (virtiofs).
-- The guest agent user is uid/gid 1001 (host group `harbinger` has gid 1001;
-  operator `rahul` is a member). Population from the host must map ownership
+- The guest agent user is uid/gid 1001 (the host group with gid 1001, of which
+  the operator is a member). Population from the host must map ownership
   to 1001:1001 or the agent cannot write its own files.
 - The site runs **one sandbox VM at a time**; `chasm create/start` refuses
   while another VM runs. Stop the other sandbox first (`chasm stop <name>`);
