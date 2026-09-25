@@ -82,6 +82,7 @@ layer = "workflow"
 
 [skills.invokellm]
 commands = ["gptengage"]
+portable_payloads = ["references/gptengage-invocation.md", "references/gptengage-invoke.md"]
 effect = "external-call"
 effects = ["external-call"]
 layer = "primitive"
@@ -90,6 +91,7 @@ overlap_kind = "shared-backend"
 
 [skills.debate]
 commands = ["gptengage"]
+portable_payloads = ["references/gptengage-invocation.md", "references/gptengage-debate.md"]
 effect = "external-call"
 effects = ["external-call"]
 layer = "workflow"
@@ -105,6 +107,7 @@ overlap_kind = "producer-consumer"
 
 [skills.ideate]
 commands = ["gptengage"]
+portable_payloads = ["references/gptengage-invocation.md", "references/gptengage-ideate.md"]
 effect = "external-call"
 effects = ["external-call"]
 layer = "workflow"
@@ -118,6 +121,19 @@ effects = ["local-process"]
 layer = "workflow"
 overlaps = ["supervised-dispatch"]
 overlap_kind = "composer"
+
+[skills.worktree-salvage]
+commands = ["git"]
+effect = "readonly"
+effects = ["readonly"]
+layer = "workflow"
+
+[skills.new-worktree-feature]
+commands = ["git"]
+effect = "local-write"
+effects = ["readonly", "local-write"]
+approval_boundaries = ["worktree-create"]
+layer = "workflow"
 
 [skills.markdown-to-pdf]
 commands = ["pandoc", "weasyprint"]
@@ -162,6 +178,7 @@ layer = "workflow"
 platforms = ["linux"]
 commands = ["python3", "git"]
 optional_commands = ["opencode"]
+portable_payloads = ["references/learning-record.schema.json"]
 effect = "local-write"
 effects = ["readonly", "local-write", "local-process", "external-call"]
 approval_boundaries = ["provider-execution", "source-snapshot", "installation"]
@@ -186,6 +203,7 @@ effect = "external-call"
 effects = ["readonly", "local-write", "local-process", "external-call"]
 
 [skills.check-antipatterns]
+portable_payloads = ["references/learning-record.schema.json"]
 effect = "readonly"
 effects = ["readonly"]
 layer = "primitive"
@@ -205,6 +223,18 @@ effect = "local-write"
 effects = ["local-write"]
 layer = "workflow"
 
+[skills.translate-output]
+effect = "none"
+effects = ["none"]
+layer = "primitive"
+
+[skills.chasm-migrate]
+effect = "local-write"
+effects = ["local-write"]
+layer = "workflow"
+overlaps = ["autonomy-loop", "continue-work", "handoff"]
+overlap_kind = "producer-consumer"
+
 [skills.autonomous-execution-contract]
 effect = "local-write"
 effects = ["local-write"]
@@ -217,7 +247,7 @@ overlap_kinds = { autonomy-loop = "composer", define-operating-charter = "produc
 effect = "local-write"
 effects = ["local-write"]
 layer = "composer"
-overlaps = ["autonomous-execution-contract"]
+overlaps = ["autonomous-execution-contract", "chasm-migrate"]
 overlap_kind = "composer"
 
 [skills.commit]
@@ -301,7 +331,7 @@ commands = ["git"]
 effect = "local-write"
 effects = ["local-write"]
 layer = "composer"
-overlaps = ["commit", "handoff-extract"]
+overlaps = ["commit", "handoff-extract", "chasm-migrate"]
 overlap_kind = "composer"
 
 [skills.handoff-extract]
@@ -415,23 +445,27 @@ overlap_kind = "composer"
 
 [skills.reference-cleaner]
 commands = ["git", "git-filter-repo"]
+portable_payloads = ["references/history-rewrite-safety.md"]
 effect = "destructive"
 effects = ["destructive"]
 layer = "workflow"
 
 [skills.rewrite-commit-messages]
 commands = ["git", "git-filter-repo"]
+portable_payloads = ["references/history-rewrite-safety.md"]
 effect = "destructive"
 effects = ["destructive"]
 layer = "workflow"
 
 [skills.skill-creator]
+portable_payloads = ["references/skill-authoring-contract.md"]
 effect = "local-write"
 effects = ["local-write"]
 layer = "workflow"
 
 [skills.squash-commits]
 commands = ["git"]
+portable_payloads = ["references/history-rewrite-safety.md"]
 effect = "destructive"
 effects = ["destructive"]
 layer = "workflow"
@@ -498,7 +532,7 @@ effect = "readonly"
 effects = ["readonly"]
 layer = "composer"
 routes_to = ["handoff", "work-intake", "metabuilder-harness-design", "metabuilder-consumer-qualification", "autonomy-loop"]
-overlaps = ["work-intake"]
+overlaps = ["work-intake", "chasm-migrate"]
 overlap_kind = "router"
 
 [skills.diagram-review-viewer]

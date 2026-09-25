@@ -17,10 +17,10 @@ Do NOT rely on the daemon's ambient environment for nested agent CLIs. Dispatch
 with `env_mode="caller_only"` and an explicit mapping:
 
 ```
-PATH=/home/rahul/.opencode/bin:/home/rahul/.local/bin:<runtime bins>:/usr/bin:/bin
-HOME=/home/rahul
-LOGNAME=rahul  USER=rahul  SHELL=/usr/bin/zsh  TERM=xterm-256color
-XDG_RUNTIME_DIR=/run/user/1000       # add CARGO_NET_OFFLINE=true for cargo work
+PATH=$HOME/.opencode/bin:$HOME/.local/bin:<runtime bins>:/usr/local/bin:/usr/bin:/bin
+HOME=<operator-home>
+LOGNAME=<operator>  USER=<operator>  SHELL=<login shell>  TERM=xterm-256color
+XDG_RUNTIME_DIR=/run/user/<uid>      # add CARGO_NET_OFFLINE=true for cargo work
 ```
 
 Why: the daemon may run under systemd/desktop session variables (DISPLAY,

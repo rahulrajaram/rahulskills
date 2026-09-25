@@ -1,7 +1,6 @@
 # Skill Contract Registry
 
-Phase 0 of the composition rollout from
-[`docs/skill-composition-audit.md`](../../docs/skill-composition-audit.md).
+This directory holds the schema and checked contracts for skill composition.
 
 - [`skill-contract.schema.json`](skill-contract.schema.json) is the canonical
   contract shape. `work-intake.contract.json` is the worked example; read it
@@ -28,17 +27,9 @@ recipe role resolution, edge port matching against contract inputs/outputs,
 catalog overlap symmetry, and `overlap_kind` presence wherever `overlaps`
 is declared.
 
-Recipes declaring `selected_roles` also pass the strict
-`scripts/composition_lock.py` boundary. Required roles are always selected;
-optional preparation edges are inactive until their role is explicitly selected
-and supplied with a typed contract. Port `schema_path` values are relative to
-this directory, and their raw SHA256 identities must match `schema_digest`.
-The selected local recipe passes routing diagnostics to `routing_context`,
-leaving `objective_request` as a separate human input.
-
-Create a lock from the current recipe, catalog, contract directory and contract
-schema with `composition_lock.py create`; compare a saved lock to a freshly
-created one with `check`, or obtain a stable review report with `diff`. Identity
-changes require review rather than automatic migration. These repository tools
-do not implement MetaBuilder admission, validate artifact meaning, authenticate
-approvals or grant effects.
+When a recipe declares `selected_roles`, `scripts/composition_lock.py`
+checks that required roles are selected and that typed ports match the
+contracts. Port `schema_path` values are relative to this directory, and
+their raw SHA-256 identities must match `schema_digest`. The tool validates
+composition data; it does not implement MetaBuilder admission, validate
+artifact meaning, authenticate approvals or grant effects.

@@ -55,6 +55,7 @@ core = [
   "supervised-dispatch",
   "system-memory-audit",
   "test",
+  "translate-output",
   "whitepaper",
   "work-intake",
   "yore-vocabulary-harvest",
@@ -62,3 +63,7 @@ core = [
 ]
 design = ["figma", "figma-implement-design", "tui-web-design-orchestrator"]
 all = ["@core", "@design"]
+# Explicit guest development and host administration selections. These remain
+# opt-in so host defaults and the historical `all` profile are unchanged.
+chasm-development = ["@core", "new-worktree-feature", "worktree-salvage"]
+chasm-admin = ["chasm-migrate"]
