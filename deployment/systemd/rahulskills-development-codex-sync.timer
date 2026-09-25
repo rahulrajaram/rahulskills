@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep development sandbox Codex skills synchronized with this host
+
+[Timer]
+OnStartupSec=30s
+OnUnitInactiveSec=2min
+Unit=rahulskills-development-codex-sync.service
+
+[Install]
+WantedBy=timers.target

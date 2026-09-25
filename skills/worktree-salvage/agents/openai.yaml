@@ -1,0 +1,4 @@
+interface:
+  display_name: "Worktree Salvage"
+  short_description: "Audit and salvage work across Git worktrees"
+  default_prompt: "Use $worktree-salvage to audit this repository's worktrees and report what can be safely recovered."
