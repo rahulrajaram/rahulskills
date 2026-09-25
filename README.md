@@ -66,7 +66,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (62)
+### Package-managed skills (63)
 
 Authored in this package and available for explicit selection on Pi, Codex, and
 Claude Code. The default `core` profile omits the optional design skills
@@ -75,6 +75,7 @@ exclusions prevent package copies from shadowing system-owned skills.
 
 | Skill | Description |
 |-------|-------------|
+| `agent-stall-triage` | Diagnose and recover a stalled Pi, Codex, Claude, or OpenCode session while preserving its saved state |
 | `analyze-conversation` | Post-mortem analysis of conversations for anti-patterns and learnings |
 | `archdiagram` | Generate architecture diagrams from context or codebase |
 | `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |

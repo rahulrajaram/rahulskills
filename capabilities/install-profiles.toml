@@ -4,6 +4,7 @@ default = "core"
 
 [profiles]
 core = [
+  "agent-stall-triage",
   "analyze-conversation",
   "archdiagram",
   "autonomous-execution-contract",
