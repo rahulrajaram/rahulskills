@@ -1,160 +1,252 @@
 ---
 name: chasm-migrate
-description: >
-  Migrate a project into a chasm sandbox: copy (never move) the code into the
-  sandbox's own workspace volume, install the project's requirements inside
-  the guest, and verify the build plus the pinned rahulrajaram/dotfiles
-  artifacts. Use when the user asks to migrate/copy a project into a chasm
-  sandbox, give a project its own sandbox workspace, or set up a new sandbox
-  for existing work.
+description: "Copy a project into a Chasm sandbox's persistent /workspace, install only the project's required dependencies in the guest, and verify the result. Use when a user asks to migrate or copy existing project work into Chasm."
 metadata:
-  short-description: Migrate a project into a chasm sandbox
+  short-description: "Migrate a project into a Chasm sandbox"
 ---
 
 # Chasm project migration
 
-Migrate host-side work into a chasm sandbox VM: copy the code into the
-sandbox's own workspace, make the project's requirements true inside the
-guest, and prove it. Copying is one-way: the host tree stays the source of
-truth, and the sandbox workspace is a working copy.
+Copy a host project into a named Chasm sandbox and make it usable in the
+sandbox's persistent `/workspace`. Record which checkout is authoritative.
+Honor an existing sandbox-primary designation; for a new Chasm-first project,
+use the guest checkout as primary when that is the user's selected workflow.
+Retain host-primary operation when explicitly selected, and preserve the host
+copy in either case. Recover dirty and untracked work before re-import or deletion.
 
-## Model (verified on a live chasm site, 2026-09-19)
+## Intent and boundaries
 
-- A sandbox named `<name>` is Incus instance `sandbox-<name>`; its
-  `/workspace` is the host-side btrfs volume
-  `/var/lib/incus/storage-pools/chasm/custom/default_agent-sandbox-workspace-sandbox-<name>`
-  (Incus prefixes the project name `default_`). Writes on either side appear
-  on the other instantly (virtiofs).
-- The guest agent user is uid/gid 1001 (the host group with gid 1001, of which
-  the operator is a member). Population from the host must map ownership
-  to 1001:1001 or the agent cannot write its own files.
-- The site runs **one sandbox VM at a time**; `chasm create/start` refuses
-  while another VM runs. Stop the other sandbox first (`chasm stop <name>`);
-  its state persists.
-- Dotfiles: new sandboxes inherit `rahulrajaram/dotfiles` from the sealed
-  template at the revision pinned in `guest-config/dotfiles/SOURCE` —
-  `.zshrc`, `.vimrc`, `.tmux.conf` are symlinks into
-  `/usr/local/share/agent-sandbox/dotfiles/<sha256>/` in the guest, and the
-  login shell is zsh. `.gitconfig` is a template, not auto-installed.
-- Guest egress reaches the internet (DNS + non-RFC1918); apt works in-guest.
+This skill covers one project copy, project-local dependency installation,
+build/test proof, and export or recovery of guest changes. It does not upgrade
+dotfiles, refresh a site profile, prune old sandboxes, or change host policy.
+The contract is runtime-neutral and applies to Pi, Codex, Claude, and OpenCode;
+each runtime must still be admitted through its own reviewed discovery root and
+instruction/profile binding before claiming that runtime is ready.
+
+The sandbox owner chooses the logical sandbox name and whether an existing
+sandbox is the migration target. Preserve the selected authoritative checkout;
+do not infer source authority from the fact that a copy was migrated. A guest
+checkout becomes primary only after that authority is explicitly designated.
+If Chasm refuses admission because available resources are insufficient,
+report the refusal; do not stop another guest automatically.
+
+## Inputs and authority
+
+Bind these values before mutating anything:
+
+- `PROJECT`: one existing host project directory, resolved to an absolute path;
+- `SANDBOX`: one logical Chasm name (the CLI derives `sandbox-$SANDBOX`);
+- `PROJECT_NAME`: one safe path component for the guest project directory;
+- `BUDGET_MIB`: a declared memory budget within Chasm's supported 512–16384 MiB range;
+- `WORKSPACE`: `/workspace/$PROJECT_NAME`, the persistent guest path;
+- `TASK_WORKTREE`: `/workspace/.worktrees/$PROJECT_NAME/$TASK_NAME` for an
+  additional guest worktree; the project checkout remains authoritative at
+  `WORKSPACE`;
+- `SOURCE_COMMIT`: the host Git commit being copied, when `PROJECT` is a Git repository.
+- `AUTHORITY`: the designated host or guest checkout and the approved integration route.
+- `CHASM_DIR`: the verified local Chasm source checkout when source helpers are needed.
+
+Project and task names must match `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` as one
+path component. The bare `/workspace` root and `.worktrees` are not projects.
+
+Use the Chasm CLI for lifecycle operations. The source CLI documents
+`create NAME [BUDGET_MEMORY_MIB]`, `start [NAME]`, `show NAME --layout`, `stop
+[NAME]`, `delete NAME`, and `shell [NAME]` (`chasm/cmd/chasm/help.go`). Chasm
+creates a persistent per-sandbox `/workspace` and a global `/shared`; do not
+mistake `/shared` for the project workspace.
+
+## Safety gate
+
+Run this from the host before lifecycle, copy, install, or build work:
+
+```sh
+if mountpoint -q /workspace && [ "$(stat -c '%u:%g:%a' /workspace 2>/dev/null)" = '1001:1001:770' ]; then
+  echo 'already inside a Chasm guest; start migration from the host' >&2
+  exit 1
+fi
+[ -f /etc/agent-sandbox/site-host-id ] || {
+  echo 'Chasm host identity marker is unavailable' >&2
+  exit 1
+}
+```
+
+If the context is ambiguous, stop without side effects. Run the read-only
+preflight and record its output:
+
+```sh
+cd "$CHASM_DIR"
+scripts/install-chasm.sh --verify
+chasm list
+chasm show "$SANDBOX" --layout 2>/dev/null || true
+```
+
+Do not expose `/etc/agent-sandbox/openrouter.env` or any credential material.
+Provider access is a separate, explicitly approved route; migration does not
+copy host credentials into the guest.
 
 ## Procedure
 
-### 1. Site and sandbox preparation
+### 1. Select or create the sandbox
+
+Use the existing owner-selected sandbox when it exists. Otherwise, after the
+owner authorizes creation:
 
 ```sh
-cd ~/Documents/chasm && sudo scripts/install-chasm.sh --verify   # expect 0 drift
-chasm create <name> <budget-mib>   # 512-16384; give Lisp/C++ builds 4096+
-chasm start <name>
+chasm create "$SANDBOX" "$BUDGET_MIB"
+chasm start "$SANDBOX"
+chasm show "$SANDBOX" --layout
 ```
 
-If another sandbox is running, `chasm stop <other>` first. Give each project
-its own sandbox: the name is the workspace identity.
+Chasm's documented default budget is 3072 MiB; use that unless the owner has a
+measured reason to choose another value. Creation leaves the sandbox stopped;
+start waits for the guest agent. Do not change `default_sandbox` or stop
+another guest as an implicit prerequisite.
 
-### 2. Copy the code (never move)
+Before claiming Pi HEAD behavior, read the installed `bootstrap_profile` from
+the site descriptor and the corresponding profile. `minimal.profile` pins the
+vendored Pi release with `pi_head_resolution=none`; `chasm.profile` resolves
+site Pi HEAD at create time. A source manifest alone does not prove which path
+the installed site will take.
 
-The pool's `custom/` directory is root-only, so population runs under sudo.
-Map ownership to the guest agent and keep files group-accessible:
+### 2. Check the destination and recover guest work
+
+Inspect `/workspace/$PROJECT_NAME` before copying. If it exists, verify its Git
+status, source metadata, and base commit. Preserve any dirty or untracked work
+through the recovery procedure below before re-importing. A clean, matching
+destination may be reused; a mismatched destination requires an owner decision
+before replacement. Never mirror destructively by default. Additional guest
+worktrees belong under `/workspace/.worktrees/$PROJECT_NAME/$TASK_NAME`; do not
+put them beside the primary checkout or under the host worktree root.
+
+Inspect the installed import/export helper versions and capabilities before
+using them. For clean executor deployment, the selected helper must accept
+`/workspace/<PROJECT_NAME>` with the same name, commit, clean-tree, and
+credential-filter checks. If it still accepts only `/home/agent/workspaces/*`,
+record that path capability gap; do not silently substitute `/home/agent`.
+
+An owner-authorized local host-to-guest migration may use the existing
+configured Incus guest interface when the host, instance, destination path,
+guest UID, and source identity are verified. Clean executor deployment is not a
+prerequisite. Use guest-side unprivileged commands or the approved import
+adapter; never access Incus storage directly. A helper's path check does not
+prove dirty-state recovery. If a helper or credential filter rejects the
+source, destination, or payload, stop and preserve that rejection; do not
+bypass it with an unreviewed copy route.
+
+Dirty or untracked recovery is a separate approved transfer: capture the bundle
+and status payloads below before replacement, and use a helper or verified guest
+interface that explicitly supports their import/export modes.
+
+### 3. Copy without moving
+
+Copy only after the destination and recovery decision are recorded. Do not tar
+the source with `.git` excluded: that destroys the repository's actual history
+and index needed for recovery. Instead, transfer a reviewed Git bundle (or
+rebuild a guest clone from the pinned source commit), then apply separate
+status-preserving payloads for the source's dirty state:
+
+- `git diff --cached --binary --full-index HEAD` for staged changes;
+- `git diff --binary --full-index` for unstaged tracked changes;
+- an explicit deletion list; and
+- a reviewed archive of untracked files after secret and credential filtering.
+
+Never bulk-copy `.git/config`, credential helpers, authentication directories,
+or other host-local configuration. Rebuild guest worktrees from the transferred
+history and record their branch/base bindings. Preserve machine-local state and
+regenerable output by default (`.agent/`, `.cache/`, `__pycache__/`, `dist/`,
+`tmp/`, `.venv/`, and `node_modules/`), while retaining checked-in vendored
+inputs required by the project's build. Preserve file ownership for the guest
+agent (the site normally uses uid/gid 1001). Use the approved Chasm import adapter or the verified configured Incus guest
+interface once the `/workspace` path contract is resolved; do not access Incus
+storage directly or bypass a real source, path, or credential rejection.
+
+For a Git source, bind `SOURCE_COMMIT` and record the guest base commit. The
+guest import must be idempotent: a retry is allowed only when the existing
+destination has the same source identity, base commit, and clean status. If the
+user selects a task worktree, create it with `git worktree add` at
+`TASK_WORKTREE` after the primary checkout is verified; task worktree creation
+does not change the authority of the primary checkout.
+
+### 3b. Recover Git state without transferring host configuration
+
+Before replacement, capture the source repository's complete history in a
+reviewed bundle and capture its working state separately. A recovery record must
+name the source commit, bundle digest, staged and unstaged patch digests,
+deletions, untracked payload digest, and any intentionally omitted files. Apply
+the staged patch first with `git apply --index`, then apply the unstaged patch,
+and finally restore the reviewed untracked/deletion payload. Verify
+`git status --short`, the index distinction, and the resulting content. If a
+bundle or patch cannot be produced safely, stop before replacement and report
+the exact recovery gap. A tar stream is a payload transport only; without the
+bundle and status payloads it does not preserve Git history or the index, and it
+is not a reason to copy host `.git` configuration.
+
+### 4. Install project requirements inside the guest
+
+Inspect the copied project's manifests and documented build entry point. Install
+only the missing project requirements inside the guest, using the project's
+native package manager and the guest's unprivileged environment where possible.
+Package installation is an external mutation and may require separate approval.
+Do not upgrade Chasm's pinned dotfiles or profile as part of project migration.
+
+Record the package command, versions, and any approved provider route in the
+task evidence. Never record secrets.
+
+### 5. Verify the migrated project
+
+Run the project's build and fast test/check target from `/workspace/$PROJECT_NAME`
+as the guest agent. If a task worktree was selected, repeat the relevant checks
+from `/workspace/.worktrees/$PROJECT_NAME/$TASK_NAME`. Also verify the guest
+working style relevant to the request:
+
+- inspect the repository and status;
+- edit a fixture file;
+- run the project's relevant test or check;
+- produce and inspect the requested review/evidence output;
+- make a local commit when the task requires commit capability;
+- verify the pinned dotfile links and shell without modifying the pinned store.
+
+Static manifests and a successful `chasm show` do not establish project
+functionality. Report command lines, exit status, commit IDs, and non-secret
+artifacts separately from inferences.
+
+### 6. Stop, export, and recover
+
+The `/workspace` volume persists across stop/start. Before an approved delete,
+export clean metadata and any intended patch/mbox/diffstat, and separately
+preserve dirty or untracked work. Verify the export's source/base/head binding
+and credential-filter result. If the requested lifecycle includes stopping the
+target, stop through the Chasm CLI; an ongoing primary workspace may stay running:
 
 ```sh
-WS=/var/lib/incus/storage-pools/chasm/custom/default_agent-sandbox-workspace-sandbox-<name>
-sudo rsync -a --chown=1001:1001 --chmod=Du=rwx,Fu=rw \
-  --exclude=/.git/ --exclude=__pycache__/ --exclude='*.pyc' \
-  --exclude=/dist/ --exclude=/tmp/ --exclude=/.venv/ --exclude=/node_modules/ \
-  <host-project>/ "$WS/"
+chasm stop "$SANDBOX"
+chasm show "$SANDBOX"
 ```
 
-Defaults: exclude machine-local agent state (dot-directories like `.agent/`,
-`.cache/`, project tool state) and regenerable build output (`dist/`, `tmp/`,
-`__pycache__`). Keep anything the build needs vendored (for example a
-checked-in dependency toolchain such as a bundled Quicklisp, node_modules
-with a lockfile, or a Cargo vendor dir). Re-run the same command to re-sync
-later; add `--delete` only when the sandbox copy is meant to mirror the host
-exactly.
+Deletion is a separate destructive action. Request or reuse explicit approval
+only after recovery and export are verified, then use `chasm delete "$SANDBOX"`.
+The global `/shared` volume must remain untouched. If a Pi/OpenRouter capability
+was explicitly enabled and a shell ended uncleanly, use `chasm revoke "$SANDBOX"`
+before stopping; otherwise do not invoke capability controls.
 
-### 3. Install the project's requirements in the guest
+## Dotfiles and symlink boundary
 
-Inspect the project (manifests, Makefile, install.sh), then install into the
-guest as root:
+New sandboxes inherit the pinned dotfiles layer from the sealed profile. Verify
+the links and shell as evidence; do not hand-edit the root-owned pinned store.
+Personal overrides belong in the guest user's local override files when the
+dotfiles contract supports them. A host reader can resolve guest-created
+symlinks against the host root, so host-side inspection and export must not
+blindly dereference links (`cp -L`, recursive readers, or backup jobs).
 
-```sh
-sudo incus exec sandbox-<name> -- bash -c \
-  'export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y <packages>'
-```
+## Completion and evidence
 
-Record per-project requirement notes as projects migrate (guest packages,
-version quirks, the build/test command that proves it). Two patterns seen so
-far: interpreted-language projects usually need only their runtime plus the
-build tool; compiled/Lisp projects may additionally need `-dev` packages when
-a vendored dependency probes unversioned shared libraries that the distro
-ships only versioned (e.g. cl+ssl probing `libcrypto.so` on a release that
-installs only `libcrypto.so.3` — install the matching `libssl-dev`).
-
-### 4. Verify
-
-```sh
-# build/test proof (as the agent user, from the workspace):
-sudo incus exec sandbox-<name> -- su - agent -c 'cd /workspace && <build-or-test-command>'
-# dotfiles proof:
-sudo incus exec sandbox-<name> -- su - agent -c \
-  'ls -la ~/.zshrc ~/.vimrc ~/.tmux.conf; echo $SHELL'
-```
-
-Migration is done when the build (and, where cheap, the fast test target)
-exits 0 in the guest and the dotfile symlinks resolve.
-
-### 4b. Personalizing the environment (E166)
-
-`.zshrc`, `.vimrc`, `.tmux.conf` are symlinks into the root-owned, read-only
-pinned store, so vim fails with E166 if pointed at them directly. That is the
-integrity design, not a bug: personal overrides belong in `~/.zshrc.local` and
-`~/.vimrc.local`, which the pinned files source at the end. Create them
-agent-owned:
-
-```sh
-sudo incus exec sandbox-<name> -- su - agent -c \
-  'echo "# Personal overrides" > ~/.zshrc.local; echo "\" Personal overrides" > ~/.vimrc.local'
-```
-
-Only changes that belong in the dotfiles themselves go through section 5.
-
-### 5. Refreshing the dotfiles pin (when rahulrajaram/dotfiles moves)
-
-The pin lives in three places that must move together:
-`guest-config/dotfiles/SOURCE` (revision + per-file sha256 pins),
-`scripts/install-guest-dotfiles.sh` (the same constants), and the bootstrap
-profile manifests (`dotfiles_revision`). Update all three, run
-`scripts/check-carve-equivalence.sh` and `scripts/check-site-profiles.sh`,
-then rebuild the template — the identity digests the dotfiles layer, so
-`build-sandbox-template.sh` creates a coexisting new template and
-`install-chasm.sh --provision` picks it up. Never hand-edit dotfiles inside
-an existing sandbox; refresh the pin and rebuild instead.
-
-## Symlink boundary (verified)
-
-A symlink stored in a share resolves in whichever kernel walks the path.
-Guest processes resolve against the guest root: a sandbox can NEVER reach
-host files through a symlink in /shared or /workspace (proven: host-written
-and guest-written links both resolved to the guest's own /etc/hostname).
-Host processes resolve against the HOST root: a sandbox-written symlink
-redirects a host reader to host files. Therefore never dereference paths in
-the volume directories blindly (no `cat <ws>/...`, `cp -L`, or backup jobs
-that follow links), and run the standing audit:
-
-```sh
-cd ~/Documents/chasm && sudo scripts/audit-workspace-symlinks.sh        # exit 1 if any exist
-sudo scripts/audit-workspace-symlinks.sh --prune                        # remove them
-```
-
-## Gotchas
-
-- `chasm shell <name>` needs no sudo (built-in passwordless allowlist) and
-  REFUSES to run as root. It is interactive only — automation goes through
-  `sudo incus exec sandbox-<name> -- …`.
-- Host-side writes into the volume need sudo (the `custom/` dir is 0700
-  root). Without `--chown=1001:1001` the agent cannot write its own files.
-- First `make`-style runs compile from scratch (fresh guest HOME); budget
-  tens of minutes for Lisp builds, not seconds.
-- The workspace volume is uncapped and shares the 64G pool with VM disks;
-  check `sudo incus storage volume list chasm` and host `df` before big
-  copies.
+Migration is complete only when the copied project is in
+`/workspace/$PROJECT_NAME`, any selected task worktree is under
+`/workspace/.worktrees/$PROJECT_NAME/$TASK_NAME`, required dependencies are
+installed with their approval recorded, the relevant build/test/review/commit
+checks pass, and guest changes are either intentionally retained or exported
+for recovery. Update the bound project plan or checkpoint with the actual
+transfer, test, persistence, and exclusion evidence plus remaining gates before
+returning, so `continue-work` does not repeat completed migration work. Report
+unresolved path-adapter, provider, package, or existing-destination gaps instead
+of claiming migration success.

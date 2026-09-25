@@ -16,6 +16,14 @@ then write a verified continuation artifact; this mode includes commit triage.
 Read [references/write-workflow.md](references/write-workflow.md)
 completely and run the write workflow.
 
+For a Chasm task, record the guest primary checkout
+(`/workspace/<project-name>`), any task worktree
+(`/workspace/.worktrees/<project-name>/<task-name>`), selected source
+authority, source/base commits, and recovery evidence for staged, unstaged,
+deleted, and untracked files. A handoff must distinguish Git bundles and
+status patches from reviewed payloads; it must not imply that copying host
+`.git` configuration or credentials is safe.
+
 ## Claim verification (required)
 
 A handoff's negative claims ("missing", "not done", "still needs") are

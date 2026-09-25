@@ -97,14 +97,14 @@ selection of a workflow is honored without re-classification.
 
 ## Must not
 
-- Must not route qualifying long-horizon work around MetaBuilder for
-  convenience, budget pressure, or an unavailable CLI operation.
 - Must not rediscover resumable state; `continue-work` is the sole discovery
   owner.
 - Must not treat a bare resume request as a fresh work statement or retry a
   no-resumable result in the same invocation without relevant state change.
 - Must not describe work as governed when no MetaBuilder controller observed
   it.
+- Must not route qualifying long-horizon work around MetaBuilder for
+  convenience, budget pressure, or an unavailable CLI operation.
 - Must not perform the destination skill's startup work — locating
   checkouts, reading its README, confirming CLI journeys, or resolving help
   evidence. A presence check (`command -v`) is the ceiling; discovery

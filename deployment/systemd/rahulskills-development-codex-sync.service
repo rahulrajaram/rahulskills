@@ -1,0 +1,8 @@
+[Unit]
+Description=Synchronize local Codex skills into the running development sandbox
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.local/lib/rahulskills/sync_pi_guest.py --runtime codex --sandbox development --allow-root %h/Documents/rahulskills --references %h/Documents/rahulskills/references --apply
+TimeoutStartSec=240
+UMask=0077

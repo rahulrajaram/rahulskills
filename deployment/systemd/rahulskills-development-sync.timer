@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep development sandbox Pi skills synchronized with this host
+
+[Timer]
+OnStartupSec=30s
+OnUnitInactiveSec=2min
+Unit=rahulskills-development-sync.service
+
+[Install]
+WantedBy=timers.target
