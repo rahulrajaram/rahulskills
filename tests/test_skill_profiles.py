@@ -155,7 +155,8 @@ class SkillProfileTests(unittest.TestCase):
         root = skill_profiles.ROOT
         common_names = skill_profiles.select(root, "codex", ["chasm-development"], [])
         pi_names = ("skill-creator",)
-        self.assertEqual(len(set(common_names) | set(pi_names)), 58)
+        self.assertEqual(len(set(common_names) | set(pi_names)), 59)
+        self.assertIn("agent-stall-triage", common_names)
         self.assertEqual(set(common_names) & set(pi_names), set())
         for runtime in ("pi", "codex", "claude", "opencode"):
             selected = set(skill_profiles.select(root, runtime, ["chasm-development"], []))

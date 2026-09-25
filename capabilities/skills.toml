@@ -218,6 +218,13 @@ layer = "workflow"
 overlaps = ["check-antipatterns", "metabuilder-assess"]
 overlap_kind = "router"
 
+[skills.agent-stall-triage]
+platforms = ["linux"]
+effect = "local-process"
+effects = ["readonly", "privileged-observe", "local-process"]
+approval_boundaries = ["signal", "terminate", "resume", "restart"]
+layer = "workflow"
+
 [skills.archdiagram]
 effect = "local-write"
 effects = ["local-write"]
