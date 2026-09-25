@@ -1,0 +1,4 @@
+interface:
+  display_name: "New Worktree Feature"
+  short_description: "Start isolated feature work safely"
+  default_prompt: "Use $new-worktree-feature to start this feature in a new worktree under the project worktree root."

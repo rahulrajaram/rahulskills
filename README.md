@@ -66,7 +66,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (58)
+### Package-managed skills (62)
 
 Authored in this package and available for explicit selection on Pi, Codex, and
 Claude Code. The default `core` profile omits the optional design skills
@@ -126,13 +126,27 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
 | `supervised-dispatch` | Launch and monitor Overwatch worker runs with env recipes, preflight, cursor-driven monitoring, and blocking terminal waits |
 | `system-memory-audit` | Audit Linux system-wide memory health, swap, PSI, and top consumers |
+| `translate-output` | Simplify the language of the most recent LLM response or supplied text into plain language with clean formatting |
+| `work-intake` | Classify work by horizon and route it: bounded work to autonomy-loop or the execution contract, long-horizon work to a dedicated governed lifecycle |
+| `chasm-migrate` | Migrate a host project into a chasm sandbox: copy the code into the sandbox workspace, install requirements in the guest, and verify the build |
 | `test` | Run tests with overwatch for streaming output and failure detection |
 | `tui-web-design-orchestrator` | Generate structured design prompt packets for TUIs and web UIs |
 | `whitepaper` | Author an investor-facing enterprise whitepaper (case for building a product) with YC-flavored, un-theatrical voice, cost/revenue model, naming/branding, and a branded PDF with embedded fonts |
+| `new-worktree-feature` | Start isolated feature work safely in a new project worktree |
+| `worktree-salvage` | Audit and salvage work across Git worktrees |
 | `continue-work` | Resume-first front door: find the most specific resumable state (handoff artifact, governed campaign, active plan, human gate) and force its owning workflow |
-| `work-intake` | Classify work by horizon and route it: bounded work to autonomy-loop or the execution contract, long-horizon work to the MetaBuilder lifecycle |
 | `yore-vocabulary-harvest` | Extract candidate vocabulary terms from a Yore index |
 | `yore-vocabulary-llm-filter` | Build Whisper-specific vocabulary by filtering common terms |
+
+### MetaBuilder documentation
+
+The MetaBuilder documentation is organized by purpose:
+
+- Charter: [bounded autonomy charter](docs/metabuilder-bounded-autonomy-charter.md)
+- Model: [functional model](docs/metabuilder-autonomy-functional-model.md) and [runtime loop](docs/metabuilder-runtime-loop.mmd)
+- Continuation: [contracts](docs/metabuilder-continuation-contracts.md) and [qualification report](docs/metabuilder-continuation-qualification.md)
+- Evidence: [front-door validation](docs/front-door-validation.md) and [maturity backlog](docs/metabuilder-maturity-backlog.md)
+- Diagrams: [authority model](docs/metabuilder-authority-model.mmd), [skill components](docs/metabuilder-skill-components.mmd), and [autonomy components](docs/metabuilder-autonomy-components.mmd)
 
 ### Codex runtime-owned skills (6)
 
@@ -221,6 +235,23 @@ the replacement. Excluded skills are left untouched.
 ./sync-skills.sh capability-health --mcp figma  # Check commands/MCPs/platforms
 ```
 
+For an explicitly designated Chasm or other offline guest, create a portable
+bundle without changing any host installation:
+
+```bash
+python3 scripts/skill_profiles.py bundle --runtime pi --profile core --output /tmp/rahulskills-bundle
+python3 scripts/capability_health.py --portable --json
+```
+
+Bundling reuses profile selection, includes selected skill trees and explicitly
+declared repository-local support resources (`--payload` or capability metadata),
+and omits Python caches. The admission report separates required command gaps,
+optional degradation, and host-only metadata. Loaded MCP namespaces are
+observations only; they do not prove guest MCP functionality. Supply a guest
+observation with `--observation-file` when checking readiness. Command presence
+still does not prove that a command's operation succeeds. The output directory
+must be empty or absent.
+
 Respects per-machine exclusion list in `.exclude-skills` (one skill name per line, gitignored).
 
 ### `scan-skills.sh`
@@ -304,4 +335,4 @@ The dispatchers look for executable hooks in `.githooks/` (or `scripts/git-hooks
 
 ## License
 
-Private repository. All rights reserved.
+All rights reserved.

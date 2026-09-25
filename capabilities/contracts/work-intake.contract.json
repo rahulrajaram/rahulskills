@@ -4,7 +4,7 @@
     "phase_id": "classify-work-horizon",
     "skill": "work-intake",
     "semantic_version": "1.1.0",
-    "guidance_digest": "9bd0645391f02332489da105470e2f13561ea18b28ae216022a2f5b1a4198fd8"
+    "guidance_digest": "1d1f834d8d115f0940bd252bd81efbc96941d4784d181873752fde10cfa3332d"
   },
   "inputs": [
     {

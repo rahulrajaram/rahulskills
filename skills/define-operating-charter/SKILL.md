@@ -190,6 +190,7 @@ charter is the authoritative input for the harness brief's actors and
 authority boundaries; `metabuilder-harness-design` restates rather than
 re-decides them.
 
+
 ## Quality check
 
 Before returning, verify that:

@@ -71,11 +71,11 @@ do not manufacture work after the objective is complete.
   the authority and MetaBuilder remains its evidence layer. Cite the
   intake classification the plan already records instead of
   re-classifying.
+- Active epic plan or ranked backlog without its own discipline →
+  `autonomy-loop`, which owns ranking and next-slice selection.
 - Governed campaign with in-run recovery owed (incomplete run, failed
   action) → `metabuilder-consumer-qualification` for the durable
   attempts and controller observations.
-- Active epic plan or ranked backlog without its own discipline →
-  `autonomy-loop`, which owns ranking and next-slice selection.
 - Only a checkpoint resumability record exists (no plan, no artifact) →
   adopt its objective and next step, then re-route what it describes by
   the rules above.
