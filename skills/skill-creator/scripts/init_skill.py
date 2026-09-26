@@ -3,14 +3,18 @@
 Skill Initializer - Creates a new skill from template
 
 Usage:
-    init_skill.py <skill-name> --path <path> [--resources scripts,references,assets] [--examples] [--interface key=value]
+    init_skill.py <skill-name> --path <path> [--resources scripts,references,assets] [--examples] [--codex-metadata] [--interface key=value]
 
 Examples:
     init_skill.py my-new-skill --path skills/public
     init_skill.py my-new-skill --path skills/public --resources scripts,references
     init_skill.py my-api-helper --path skills/private --resources scripts --examples
     init_skill.py custom-skill --path /custom/location
+    init_skill.py my-skill --path skills/public --codex-metadata
     init_skill.py my-skill --path skills/public --interface short_description="Short UI label"
+
+agents/openai.yaml (Codex UI metadata) is written only with --codex-metadata
+or --interface.
 """
 
 import argparse
@@ -31,7 +35,7 @@ description: "[TODO: Briefly describe what this skill does and when it applies.]
 
 # {skill_title}
 
-[TODO: Add the task-specific guidance Codex needs. Reference supporting files only when they are relevant.]
+[TODO: Add the task-specific guidance the agent needs. Reference supporting files only when they are relevant.]
 """
 
 EXAMPLE_SCRIPT = '''#!/usr/bin/env python3
@@ -57,7 +61,7 @@ if __name__ == "__main__":
 
 EXAMPLE_REFERENCE = """# Reference for {skill_title}
 
-Replace this placeholder with maintained, task-specific details that Codex
+Replace this placeholder with maintained, task-specific details that an agent
 would not reliably know, such as operational constraints, local schemas, or
 fragile integration behavior.
 
@@ -70,7 +74,7 @@ This placeholder represents where asset files would be stored.
 Replace with actual asset files (templates, images, fonts, etc.) or delete if not needed.
 
 Asset files are NOT intended to be loaded into context, but rather used within
-the output Codex produces.
+the output the agent produces.
 
 Example asset files from other skills:
 - Brand guidelines: logo.png, slides_template.pptx
@@ -156,7 +160,14 @@ def create_resource_dirs(
                 print("[OK] Created assets/")
 
 
-def init_skill(skill_name, path, resources, include_examples, interface_overrides):
+def init_skill(
+    skill_name,
+    path,
+    resources,
+    include_examples,
+    interface_overrides,
+    codex_metadata=False,
+):
     """
     Initialize a new skill directory with template SKILL.md.
 
@@ -165,6 +176,9 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
         path: Path where the skill directory should be created
         resources: Resource directories to create
         include_examples: Whether to create example files in resource directories
+        interface_overrides: agents/openai.yaml key=value overrides; any
+            override implies codex_metadata
+        codex_metadata: Whether to write Codex agents/openai.yaml metadata
 
     Returns:
         Path to created skill directory, or None if error
@@ -176,9 +190,11 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
         print(f"[ERROR] Skill directory already exists: {skill_dir}")
         return None
 
-    interface_content = render_openai_yaml(skill_name, interface_overrides)
-    if interface_content is None:
-        return None
+    interface_content = None
+    if codex_metadata or interface_overrides:
+        interface_content = render_openai_yaml(skill_name, interface_overrides)
+        if interface_content is None:
+            return None
 
     try:
         base_path.mkdir(parents=True, exist_ok=True)
@@ -199,7 +215,8 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
         skill_md_path = stage_dir / "SKILL.md"
         skill_md_path.write_text(skill_content)
         print("[OK] Created SKILL.md")
-        write_openai_yaml_content(stage_dir, interface_content)
+        if interface_content is not None:
+            write_openai_yaml_content(stage_dir, interface_content)
         if resources:
             create_resource_dirs(
                 stage_dir,
@@ -238,7 +255,10 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
         print(
             "2. Create resource directories only if needed (scripts/, references/, assets/)"
         )
-    print("3. Update agents/openai.yaml if the UI metadata should differ")
+    if interface_content is not None:
+        print("3. Update agents/openai.yaml if the UI metadata should differ")
+    else:
+        print("3. Add agents/openai.yaml only if Codex UI metadata is needed")
     print("4. Run the validator when ready to check the skill structure")
     print(
         "5. Consider independent forward-testing only when complexity or risk warrants it"
@@ -264,10 +284,15 @@ def main():
         help="Create example files inside the selected resource directories",
     )
     parser.add_argument(
+        "--codex-metadata",
+        action="store_true",
+        help="Also write Codex agents/openai.yaml UI metadata",
+    )
+    parser.add_argument(
         "--interface",
         action="append",
         default=[],
-        help="Interface override in key=value format (repeatable)",
+        help="agents/openai.yaml override in key=value format (repeatable; implies --codex-metadata)",
     )
     args = parser.parse_args()
 
@@ -302,7 +327,14 @@ def main():
         print("   Resources: none (create as needed)")
     print()
 
-    result = init_skill(skill_name, path, resources, args.examples, args.interface)
+    result = init_skill(
+        skill_name,
+        path,
+        resources,
+        args.examples,
+        args.interface,
+        codex_metadata=args.codex_metadata,
+    )
 
     if result:
         sys.exit(0)

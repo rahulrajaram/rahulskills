@@ -105,6 +105,39 @@ class QuickValidateTests(unittest.TestCase):
 
             self.assertEqual((True, "Skill is valid!"), validate_skill(skill))
 
+    def test_accepts_claude_code_frontmatter(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            skill = write_skill(
+                Path(raw_dir),
+                "\n".join(
+                    (
+                        "name: example-skill",
+                        "description: Validate an example skill.",
+                        "when_to_use: When an example needs validating.",
+                        "user-invocable: false",
+                        "model: sonnet",
+                        "effort: low",
+                        "context: fork",
+                        "agent: general-purpose",
+                        'paths: "src/**/*.py"',
+                        "allowed-tools: Read Grep",
+                    )
+                ),
+            )
+
+            self.assertEqual((True, "Skill is valid!"), validate_skill(skill))
+
+    def test_rejects_wrong_claude_code_key_type(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            skill = write_skill(
+                Path(raw_dir),
+                "name: example-skill\ndescription: Validate.\nuser-invocable: maybe",
+            )
+
+            valid, message = validate_skill(skill)
+            self.assertFalse(valid)
+            self.assertIn("'user-invocable' must be bool", message)
+
     def test_rejects_wrong_extension_type(self) -> None:
         with tempfile.TemporaryDirectory() as raw_dir:
             skill = write_skill(
@@ -256,7 +289,12 @@ class QuickValidateTests(unittest.TestCase):
             root = Path(raw_dir)
             with contextlib.redirect_stdout(io.StringIO()):
                 result = init_skill_module.init_skill(
-                    "example-skill", root, ["references"], False, []
+                    "example-skill",
+                    root,
+                    ["references"],
+                    False,
+                    [],
+                    codex_metadata=True,
                 )
 
             destination = root / "example-skill"
@@ -265,6 +303,36 @@ class QuickValidateTests(unittest.TestCase):
             self.assertTrue((destination / "agents" / "openai.yaml").is_file())
             self.assertTrue((destination / "references").is_dir())
             self.assertEqual([], list(root.glob(".example-skill.stage-*")))
+
+    def test_initializer_omits_codex_metadata_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            root = Path(raw_dir)
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = init_skill_module.init_skill(
+                    "example-skill", root, [], False, []
+                )
+
+            self.assertEqual(root / "example-skill", result)
+            self.assertTrue((result / "SKILL.md").is_file())
+            self.assertFalse((result / "agents").exists())
+
+    def test_initializer_interface_override_implies_codex_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            root = Path(raw_dir)
+            with contextlib.redirect_stdout(io.StringIO()):
+                result = init_skill_module.init_skill(
+                    "example-skill",
+                    root,
+                    [],
+                    False,
+                    ["display_name=Example Skill"],
+                )
+
+            self.assertEqual(root / "example-skill", result)
+            self.assertIn(
+                "Example Skill",
+                (result / "agents" / "openai.yaml").read_text(encoding="utf-8"),
+            )
 
 
 if __name__ == "__main__":

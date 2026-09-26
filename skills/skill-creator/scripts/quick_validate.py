@@ -20,6 +20,15 @@ ALLOWED_FRONTMATTER_PROPERTIES = frozenset(
         "disable-model-invocation",
         "author",
         "version",
+        # Claude Code skill frontmatter
+        "when_to_use",
+        "user-invocable",
+        "model",
+        "effort",
+        "context",
+        "agent",
+        "hooks",
+        "paths",
     }
 )
 
@@ -134,7 +143,7 @@ def parse_frontmatter(frontmatter_text):
 
 def validate_skill(skill_path):
     """Basic validation of a skill"""
-    skill_path = Path(skill_path)
+    skill_path = Path(skill_path).resolve()
 
     skill_md = skill_path / "SKILL.md"
     if not skill_md.exists():
@@ -169,6 +178,12 @@ def validate_skill(skill_path):
         "disable-model-invocation": bool,
         "author": str,
         "version": str,
+        "when_to_use": str,
+        "user-invocable": bool,
+        "model": str,
+        "effort": str,
+        "context": str,
+        "agent": str,
     }
     for key, expected_type in expected_types.items():
         value = frontmatter.get(key)

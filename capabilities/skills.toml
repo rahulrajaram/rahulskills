@@ -202,6 +202,14 @@ commands = ["python3", "git", "opencode"]
 effect = "external-call"
 effects = ["readonly", "local-write", "local-process", "external-call"]
 
+# Claude Code route: the host session's Agent tool spawns one fresh subagent per
+# selected review perspective; results aggregate only as an unbound import.
+[skills.code-review.modes.claude-native]
+commands = ["python3", "git"]
+runtimes = ["claude"]
+effect = "local-write"
+effects = ["readonly", "local-write", "local-process"]
+
 [skills.check-antipatterns]
 portable_payloads = ["references/learning-record.schema.json"]
 effect = "readonly"
@@ -514,6 +522,8 @@ approval_boundaries = ["external-data-send", "proposal-write", "merge-local", "m
 layer = "workflow"
 
 [skills.pi-defects-harvester]
+# Pi-only: harvests Pi session artifacts and writes ~/.pi/agent/reports.
+runtimes = ["pi"]
 effect = "local-write"
 effects = ["sensitive-read", "local-write", "home-write"]
 approval_boundaries = ["sensitive-source-read", "report-write"]

@@ -29,7 +29,9 @@ The skill synchronizer supports `--runtime codex` and uses the host's installed
 `~/.codex/skills`, including explicitly supplied shared references. It publishes under
 `/workspace/.agent-skills/codex` and exposes the active snapshot through
 `~/.codex/skills/host-synced` in the guest. Existing runtime-provided `.system`
-skills are kept separate. The Pi and Codex destinations are independent.
+skills are kept separate. The Pi, Codex, and Claude destinations are
+independent; Claude uses a ledger-managed projection described in
+[`claude-guest-setup.md`](claude-guest-setup.md).
 
 The host user timer `rahulskills-development-codex-sync.timer` can refresh this
 catalog periodically while the user service manager is running. It skips

@@ -13,6 +13,11 @@ selection of this same profile. If the host cannot route tasks and results as
 required, record the missing capability and keep affected findings provisional;
 do not invent a dispatcher or install capabilities.
 
+Select it with a `mediated` invocation argument or an explicit answer to the
+prepared route question. On Claude Code this is the only route to specialist
+delegation, because subagents cannot spawn nested subagents: the main session
+transports packets with the Agent tool, one fresh subagent per specialist task.
+
 In this profile the respondent still owns specialist questions, task context,
 evidence standards, stop conditions, corrections/retries and synthesis. The
 orchestrator transports those respondent-authored packets using actual host

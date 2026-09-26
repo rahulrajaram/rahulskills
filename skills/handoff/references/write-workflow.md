@@ -107,5 +107,6 @@ Verify that the artifact:
 
 Return the commit hash and message (or no-op), canonical document status, the
 absolute artifact path, and `$handoff-extract` (or `print`). Also give Pi's
-equivalents: `/skill:handoff-extract` and `/skill:handoff-extract print`. Do
-not include the handoff document contents in the response.
+equivalents, `/skill:handoff-extract` and `/skill:handoff-extract print`, and
+Claude Code's, `/handoff-extract` and `/handoff-extract print`. Do not include
+the handoff document contents in the response.

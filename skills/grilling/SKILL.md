@@ -1,7 +1,7 @@
 ---
 name: grilling
 description: "Ask dependency-aware questions about a plan, decision, or idea. Default to an interview with the user; select researched multi-agent answers, linear runtime, or a gradient lattice only when requested. Use for grilling, stress-testing assumptions, or /grilling and /grill-me."
-argument-hint: "[spec|factory|debate|gradient|linear-runtime] [topic or artifact] [--depth <n>] [--n <stems>] [--branch <b>] [--keep <k>] [--zones <z>] [--cap <nodes>]"
+argument-hint: "[spec|factory|debate|gradient|linear-runtime] [mediated] [topic or artifact] [--depth <n>] [--n <stems>] [--branch <b>] [--keep <k>] [--zones <z>] [--cap <nodes>]"
 ---
 
 # Grilling
@@ -48,6 +48,17 @@ Do not load lattice mechanics for an ordinary interview or linear run.
 The native named modes preserve direct respondent-to-specialist delegation.
 Only an explicitly selected [mediated compatibility profile](references/compatibility-profile.md)
 may change that transport. Host capability alone does not select it.
+
+Claude Code subagents cannot spawn nested subagents, so a respondent running as
+a subagent has no direct specialist delegation there. On Claude Code, any
+specialist wave in a native named mode must use the mediated profile: the main
+session is the orchestrator and spawns each respondent-authored specialist
+packet with the Agent tool. Selection stays explicit: the user adds `mediated`
+to the invocation (for example `/grilling spec mediated <topic>`) or accepts it
+when asked, with the visibility tradeoff stated, before the first specialist
+wave. Reuse that selection for the run. Unselected, the respondent uses only its
+own tools and records the capability limitation. The ordinary interview needs
+no profile.
 For an explicit raw graph/protocol request, load
 [review-boundaries.md](references/review-boundaries.md) after preparing the
 human review. For private machine transport or any offered resume/replay, load

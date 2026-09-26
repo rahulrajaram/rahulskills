@@ -9,7 +9,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "profiles/chasm-development/instructions/policy.md"
-PI_RUNTIME = ROOT / "profiles/chasm-development/instructions/pi-runtime.md"
+RUNTIME_NOTES = {
+    "pi": ROOT / "profiles/chasm-development/instructions/pi-runtime.md",
+    "claude": ROOT / "profiles/chasm-development/instructions/claude-runtime.md",
+}
 OUTPUT = ROOT / "profiles/chasm-development/instructions/rendered"
 
 RUNTIMES = {
@@ -39,7 +42,8 @@ RUNTIMES = {
 
 def render(runtime: str, policy: str) -> str:
     """Render the shared policy without installer notes in agent context."""
-    runtime_text = PI_RUNTIME.read_text(encoding="utf-8").rstrip() if runtime == "pi" else ""
+    note = RUNTIME_NOTES.get(runtime)
+    runtime_text = note.read_text(encoding="utf-8").rstrip() if note else ""
     body = policy.rstrip() + ("\n\n" + runtime_text if runtime_text else "")
     return (
         f"<!-- Generated from profiles/chasm-development/instructions/policy.md; "

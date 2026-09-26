@@ -111,6 +111,7 @@ if not isinstance(skills, dict):
     raise SystemExit("Capability catalog must define a [skills] table")
 
 allowed_layers = {"primitive", "workflow", "composer"}
+known_runtimes = {"claude", "codex", "pi", "opencode"}
 problems = []
 for name, entry in sorted(skills.items()):
     effect = entry.get("effect")
@@ -130,6 +131,25 @@ for name, entry in sorted(skills.items()):
         isinstance(command, str) and command for command in optional_commands
     ):
         problems.append(f"skills.{name}: optional_commands must be a list of non-empty strings")
+    # Optional per-runtime support, at skill or mode level. Absent means all.
+    scoped = [(f"skills.{name}", entry)] + [
+        (f"skills.{name}.modes.{mode_name}", mode)
+        for mode_name, mode in entry.get("modes", {}).items()
+        if isinstance(mode, dict)
+    ]
+    for label, scope in scoped:
+        if "runtimes" not in scope:
+            continue
+        runtimes = scope["runtimes"]
+        if not isinstance(runtimes, list) or not runtimes or not all(
+            isinstance(runtime, str) for runtime in runtimes
+        ):
+            problems.append(f"{label}: runtimes must be a non-empty list of strings")
+        elif unknown := sorted(set(runtimes) - known_runtimes):
+            problems.append(
+                f"{label}: unknown runtime(s) {', '.join(unknown)}; expected "
+                + ", ".join(sorted(known_runtimes))
+            )
 
 scoped_bash = re.compile(r"Bash\(([^:(),]+):\*\)")
 prohibited_preapprovals = {"curl", "rm"}
@@ -139,6 +159,8 @@ for overlay in sorted(overlay_dir.glob("*.yml")):
     if entry is None:
         problems.append(f"{overlay}: no matching skills.{skill_name} catalog entry")
         continue
+    if "claude" not in entry.get("runtimes", ["claude"]):
+        problems.append(f"{overlay}: skills.{skill_name} is not declared for the claude runtime")
     granted = set(scoped_bash.findall(overlay.read_text(encoding="utf-8")))
     prohibited = sorted(granted & prohibited_preapprovals)
     if prohibited:
