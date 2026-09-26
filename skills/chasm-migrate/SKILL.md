@@ -42,7 +42,9 @@ Bind these values before mutating anything:
 - `TASK_WORKTREE`: `/workspace/.worktrees/$PROJECT_NAME/$TASK_NAME` for an
   additional guest worktree; the project checkout remains authoritative at
   `WORKSPACE`;
-- `SOURCE_COMMIT`: the host Git commit being copied, when `PROJECT` is a Git repository.
+- `SOURCE_COMMIT`: the host Git commit being copied, when `PROJECT` is a Git repository;
+  for a multi-repository project, record a commit and working state for every
+  required repository, not only the umbrella.
 - `AUTHORITY`: the designated host or guest checkout and the approved integration route.
 - `CHASM_DIR`: the verified local Chasm source checkout when source helpers are needed.
 
@@ -110,6 +112,19 @@ the installed site will take.
 
 ### 2. Check the destination and recover guest work
 
+Before deciding what to copy, inventory the task's **source closure**: the
+umbrella repository, recursively required submodules, separate companion
+repositories, selected task worktrees, and any non-Git inputs the project
+actually reads. Use the project's dependency or question scope to decide what
+is required; do not assume every nearby repository belongs in the closure.
+For each required Git repository, record its path, HEAD, branch or detached
+state, staged and unstaged changes, relevant untracked files, and whether its
+working tree contains source. `git submodule status --recursive` identifies
+pins but does not prove that the submodule working files exist. Record missing
+or empty checkouts as gaps, and never silently replace a missing pin with a
+remote branch tip. Identify indexes and other derived stores separately from
+source; list their owning module, language or data scope, and source identity.
+
 Inspect `/workspace/$PROJECT_NAME` before copying. If it exists, verify its Git
 status, source metadata, and base commit. Preserve any dirty or untracked work
 through the recovery procedure below before re-importing. A clean, matching
@@ -149,6 +164,14 @@ status-preserving payloads for the source's dirty state:
 - `git diff --binary --full-index` for unstaged tracked changes;
 - an explicit deletion list; and
 - a reviewed archive of untracked files after secret and credential filtering.
+
+Make a separate history and working-state payload for each required submodule,
+companion repository, or independently dirty task worktree. Materialize each
+submodule at its recorded relative path and HEAD before applying its working
+state. An umbrella Git bundle contains gitlinks, not the submodules' objects or
+working files. Include task-relevant ignored or generated
+inputs only when the project actually needs them and they pass the same review;
+the standard untracked payload does not capture ignored files.
 
 Never bulk-copy `.git/config`, credential helpers, authentication directories,
 or other host-local configuration. Rebuild guest worktrees from the transferred
@@ -193,6 +216,29 @@ Record the package command, versions, and any approved provider route in the
 task evidence. Never record secrets.
 
 ### 5. Verify the migrated project
+
+For a multi-repository or index-backed project, first verify the source closure
+in the guest before claiming the workload is ready. Compare each required
+repository's selected source entries with a host manifest made from a stable
+source view: relative path, regular-file size and SHA-256, executable mode when
+relevant, or symlink target. Include dirty and relevant untracked content. In
+the guest, re-enumerate the same selection and report missing, extra, or
+changed paths by repository. If either checkout changes during capture or
+verification, repeat the affected comparison. Matching umbrella HEADs,
+submodule pins, or a copied manifest alone do not prove source parity. A
+missing required submodule is a failed closure, not a partial success silently
+treated as complete.
+
+Admit each needed index or derived store separately. For an index copied from
+the host, bind its owning module, source snapshot, language/data scope,
+metadata, tool version, and stable snapshot digest; quiesce or snapshot active
+stores before hashing or transfer. Validate the guest copy and run a
+task-specific retrieval or read smoke test. If the guest builds a new index,
+record its own identity and validate it against the verified guest source;
+never claim byte identity with the host index. Source parity, index readiness,
+and permission or harness readiness are distinct gates. Continue independent
+work while a gate is pending, but do not run the dependent evaluation or claim
+full migration readiness until it passes.
 
 Run the project's build and fast test/check target from `/workspace/$PROJECT_NAME`
 as the guest agent. If a task worktree was selected, repeat the relevant checks
@@ -244,7 +290,8 @@ Migration is complete only when the copied project is in
 `/workspace/$PROJECT_NAME`, any selected task worktree is under
 `/workspace/.worktrees/$PROJECT_NAME/$TASK_NAME`, required dependencies are
 installed with their approval recorded, the relevant build/test/review/commit
-checks pass, and guest changes are either intentionally retained or exported
+checks pass, any required multi-repository source closure and index gates pass,
+and guest changes are either intentionally retained or exported
 for recovery. Update the bound project plan or checkpoint with the actual
 transfer, test, persistence, and exclusion evidence plus remaining gates before
 returning, so `continue-work` does not repeat completed migration work. Report

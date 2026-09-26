@@ -73,3 +73,10 @@ untracked files and ignored files; preserve unique work that still matters and
 record any necessary recovery metadata. Use `git worktree remove` to remove the
 checkout and its registration together. Do not create replacement backup copies
 of content already recoverable from Git.
+
+## Child-agent attribution
+
+When wrapping authorized agent CLI calls, preserve existing
+`AGENT_ATTRIBUTION_*` and `SELFIMPROVE_*` context. Supply caller, project, and a
+stable session identity when known; do not invent identities or broaden the
+child's permissions. Keep attribution separate from approval and evidence.

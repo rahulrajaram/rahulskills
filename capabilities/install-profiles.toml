@@ -4,6 +4,7 @@ default = "core"
 
 [profiles]
 core = [
+  "agent-stall-triage",
   "analyze-conversation",
   "archdiagram",
   "autonomous-execution-contract",
@@ -18,6 +19,7 @@ core = [
   "define-operating-charter",
   "diagram-review-viewer",
   "ecosystem-borrow-audit",
+  "evaluate-skill",
   "fp-refine",
   "frame-goals-constraints",
   "git-status-report",
@@ -38,6 +40,7 @@ core = [
   "metabuilder-harness-improvement",
   "metabuilder-consumer-qualification",
   "metabuilder-harness-design",
+  "metabuilder-progressive-harness",
   "next-todos",
   "objective-to-dag-decomposition",
   "pi-defects-harvester",

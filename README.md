@@ -66,7 +66,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (62)
+### Package-managed skills (67)
 
 Authored in this package and available for explicit selection on Pi, Codex, and
 Claude Code. The default `core` profile omits the optional design skills
@@ -75,6 +75,7 @@ exclusions prevent package copies from shadowing system-owned skills.
 
 | Skill | Description |
 |-------|-------------|
+| `agent-stall-triage` | Diagnose and recover a stalled Pi, Codex, Claude, or OpenCode session while preserving its saved state |
 | `analyze-conversation` | Post-mortem analysis of conversations for anti-patterns and learnings |
 | `archdiagram` | Generate architecture diagrams from context or codebase |
 | `autonomous-execution-contract` | Execute agreed long-running engineering work autonomously from a bounded objective |
@@ -87,6 +88,7 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
 | `define-operating-charter` | Define and ratify authority, lifecycle, evidence, and stop rules for long-running agentic systems |
 | `diagram-review-viewer` | Create Mermaid diagrams with an interactive browser review viewer |
+| `evaluate-skill` | Review skill instructions through realistic scenarios and propose evidence-backed corrections |
 | `ecosystem-borrow-audit` | Cross-repo borrowing analysis and multi-sigma ideation sweeps |
 | `figma` | Use Figma MCP for design context, screenshots, variables, assets, setup, and design-to-code work |
 | `figma-implement-design` | Translate Figma nodes into production code with 1:1 visual fidelity |
@@ -109,6 +111,8 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `metabuilder-assess` | Assess epoch evidence and route justified improvements to the owning workflow |
 | `metabuilder-harness-improvement` | Repair an existing harness against the same objective and requalify it through the MetaBuilder package |
 | `metabuilder-consumer-qualification` | Run and assess an already designed consumer harness without conflating controller evidence with product judgment |
+| `metabuilder-sandbox-runtime` | Historical sandbox observations with required verification against the installed runtime |
+| `metabuilder-progressive-harness` | Select the smallest useful analysis harness and expand only from demonstrated gaps |
 | `metabuilder-harness-design` | Turn a target objective into an agreed brief and typed MetaBuilder harness design |
 | `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |
 | `objective-to-dag-decomposition` | Decompose vague objectives into typed reasoning trees, an execution DAG, and phased plans |
@@ -121,6 +125,7 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `reference-cleaner` | Remove blocklisted references from git history and source files |
 | `repo-topics` | Analyze a GitHub repo and apply relevant topic labels |
 | `rewrite-commit-messages` | Bulk rewrite git commit messages with filter-repo |
+| `runpod-b300-personal` | Launch or recover the owner’s personal B300 chat service within explicit provisioning authority |
 | `skill-creator` | Create or update scoped skills and their supporting resources across the package runtimes |
 | `speak` | Read text out loud using Kokoro TTS |
 | `squash-commits` | Analyze and squash contiguous thematic git commit groups |
@@ -254,6 +259,17 @@ must be empty or absent.
 
 Respects per-machine exclusion list in `.exclude-skills` (one skill name per line, gitignored).
 
+### Activate a reviewed Chasm bundle
+
+From the development guest, `scripts/activate_chasm_skills.py --runtime pi
+--bundle BUNDLE` previews composition over the existing managed skill snapshot.
+Use `--runtime codex` for Codex. After reviewing the preview, `--apply` atomically
+switches the selected runtime's discovery link and reports its rollback target.
+Unselected skills remain in the composed snapshot. Pi collisions for selected
+skills are listed before archival. Unrelated duplicate or broken discovery entries
+are preserved unless `--archive-unrelated` is explicitly selected. This does not
+install global instructions, credentials, providers, or external dependencies.
+
 ### `scan-skills.sh`
 
 Discover skills, scripts, agents, and build targets across all local projects listed in `~/Documents/listings.txt`.
@@ -336,3 +352,29 @@ The dispatchers look for executable hooks in `.githooks/` (or `scripts/git-hooks
 ## License
 
 All rights reserved.
+
+## Optional local integration tools
+
+Chasm bundles support instruction fragments under
+`profiles/chasm-development/skills/<name>/`: `prepend.md` adds guidance after
+frontmatter, `SKILL.md` replaces the manifest, and `replace.toml` makes exact,
+single-match replacements. Overrides and prepends are mutually exclusive.
+Select `--profile chasm-development` to compose them; canonical skills remain
+unchanged and composed links still require declared portable payloads.
+Global instruction candidates can be rendered with
+`scripts/render_chasm_instructions.py`; review them against current authority
+before installation. Rendering does not install policy or providers.
+The optional credential-import helper requires an explicitly authorized,
+interactive guest terminal; never put real credentials in repository files.
+
+`bin/ow-run` records completion evidence, while `bin/ow-child` reads an existing
+OpenCode SQLite store. The optional TypeScript completion bridge in
+`overlays/opencode/plugin/` is not installed automatically. It requires exact
+process, session, and workspace addressing; stale or uncertain deliveries remain
+pending for manual reconciliation. See the supervised-dispatch skill for usage.
+No helper or completion message grants authority to start another task.
+Run its mocked bridge tests with `node --test tests/test_overwatch_continuation.mjs`
+using a Node runtime with built-in TypeScript support.
+
+`runpod-b300-personal` and `metabuilder-sandbox-runtime` are available through
+explicit `--skill` selection; they are not added to the default core profile.

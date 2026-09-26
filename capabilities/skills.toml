@@ -218,6 +218,13 @@ layer = "workflow"
 overlaps = ["check-antipatterns", "metabuilder-assess"]
 overlap_kind = "router"
 
+[skills.agent-stall-triage]
+platforms = ["linux"]
+effect = "local-process"
+effects = ["readonly", "privileged-observe", "local-process"]
+approval_boundaries = ["signal", "terminate", "resume", "restart"]
+layer = "workflow"
+
 [skills.archdiagram]
 effect = "local-write"
 effects = ["local-write"]
@@ -539,3 +546,28 @@ overlap_kind = "router"
 effect = "local-write"
 effects = ["local-write"]
 layer = "composer"
+
+[skills.evaluate-skill]
+effect = "readonly"
+effects = ["readonly"]
+layer = "workflow"
+
+[skills.metabuilder-progressive-harness]
+optional_commands = ["metabuilder"]
+effect = "local-write"
+effects = ["readonly", "local-write", "local-process"]
+approval_boundaries = ["brief-approval", "epoch-activation", "effect-expansion", "campaign-continuation"]
+layer = "composer"
+
+[skills.runpod-b300-personal]
+optional_commands = ["llmctl"]
+effect = "external-call"
+effects = ["readonly", "local-process", "network-read", "external-call"]
+approval_boundaries = ["provisioning", "spending", "credentials", "teardown"]
+layer = "workflow"
+
+[skills.metabuilder-sandbox-runtime]
+commands = ["metabuilder"]
+effect = "readonly"
+effects = ["readonly"]
+layer = "workflow"

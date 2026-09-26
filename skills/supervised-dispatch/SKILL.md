@@ -93,3 +93,34 @@ gate-run <name> --require-executed -- cargo clippy --offline --all-features -- -
 - A failed run directory cannot be reused; use a fresh one.
 - Set silent/soft timeouts so hangs self-report instead of stalling a queue.
 - Never substitute models to work around a missing one; record the routing fact.
+
+
+## Optional completion and child inspection tools
+
+When the package's `ow-run` helper and OpenCode continuation bridge have been
+explicitly installed, address a completion to the known orchestrator process,
+session, and workspace:
+
+```bash
+ow-run task-label --cwd WORKSPACE --log DURABLE_LOG \
+  --target-pid PID --target-session SESSION_ID -- COMMAND ARGUMENTS
+ow-child --session SESSION_ID --db OPENCODE_DATABASE
+```
+
+An unspecified recipient leaves a record for inspection. A dead recipient is
+not permission to deliver to another session. Reconcile pending or uncertain
+claims manually before retrying; the bridge does not promise exactly-once
+notification or authorize the next task. Prove the installed wake path before
+promising unattended continuation. Without a verified bridge, retain the task
+handle and report that an agent turn is still needed to collect completion.
+
+The read-only inspector depends on the installed OpenCode database schema;
+a missing database, schema mismatch, or empty result is not evidence of completion.
+Process liveness, CPU use, and log growth are observations, not proof that a child
+is progressing toward the requested outcome. Pair status with task artifacts.
+
+Avoid silent timeouts shorter than a known quiet phase, especially with buffered
+pipelines such as `tee | tail`. A killed wrapper may never write its sentinel;
+controller exit evidence remains authoritative. Preserve inherited
+`AGENT_ATTRIBUTION_*` and `SELFIMPROVE_*` attribution fields for authorized child
+calls without treating those fields as new effects or credentials authority.
