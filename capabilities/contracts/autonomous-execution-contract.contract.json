@@ -3,8 +3,8 @@
   "unit": {
     "phase_id": "execute-bounded-task",
     "skill": "autonomous-execution-contract",
-    "semantic_version": "1.0.0",
-    "guidance_digest": "7d4a406b3bf42f7be6fac38c22e25bc1e0f17483c4e4afc071d452b85fa367b8"
+    "semantic_version": "1.0.1",
+    "guidance_digest": "da6af66a5eae5ed1bd12926d9bf33fd194696237894f2e39567bf6a88de42e21"
   },
   "inputs": [
     {

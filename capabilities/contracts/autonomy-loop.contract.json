@@ -3,8 +3,8 @@
   "unit": {
     "phase_id": "orchestrate-epic",
     "skill": "autonomy-loop",
-    "semantic_version": "1.0.1",
-    "guidance_digest": "4260f86834a21b48283920803b6c3de2e70c712727113b20602d43cfb58e7e70"
+    "semantic_version": "1.0.2",
+    "guidance_digest": "9a094d2ca515986a42723b92b410d7e8a1f6a1a0722bfd1a85dd0649377daf23"
   },
   "inputs": [
     {

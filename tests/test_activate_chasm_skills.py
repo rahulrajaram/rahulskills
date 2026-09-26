@@ -96,7 +96,7 @@ class ActivateChasmSkillsTests(unittest.TestCase):
       broken = root / "gone-skill"
       broken.symlink_to(home / "deleted-source")
 
-      plan = prepare("pi", bundle, home, snapshots)
+      plan = prepare("pi", bundle, home, snapshots, archive_unrelated=True)
       self.assertEqual(set(plan["archive_candidates"]), {duplicate, broken})
       final, rollback, archive = apply(plan)
       self.assertEqual(rollback, old / "skills")
@@ -165,6 +165,27 @@ class ActivateChasmSkillsTests(unittest.TestCase):
       (occupied / "skills/corrupt").write_text("wrong content")
       with self.assertRaisesRegex(ValueError, "does not match its digest"):
           apply(plan)
+
+
+
+
+class ScopedActivationTests(unittest.TestCase):
+    def test_default_preserves_unrelated_duplicate_and_broken_entries(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home, snapshots, bundle = fixture(root, "pi")
+            seed_snapshot(home, snapshots, "pi", {"other": "managed old"})
+            discovery = home / ".pi/agent/skills"
+            duplicate = discovery / "other"
+            duplicate.mkdir()
+            (duplicate / "SKILL.md").write_text("user variant")
+            broken = discovery / "broken"
+            broken.symlink_to(root / "absent")
+            plan = prepare("pi", bundle, home, snapshots)
+            self.assertEqual(plan["archive_candidates"], [])
+            apply(plan)
+            self.assertEqual((duplicate / "SKILL.md").read_text(), "user variant")
+            self.assertTrue(broken.is_symlink())
 
 
 if __name__ == "__main__":

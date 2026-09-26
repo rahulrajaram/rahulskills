@@ -2,8 +2,8 @@
 """Compose and atomically activate a Chasm runtime skill snapshot.
 
 The default invocation is a preview. Applying writes only immutable snapshots,
-the selected runtime's host-synced link, and (for Pi) an archive of broken or
-duplicate top-level entries in its discovery directory.
+the selected runtime's host-synced link, and (for Pi) an archive of conflicting
+selected entries. Unrelated discovery cleanup is explicit opt-in.
 """
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ def _active_snapshot(link: Path, snapshot_root: Path, runtime: str) -> Path | No
     return target
 
 
-def _pi_archive_candidates(pi_root: Path, final_names: set[str]) -> list[Path]:
+def _pi_archive_candidates(pi_root: Path, final_names: set[str], *, include_broken: bool = False) -> list[Path]:
     if not pi_root.exists():
         return []
     if pi_root.is_symlink() or not pi_root.is_dir():
@@ -108,13 +108,14 @@ def _pi_archive_candidates(pi_root: Path, final_names: set[str]) -> list[Path]:
         if entry.name == "host-synced":
             continue
         if entry.is_symlink() and not entry.exists():
-            result.append(entry)
+            if include_broken or entry.name in final_names:
+                result.append(entry)
         elif entry.name in final_names:
             result.append(entry)
     return result
 
 
-def prepare(runtime: str, bundle: Path, home: Path, snapshot_root: Path) -> dict:
+def prepare(runtime: str, bundle: Path, home: Path, snapshot_root: Path, *, archive_unrelated: bool = False) -> dict:
     if runtime not in ("codex", "pi"):
         raise ValueError("Runtime must be codex or pi")
     bundle = bundle.absolute()
@@ -153,7 +154,9 @@ def prepare(runtime: str, bundle: Path, home: Path, snapshot_root: Path) -> dict
             copy_tree(refs, composed.parent / "references")
         digest = digest_tree(composed.parent)
         final_names = {p.name for p in composed.iterdir() if p.is_dir()}
-    archive_candidates = (_pi_archive_candidates(pi_root, final_names) if runtime == "pi" else [])
+    selected_names = final_names if archive_unrelated else {p.name for p in skills.iterdir()}
+    archive_candidates = (_pi_archive_candidates(pi_root, selected_names, include_broken=archive_unrelated)
+                          if runtime == "pi" else [])
     return {"runtime": runtime, "bundle": bundle, "home": home, "snapshot_root": snapshot_root,
             "runtime_root": runtime_root, "link": link, "old": old, "digest": digest,
             "final_names": final_names, "archive_candidates": archive_candidates}
@@ -245,9 +248,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--home", type=Path, default=Path.home(), help="Agent home (default: current user's home)")
     parser.add_argument("--snapshot-root", type=Path, default=Path("/workspace/.agent-skills"))
     parser.add_argument("--apply", action="store_true", help="Write snapshot and atomically activate it")
+    parser.add_argument("--archive-unrelated", action="store_true",
+                        help="Also archive unrelated Pi duplicate and broken discovery entries")
     args = parser.parse_args(argv)
     try:
-        plan = prepare(args.runtime, args.bundle, args.home, args.snapshot_root)
+        plan = prepare(args.runtime, args.bundle, args.home, args.snapshot_root, archive_unrelated=args.archive_unrelated)
         print(f"runtime: {plan['runtime']}")
         print(f"active link: {plan['link']}")
         print(f"old link target: {plan['old'] if plan['old'] else '(absent)'}")
