@@ -109,6 +109,9 @@ the site descriptor and the corresponding profile. `minimal.profile` pins the
 vendored Pi release with `pi_head_resolution=none`; `chasm.profile` resolves
 site Pi HEAD at create time. A source manifest alone does not prove which path
 the installed site will take.
+For Claude, check `/home/agent/.local/bin/claude`; auth comes from
+`claude-openrouter` under `chasm shell NAME --with claude` or an in-guest
+`claude`, then `/login`, never a copied host `~/.claude/.credentials.json`.
 
 ### 2. Check the destination and recover guest work
 

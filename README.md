@@ -4,28 +4,56 @@
   <em>A curated collection of special recipes I use extensively with AI coding assistants.</em>
 </p>
 
-Shared AI agent skills and shell scripts for Claude Code and OpenAI Codex CLI. This repository is the single source of truth for reusable skills that get synced into individual projects via `sync-skills.sh`.
+Shared AI agent skills and shell scripts for Claude Code, OpenAI Codex CLI, Pi Coding Agent, and opencode. This repository is the single source of truth for reusable skills; per-runtime installers (or `sync-skills.sh push` for all of them) deploy them.
 
 ## What is this?
 
-This repo collects skills (prompt-based automation units) for two AI coding assistants:
+This repo collects skills (prompt-based automation units) for four AI coding
+agent runtimes:
 
-- **Codex** (`~/.codex/skills/`) -- OpenAI Codex CLI skills
-- **Claude Code** (`~/.claude/skills/`) -- Claude Code skills
-- **opencode** (`~/.config/opencode/skills/`) -- opencode CLI skill links
+| Runtime | Install location | Installer | Form |
+|---------|------------------|-----------|------|
+| **Claude Code** | `${CLAUDE_CONFIG_DIR:-~/.claude}/skills/` | `install-claude-skills.sh` | stitched copies |
+| **Codex** | `~/.codex/skills/` | `stitch-skills.sh install --runtime codex` | stitched copies |
+| **Pi Coding Agent** | `~/.pi/agent/skills/` | `install-pi-skills.sh` | repository links |
+| **opencode** | `~/.config/opencode/skills/` | `install-opencode-skills.sh` | repository links |
 
-Both use the same directory-based format with `SKILL.md` entry points, optional scripts, agents, and reference material. The `skills/` directory in this repo is the single source of truth, synced to both locations.
+All four use the same directory-based format with `SKILL.md` entry points,
+optional scripts, agents, and reference material. The `skills/` directory in
+this repo is the single source of truth. Claude and Codex receive assembled
+copies (canonical skill plus any `overlays/<runtime>/` metadata), so re-run
+their installers after pulling; Pi and opencode link straight to the checkout.
+`./sync-skills.sh push` installs to all four.
+
+### Claude Code
+
+Run [`install-claude-skills.sh`](#install-claude-skillssh) with the desired
+profile after cloning and again after every pull: Claude needs stitched copies
+(for example, `allowed-tools` grants from `overlays/claude/`), so installs are
+copies, not links. Reruns are idempotent and only replace package-owned copies
+that are still unmodified. The installer honors `CLAUDE_CONFIG_DIR` (skills go
+to `$CLAUDE_CONFIG_DIR/skills`, default `~/.claude/skills`) or an explicit
+`--claude-root`. Invoke a skill as `/<name>` with arguments after the name, for
+example `/handoff-extract` or `/handoff-extract print`; Claude also selects skills
+automatically from their descriptions. Names that Claude Code ships as built-in
+skills or commands (see `runtime-exclusions/claude.txt`) are never installed
+for Claude. For Chasm guests, see [Claude guest setup](docs/claude-guest-setup.md).
+
+### Pi Coding Agent
 
 Pi Coding Agent resolves selected links from `~/.pi/agent/skills/`. Run
-[`install-pi-skills.sh`](#install-pi-skills.sh) with the desired profile after
+[`install-pi-skills.sh`](#install-pi-skillssh) with the desired profile after
 cloning or pulling. It preserves unrelated links and user-managed directories;
 profile changes do not prune optional copies. Invoke a skill explicitly in Pi as
-`/skill:<name>`; for example, `/skill:handoff extract` reviews
+`/skill:<name>`; for example, `/skill:handoff-extract` reviews
 `NEXT_SHELL_PROMPT.md`, adopts it as the current request, and immediately
 executes its authorized work.
 
+### opencode
+
+
 opencode resolves selected links from `~/.config/opencode/skills/`. Run
-[`install-opencode-skills.sh`](#install-opencode-skills.sh) with the desired
+[`install-opencode-skills.sh`](#install-opencode-skillssh) with the desired
 profile; it follows the same conservative linking and ownership rules as the
 Pi installer. opencode also auto-discovers `~/.claude/skills/` by default, so
 the linked install and the Claude install can surface the same skill names;
@@ -34,7 +62,7 @@ suppress the Claude scan if that duplication is unwanted.
 
 Skills cover workflow automation (git history cleanup, session handoffs, PDF generation), multi-AI orchestration (debates, ideation across Claude/Codex/Gemini), infrastructure diagnostics (memory leak investigation, incident postmortems), and project-specific tooling (Yore vocabulary curation).
 
-Five shell scripts handle discovery, assembly, syncing, Pi linking, and audit across all local projects.
+Shell scripts handle discovery, assembly, per-runtime installation, syncing, and audit across all local projects.
 
 ## Repository Structure
 
@@ -46,15 +74,17 @@ rahulskills/
   build/                   # Gitignored — assembled output from stitch step
   bin/                     # Shared assistant shell helpers (symlink or copy into ~/.local/bin)
   audit-skills.sh          # Pre-commit guard against private reference leaks
+  install-claude-skills.sh   # Assemble + copy repo skills into ${CLAUDE_CONFIG_DIR:-~/.claude}/skills
   install-pi-skills.sh       # Symlink repo skills into ~/.pi/agent/skills for Pi
   install-opencode-skills.sh # Symlink repo skills into ~/.config/opencode/skills for opencode
-  stitch-skills.sh         # Assemble skills + overlays, install to CLI locations
+  stitch-skills.sh         # Assemble skills + overlays, install Claude/Codex copies (--runtime)
   runtime-exclusions/      # Runtime-owned names that must not be installed twice
   scripts/audit_catalog.py # Audit resolved roots for collisions and portability
-  capabilities/skills.toml # Dependencies, effects, layers, and overlap contracts
+  capabilities/skills.toml # Dependencies, effects, layers, overlaps, optional per-runtime support
   scan-skills.sh           # Cross-project skill discovery and reporting
   sync-skills.sh           # Bidirectional sync between repo and installed locations
-  setup.sh                 # Contributor bootstrap (hooks + optional skill deploy)
+  setup.sh                 # Contributor bootstrap (hooks + optional per-runtime skill deploy)
+  CLAUDE.md                # Claude Code session guidance (defers to AGENTS.md)
   .github/workflows/       # CI: assemble + structure tests on PRs and pushes
   .githooks/pre-commit     # Repo-local hook calling audit-skills.sh
   .githooks/commit-msg     # Repo-local hook enforcing conventional commits
@@ -68,10 +98,13 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ### Package-managed skills (67)
 
-Authored in this package and available for explicit selection on Pi, Codex, and
-Claude Code. The default `core` profile omits the optional design skills
-`figma`, `figma-implement-design`, and `tui-web-design-orchestrator`. Runtime
-exclusions prevent package copies from shadowing system-owned skills.
+Authored in this package and available for explicit selection on Claude Code,
+Codex, Pi, and opencode. The default `core` profile omits the optional design
+skills `figma`, `figma-implement-design`, and `tui-web-design-orchestrator`.
+Runtime exclusions prevent package copies from shadowing system-owned skills.
+A catalog entry may declare `runtimes = [...]` in `capabilities/skills.toml` to
+limit where it installs; `pi-defects-harvester` is Pi-only because it harvests
+Pi session artifacts and writes `~/.pi/agent/reports/`.
 
 | Skill | Description |
 |-------|-------------|
@@ -161,6 +194,13 @@ but are not vendored or reinstalled because Codex owns and updates them:
 `skill-installer`. The package still carries its shared `skill-creator` source
 for Pi and Claude while excluding that copy from the Codex assembly.
 
+### Claude Code built-in names
+
+`runtime-exclusions/claude.txt` lists names Claude Code already provides as
+built-in skills or commands (for example `init`, `review`, `security-review`,
+`simplify`, `loop`, and `schedule`). No package skill currently uses one; if one
+ever did, the Claude assembly would skip it rather than shadow the built-in.
+
 ## Shell Scripts
 
 ### `install-pi-skills.sh`
@@ -182,6 +222,30 @@ ownership is recorded in `.rahulskills-ownership.json` under the Pi runtime.
 No optional profile selection activates MCPs, commands, or other dependencies.
 Runtime exclusions and `.exclude-skills` are honored.
 
+### `install-claude-skills.sh`
+
+Assemble the selected profile or explicitly named skills with their Claude
+overlays and copy them into Claude Code's skill directory. Selection defaults to
+`core` and preserves unrelated entries. It acts on Claude only, so a Codex
+ownership conflict never blocks it, and it assembles in a private temporary
+directory rather than `build/`.
+
+```bash
+./install-claude-skills.sh                       # Install the core profile
+./install-claude-skills.sh --profile all         # Select every package profile
+./install-claude-skills.sh --skill grilling      # Select one skill only
+./install-claude-skills.sh --preview --claude-root /tmp/claude  # Isolated preview
+CLAUDE_CONFIG_DIR=/tmp/claude-alt ./install-claude-skills.sh    # Alternate config dir
+```
+
+Ownership is recorded in `.rahulskills-ownership.json` in the Claude config
+directory; `--remove NAME` removes a verified package-owned copy. A ledger
+written by another checkout (for example, installing from a worktree) is refused
+unless `--adopt-source` is given, which re-roots it to the current checkout while
+still preserving user-modified copies. `install-pi-skills.sh` and
+`stitch-skills.sh` accept the same flag; for Pi it re-points links at the
+current checkout, so only adopt from a checkout that will persist.
+
 ### `install-opencode-skills.sh`
 
 Symlink the selected profile or explicitly named skills into opencode's
@@ -198,11 +262,15 @@ runtime-exclusion rules.
 
 ### `stitch-skills.sh`
 
-Assembles selected generic skills with CLI-specific overlays and can install to
-both CLIs. `--output PATH` always assembles into a fresh isolated destination;
-`preview` uses an isolated assembly and reports additions, updates, retained
-entries, ownership conflicts, and explicit removals without changing installs.
-`install` previews both runtimes before applying ownership-safe updates.
+Assembles selected generic skills with CLI-specific overlays and installs
+copies for Claude Code and Codex. `--runtime claude|codex` (repeatable; default
+both) limits assembly, preview, install, and check to the named runtimes, so one
+runtime's ownership conflict does not block another. `--output PATH` always
+assembles into a fresh isolated destination; `preview` uses an isolated assembly
+and reports additions, updates, retained entries, ownership conflicts, and
+explicit removals without changing installs. `install` previews every selected
+runtime before applying ownership-safe updates. `--claude-root` defaults to
+`${CLAUDE_CONFIG_DIR:-~/.claude}`.
 
 ```bash
 ./stitch-skills.sh repo-layout   # Validate skills/ and overlays/ directories
@@ -210,6 +278,7 @@ entries, ownership conflicts, and explicit removals without changing installs.
 ./stitch-skills.sh assemble --profile design --output /tmp/rahulskills-design
 ./stitch-skills.sh preview --profile core --codex-root /tmp/codex --claude-root /tmp/claude
 ./stitch-skills.sh install --profile core
+./stitch-skills.sh install --runtime codex         # Codex only
 ./stitch-skills.sh check --profile core
 ./stitch-skills.sh all --profile all
 ```
@@ -218,25 +287,33 @@ Use `--remove NAME` only for an explicit removal of a verified package-owned
 entry. A read-only preview of the actual default installs is:
 
 ```bash
-./stitch-skills.sh preview --codex-root "$HOME/.codex" --claude-root "$HOME/.claude"
+./stitch-skills.sh preview --codex-root "$HOME/.codex" --claude-root "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 ./install-pi-skills.sh --preview --pi-root "$HOME/.pi/agent"
+./install-opencode-skills.sh --preview
 ```
 
 ### `sync-skills.sh`
 
-Bidirectional sync between this repo and installed locations. Push delegates to
-`stitch-skills.sh install`. Pull stages each incoming skill and moves an
+Bidirectional sync between this repo and installed locations. Push installs to
+every runtime: `stitch-skills.sh install` (privately assembled) for Claude and
+Codex copies, then `install-pi-skills.sh` and `install-opencode-skills.sh` for
+links. `--runtime NAME` (repeatable) narrows it, `--profile`/`--skill` select
+skills, and each installer previews its own ownership boundary before applying.
+Installed roots honor `CODEX_SKILLS_DIR`, `PI_SKILLS_DIR`, `OPENCODE_SKILLS_DIR`,
+and `CLAUDE_SKILLS_DIR` (default `${CLAUDE_CONFIG_DIR:-~/.claude}/skills`).
+Pull stages each incoming skill and moves an
 existing source tree into a timestamped Git-metadata backup before publishing
 the replacement. Excluded skills are left untouched.
 
 ```bash
 ./sync-skills.sh pull      # Copy installed skills into this repo (strips CLI-specific keys)
-./sync-skills.sh push      # Assemble and install skills to all CLI locations
+./sync-skills.sh push      # Install to Claude, Codex, Pi, and opencode
+./sync-skills.sh push --runtime claude --runtime pi  # Only the named runtimes
 ./sync-skills.sh diff      # Freshly assemble, then show installed differences
-./sync-skills.sh status    # List which skills exist in repo, Codex, Pi, and Claude
-./sync-skills.sh source-coverage  # Verify all installed Pi/Codex skills are represented
-./sync-skills.sh compare-implementations  # Validate repo/Codex/Pi/Claude skill parity
-./sync-skills.sh audit-catalog --strict   # Fail on divergent loaded skill names
+./sync-skills.sh status    # List which skills exist in repo, Codex, Pi, Claude, and opencode
+./sync-skills.sh source-coverage  # Verify all installed Pi/Codex/Claude skills are represented
+./sync-skills.sh compare-implementations  # Validate repo/Codex/Pi/Claude/opencode parity
+./sync-skills.sh audit-catalog --strict   # Fail on divergent skills loaded by one runtime
 ./sync-skills.sh capability-health --mcp figma  # Check commands/MCPs/platforms
 ```
 
@@ -280,7 +357,11 @@ Discover skills, scripts, agents, and build targets across all local projects li
 ./scan-skills.sh report    # Generate skill-candidates.md tracking file
 ```
 
-Tags each discovered item as `[COLLECTED]`, `[EXCLUDED]`, or `[NEW]` relative to this repo.
+Covers project `.agents/skills`, `.claude/skills`, `.pi/skills`, and
+`.opencode/skills` directories. Tags each discovered skill as `[COLLECTED]`,
+`[EXCLUDED]`, or `[NEW]` relative to this repo's `skills/`. Set `SKILL_LISTINGS`
+to use another listings file.
+
 ### `audit-skills.sh`
 
 Pre-commit guard that scans skill files for private references (project names
@@ -319,7 +400,8 @@ cd ~/Documents/rahulskills
 `setup.sh` handles everything:
 1. Clones [commithooks](https://github.com/rahulrajaram/commithooks) to `~/Documents/commithooks/` if not already present
 2. Installs hook dispatchers into `.git/hooks/` and library modules into `.git/lib/`
-3. Optionally deploys skills to `~/.codex/skills/` and `~/.claude/skills/`
+3. Optionally deploys the core profile to the runtimes you choose (`claude`,
+   `codex`, `pi`, `opencode`, `all`, or `none`)
 
 Pass `--skip-skills` to skip the interactive skill deployment prompt.
 
@@ -336,7 +418,8 @@ focused pre-commit hook.
 1. Create `skills/<name>/SKILL.md` with required `name` and `description` frontmatter. Preserve supported optional fields such as `argument-hint`, and add `agents/`, `references/`, or `scripts/` only when needed.
 2. If the skill needs Claude-specific metadata (e.g. `allowed-tools`), create `overlays/claude/<name>.yml`.
 3. Run `./audit-skills.sh check` to validate the package and verify no private references leaked.
-4. Commit and `./sync-skills.sh push` to assemble and deploy to all CLI locations.
+4. If it only works on some runtimes, add `runtimes = [...]` to its catalog entry.
+5. Commit and `./sync-skills.sh push` to deploy to every runtime.
 
 ## Git Hooks
 

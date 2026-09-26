@@ -3,7 +3,8 @@
 `policy.md` is the shared source. `scripts/render_chasm_instructions.py`
 renders it with runtime-specific filenames. Generated candidates
 are Codex `AGENTS.md`, Pi `AGENTS.md`, Claude `CLAUDE.md`, and an OpenCode
-content candidate. Merge candidates into reviewed global instruction layers;
+content candidate. Runtime-specific sections are appended from
+`pi-runtime.md` (Pi) and `claude-runtime.md` (Claude). Merge candidates into reviewed global instruction layers;
 do not replace existing instructions wholesale. For OpenCode, inspect the
 installed runtime's actual global-instruction configuration before selecting a
 destination. These files do not establish runtime installation or capability.

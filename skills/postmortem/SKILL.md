@@ -137,7 +137,16 @@ kubectl get pods,svc,deploy -n <ns>
 
 Reports can be:
 1. Output directly in the conversation (default)
-2. Saved to file: `~/.claude/postmortems/YYYY-MM-DD_<incident-slug>.md`
+2. Saved, when requested, as `YYYY-MM-DD_<incident-slug>.md` in a
+   user-named directory, or else the current runtime's postmortem directory:
+   - Claude Code: `${CLAUDE_CONFIG_DIR:-~/.claude}/postmortems/` (existing
+     location; keep using it for Claude sessions);
+   - Codex: `${CODEX_HOME:-~/.codex}/postmortems/`;
+   - Pi: `~/.pi/agent/postmortems/`;
+   - opencode or an unidentified runtime: `${XDG_DATA_HOME:-~/.local/share}/postmortems/`.
+
+Create only that directory if it is missing and never overwrite an existing
+report; add a numeric suffix instead. Report the absolute saved path.
 
 ## Tips for Good Postmortems
 

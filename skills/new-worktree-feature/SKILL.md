@@ -56,6 +56,17 @@ Do not install dependencies, run migrations, push branches, or open a pull
 request as part of worktree creation. Those are separate actions requiring
 their own scope and approvals.
 
+## Claude Code
+
+Claude Code's `EnterWorktree` tool (with `name`) and `claude --worktree`
+create worktrees under the repository's `.claude/worktrees/`, not the
+prescribed root; use them only when the user asks for that location. Otherwise
+create the worktree with `git worktree add` as above, then optionally switch
+the session into it with `EnterWorktree` and `path: <destination>` (it must
+appear in `git worktree list`). `ExitWorktree` never removes a worktree entered
+by path. Without that switch, a `cd` in one Bash call does not reliably carry to
+the next: pass absolute paths or `git -C <destination>` on every command.
+
 ## Handoff
 
 Report the new worktree path, branch, base commit, verification results, and

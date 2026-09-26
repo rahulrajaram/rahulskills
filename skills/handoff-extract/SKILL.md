@@ -21,12 +21,16 @@ Runtime argument envelopes differ. In Codex, `print` follows the
 `$handoff-extract` mention in the live user request. Pi appends the literal
 trailing text after the injected `</skill>` block, without a label; therefore a
 bare trailing `print` is the authoritative mode selector, not handoff content
-and not text to echo.
+and not text to echo. Claude Code substitutes the text after `/handoff-extract`
+for `$ARGUMENTS` where the skill uses it; otherwise it appends it as an
+`ARGUMENTS: print` line after the skill body. Either way, a bare `print` is the
+mode selector; an empty or absent argument selects activation.
 
 Supported forms:
 
 - Codex: `$handoff-extract`, `$handoff-extract print`
 - Pi: `/skill:handoff-extract`, `/skill:handoff-extract print`
+- Claude Code: `/handoff-extract`, `/handoff-extract print`
 
 ## Activation protocol (default)
 

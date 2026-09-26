@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Synchronize local Pi or Codex skills into a selected running Chasm guest."""
+"""Synchronize local Pi, Codex, or Claude skills into a selected running Chasm guest.
+
+Pi and Codex discover a ``host-synced`` link to the verified generation. Claude
+discovers skills only at ``<config>/skills/<name>/SKILL.md``, so for Claude the
+generation is tracked by a bookkeeping ``active`` link and projected as real
+copies into the guest's Claude config directory (default ``/home/agent/.claude``).
+Projected entries are recorded in ``<config>/.chasm-skills-ownership.json`` and
+are updated or removed only while they still match that ledger; user-created or
+locally edited skills are never replaced.
+"""
 from __future__ import annotations
 
 import argparse
@@ -27,7 +36,16 @@ GUEST_LINK = Path("/home/agent/.pi/agent/skills/host-synced")
 RUNTIME_PATHS = {
     "pi": (Path("/workspace/.agent-skills/pi"), Path("/home/agent/.pi/agent/skills/host-synced")),
     "codex": (Path("/workspace/.agent-skills/codex"), Path("/home/agent/.codex/skills/host-synced")),
+    "claude": (Path("/workspace/.agent-skills/claude"), Path("/workspace/.agent-skills/claude/active")),
 }
+GUEST_HOME = Path("/home/agent")
+GUEST_CLAUDE_CONFIG = GUEST_HOME / ".claude"
+
+
+def host_claude_skills() -> Path:
+    """The host's installed Claude skills (stitched build/claude output), honoring CLAUDE_CONFIG_DIR."""
+    configured = os.environ.get("CLAUDE_CONFIG_DIR")
+    return (Path(configured).expanduser() if configured else Path.home() / ".claude") / "skills"
 
 
 def _inside(path: Path, roots: Iterable[Path]) -> bool:
@@ -167,7 +185,8 @@ def guest_status(sandbox: str = "development", prefix: list[str] | None = None) 
 
 GUEST_APPLY = r'''import base64, hashlib, json, os, pathlib, re, stat, sys, tempfile
 payload = json.load(sys.stdin)
-runtime_paths = {"pi": ("/workspace/.agent-skills/pi", "/home/agent/.pi/agent/skills/host-synced"), "codex": ("/workspace/.agent-skills/codex", "/home/agent/.codex/skills/host-synced")}
+runtime_paths = {"pi": ("/workspace/.agent-skills/pi", "/home/agent/.pi/agent/skills/host-synced"), "codex": ("/workspace/.agent-skills/codex", "/home/agent/.codex/skills/host-synced"), "claude": ("/workspace/.agent-skills/claude", "/workspace/.agent-skills/claude/active")}
+guest_home = pathlib.PurePosixPath("/home/agent")
 if payload.get("runtime") not in runtime_paths:
     raise SystemExit("invalid runtime")
 root = pathlib.Path(payload["root"])
@@ -258,18 +277,144 @@ else:
     (stage / ".sync-manifest.json").write_text(json.dumps({"hash": payload["hash"], "files": identity(files)}, sort_keys=True))
     os.rename(stage, generation)
     verify(generation)
+
+LEDGER, MANAGER = ".chasm-skills-ownership.json", "rahulskills-chasm-skills"
+
+def fingerprint(path):
+    if path.is_symlink():
+        return "symlink:" + os.readlink(path)
+    if not path.exists():
+        return None
+    h = hashlib.sha256()
+    if path.is_file():
+        h.update(b"file\0" + str(path.stat().st_mode & 0o777).encode() + b"\0")
+        h.update(path.read_bytes())
+        return "sha256:" + h.hexdigest()
+    if not path.is_dir():
+        return "special"
+    for child in sorted(path.rglob("*")):
+        h.update(child.relative_to(path).as_posix().encode() + b"\0")
+        if child.is_symlink():
+            h.update(b"link\0" + os.readlink(child).encode() + b"\0")
+        elif child.is_file():
+            h.update(b"file\0" + str(child.stat().st_mode & 0o777).encode() + b"\0")
+            h.update(hashlib.sha256(child.read_bytes()).digest())
+        elif child.is_dir():
+            h.update(b"dir\0")
+        else:
+            h.update(b"special\0")
+    return "sha256:" + h.hexdigest()
+
+def load_ledger(config):
+    path = config / LEDGER
+    if path.is_symlink():
+        raise SystemExit("symlink ownership ledger")
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text())
+    if data.get("version") != 1 or data.get("manager") != MANAGER:
+        raise SystemExit("ownership ledger belongs to another manager")
+    for key in data.get("entries", {}):
+        rel = pathlib.PurePosixPath(key)
+        if rel.is_absolute() or ".." in rel.parts or len(rel.parts) < 2 or rel.parts[0] not in ("skills", "references"):
+            raise SystemExit("unsafe ownership entry")
+    return dict(data.get("entries", {}))
+
+def write_ledger(config, owned):
+    fd, raw = tempfile.mkstemp(prefix=".chasm-ownership-", dir=config)
+    with os.fdopen(fd, "w") as stream:
+        json.dump({"version": 1, "manager": MANAGER, "entries": owned}, stream, indent=2, sort_keys=True)
+        stream.write("\n")
+    os.replace(raw, config / LEDGER)
+
+def plan_projection(gen, config):
+    for path in (config, *config.parents):
+        if path.is_symlink():
+            raise SystemExit("claude config ancestor is symlink")
+    for sub in ("skills", "references"):
+        if (config / sub).is_symlink() or ((config / sub).exists() and not (config / sub).is_dir()):
+            raise SystemExit("claude discovery root is not a real directory")
+    owned = load_ledger(config)
+    keys = [f"skills/{p.name}" for p in sorted((gen / "skills").iterdir()) if p.is_dir()]
+    if (gen / "references").is_dir():
+        keys += [f"references/{p.relative_to(gen / 'references').as_posix()}" for p in sorted((gen / "references").rglob("*")) if p.is_file()]
+    plan = []
+    for key in keys:
+        want, cur = fingerprint(gen / key), fingerprint(config / key)
+        action = "add" if cur is None else ("unchanged" if cur == want else "update") if owned.get(key) == cur else "blocked"
+        plan.append((key, action, want))
+    for key in sorted(set(owned) - set(keys)):
+        cur = fingerprint(config / key)
+        plan.append((key, "forget" if cur is None else "remove" if cur == owned[key] else "retain", None))
+    return plan
+
+def apply_projection(gen, config, plan):
+    import shutil
+    owned = load_ledger(config)
+    config.mkdir(mode=0o700, parents=True, exist_ok=True)
+    staging = pathlib.Path(tempfile.mkdtemp(prefix=".chasm-skills-staging-", dir=config))
+    try:
+        for index, (key, action, want) in enumerate(plan):
+            target, cur = config / key, fingerprint(config / key)
+            if action in ("unchanged", "retain"):
+                continue
+            if action == "forget":
+                owned.pop(key, None); write_ledger(config, owned); continue
+            if (action == "add" and cur is not None) or (action in ("update", "remove") and owned.get(key) != cur):
+                raise SystemExit("claude entry changed during projection: " + key)
+            if action == "remove":
+                shutil.rmtree(target) if target.is_dir() and not target.is_symlink() else target.unlink()
+                owned.pop(key, None); write_ledger(config, owned); continue
+            staged, retired = staging / str(index), staging / (str(index) + ".old")
+            (shutil.copytree(gen / key, staged, symlinks=False) if (gen / key).is_dir() else shutil.copy2(gen / key, staged))
+            if fingerprint(staged) != want:
+                raise SystemExit("generation changed while projecting")
+            target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+            if cur is not None:
+                os.replace(target, retired)
+            try:
+                os.replace(staged, target)
+            except OSError:
+                if os.path.lexists(retired) and not os.path.lexists(target):
+                    os.replace(retired, target)
+                raise
+            owned[key] = want
+            write_ledger(config, owned)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+projection = None
+if payload["runtime"] == "claude":
+    config = pathlib.Path(payload.get("claude_config", str(guest_home / ".claude")))
+    pure = pathlib.PurePosixPath(str(config))
+    if not pure.is_absolute() or ".." in pure.parts or guest_home not in pure.parents:
+        raise SystemExit("invalid claude config directory")
+    projection = plan_projection(generation, config)
+    conflicts = [key for key, action, _ in projection if action == "blocked"]
+    if conflicts:
+        raise SystemExit("claude projection conflicts with unmanaged or locally edited entries: " + ", ".join(conflicts))
 unchanged = link.is_symlink() and os.readlink(link) == str(generation / "skills")
 if not unchanged:
     link.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
     temporary = link.with_name(".host-synced." + str(os.getpid()))
     temporary.symlink_to(generation / "skills")
     os.replace(temporary, link)
-print(json.dumps({"generation": str(generation), "link": str(link), "hash": payload["hash"], "unchanged": unchanged}))
+result = {"generation": str(generation), "link": str(link), "hash": payload["hash"], "unchanged": unchanged}
+if projection is not None:
+    apply_projection(generation, config, projection)
+    result["claude_config"] = str(config)
+    result["projection"] = {key: action for key, action, _ in projection if action != "unchanged"}
+print(json.dumps(result))
 '''
 
-def apply_manifest(manifest: dict[str, Any], sandbox: str = "development", runtime: str = "pi") -> dict[str, Any]:
+def apply_manifest(manifest: dict[str, Any], sandbox: str = "development", runtime: str = "pi",
+                   claude_config: Path = GUEST_CLAUDE_CONFIG) -> dict[str, Any]:
     if runtime not in RUNTIME_PATHS:
-        raise ValueError("runtime must be pi or codex")
+        raise ValueError("runtime must be pi, codex, or claude")
+    config = Path(os.path.normpath(claude_config))
+    if runtime == "claude" and (not claude_config.is_absolute() or config != claude_config
+                                or GUEST_HOME not in config.parents):
+        raise ValueError("guest Claude config directory must be a normalized path under /home/agent")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", sandbox):
         raise ValueError("invalid sandbox name")
     prefix = _incus_prefix()
@@ -278,6 +423,8 @@ def apply_manifest(manifest: dict[str, Any], sandbox: str = "development", runti
         return {"status": "skipped", "reason": f"guest-{status}"}
     guest_root, guest_link = RUNTIME_PATHS[runtime]
     payload = {"runtime": runtime, "root": str(guest_root), "link": str(guest_link), **manifest}
+    if runtime == "claude":
+        payload["claude_config"] = str(claude_config)
     result = subprocess.run([*prefix, "exec", f"sandbox-{sandbox}", "--user", "1001", "--group", "1001", "--", "/usr/bin/python3", "-I", "-c", "import json,sys;exec(json.loads(sys.stdin.readline()))"], input=(json.dumps(GUEST_APPLY) + "\n" + json.dumps(payload, sort_keys=True)).encode(), capture_output=True, timeout=90, check=False)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.decode(errors="replace")[:1000])
@@ -303,17 +450,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--allow-root", type=Path, action="append", default=[])
     parser.add_argument("--extra-skill", type=Path, action="append", default=[])
     parser.add_argument("--references", type=Path)
+    parser.add_argument("--guest-claude-config-dir", type=Path, default=GUEST_CLAUDE_CONFIG,
+                        help="Guest Claude config root for --runtime claude (default /home/agent/.claude)")
     args = parser.parse_args(argv)
     try:
-        source = args.source or (DEFAULT_SOURCE if args.runtime == "pi" else Path.home() / ".codex/skills")
+        default_sources = {"pi": DEFAULT_SOURCE, "codex": Path.home() / ".codex/skills", "claude": host_claude_skills()}
+        source = args.source or default_sources[args.runtime]
         allowed = tuple(args.allow_root) or DEFAULT_ALLOWED
-        if args.runtime == "codex" and args.source is None:
+        if args.runtime in ("codex", "claude") and args.source is None:
             allowed = (*allowed, source)
         manifest = build_manifest(source, allowed, args.extra_skill, args.references)
         result = {"status": "check", "runtime": args.runtime, "hash": manifest["hash"], "files": len(manifest["files"])}
         if args.apply:
             with _process_lock():
-                result = {**result, **apply_manifest(manifest, args.sandbox, args.runtime)}
+                result = {**result, **apply_manifest(manifest, args.sandbox, args.runtime, args.guest_claude_config_dir)}
         print(json.dumps(result, sort_keys=True))
         return 0
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:

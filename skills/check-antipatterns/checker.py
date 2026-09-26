@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only live anti-pattern checks for active Claude and Codex conversations."""
+"""Read-only live anti-pattern checks for Claude Code, Codex, and Pi sessions."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from itertools import groupby
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+import session_discovery
 from redaction import redact_sensitive_text
 
 
@@ -323,27 +324,32 @@ def normalize_events(events: Sequence[dict[str, Any]]) -> ConversationData:
     if not events:
         return ConversationData((), 0, "unknown", "empty")
 
-    messages = tuple(
-        event for event in events if event.get("type") in {"user", "assistant"}
+    # Tool-result records become assistant-typed so they never close a human turn.
+    match session_discovery.detect_format(events):
+        case "pi":
+            messages = tuple(session_discovery.normalize_pi_records(events))
+            return ConversationData(messages, len(events), "pi-message", "observed" if messages else "empty")
+        case "claude":
+            messages = tuple(session_discovery.normalize_claude_records(events))
+            return ConversationData(messages, len(events), "claude-message", "observed" if messages else "unsupported")
+        case _:
+            return ConversationData((), len(events), "unknown", "unsupported")
+
+
+def read_conversation(
+    filepath: str | Path, include_subagents: bool = False
+) -> ConversationData:
+    events = session_discovery.load_records(filepath)
+    data = normalize_events(events)
+    if not include_subagents or data.source_format != "claude-message":
+        return data
+    merged, paths = session_discovery.merge_claude_subagents(list(data.messages), filepath)
+    return ConversationData(
+        tuple(merged),
+        data.event_count,
+        f"{data.source_format}+{len(paths)}-subagents",
+        data.coverage,
     )
-    return ConversationData(messages, len(events), "claude-message", "observed" if messages else "unsupported")
-
-
-def read_conversation(filepath: str | Path) -> ConversationData:
-    events = []
-    with Path(filepath).open(encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, 1):
-            if not line.strip():
-                continue
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ValueError(
-                    f"invalid JSON on transcript line {line_number}: {error.msg}"
-                ) from error
-            if isinstance(value, dict):
-                events.append(value)
-    return normalize_events(events)
 
 
 def extract_tool_calls(
@@ -996,19 +1002,69 @@ def analyze(
     return tuple(findings), identify_good_practices(recent)
 
 
+def resolve_transcript(
+    conversation_file: Path | None, runtime: str | None
+) -> tuple[Path | None, str]:
+    """Return an explicit or discovered transcript, or (None, candidate listing)."""
+    if conversation_file is not None:
+        return conversation_file, ""
+    try:
+        found = session_discovery.current_session(runtime)
+    except session_discovery.SessionNotFound as error:
+        return None, f"{error}\n{session_discovery.describe(error.candidates)}".rstrip()
+    return found.path, f"current {found.runtime} session"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("conversation_file", type=Path)
+    parser.add_argument(
+        "conversation_file",
+        type=Path,
+        nargs="?",
+        help="transcript JSONL; omitted means the current session",
+    )
     parser.add_argument("--lookback", type=int, default=50)
+    parser.add_argument(
+        "--runtime",
+        choices=("auto", *session_discovery.RUNTIMES),
+        default="auto",
+        help="runtime for current-session discovery and --list",
+    )
+    parser.add_argument(
+        "--include-subagents",
+        action="store_true",
+        help="merge Claude Code subagent transcripts (<session>/subagents/*.jsonl)",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="list newest candidate transcript paths (no contents) and exit",
+    )
     args = parser.parse_args(argv)
     if args.lookback <= 0:
         parser.error("--lookback must be positive")
+    runtime = None if args.runtime == "auto" else args.runtime
+
+    if args.list:
+        found = (
+            session_discovery.candidates(runtime)
+            if runtime
+            else session_discovery.all_candidates()
+        )
+        print(session_discovery.describe(found[:10]) or "No candidate transcripts found.")
+        return 0
+
+    transcript, origin = resolve_transcript(args.conversation_file, runtime)
+    if transcript is None:
+        print("No current session transcript identified; select one of:\n" + origin)
+        return 2
 
     try:
-        data = read_conversation(args.conversation_file)
+        data = read_conversation(transcript, args.include_subagents)
     except (OSError, ValueError) as error:
-        parser.error(str(error))
+        parser.error(f"{transcript}: {error}")
 
+    print(f"Transcript: {transcript}" + (f" ({origin})" if origin else ""))
     print(
         f"Loaded {data.event_count} events as {len(data.messages)} normalized "
         f"messages ({data.source_format}; coverage={data.coverage})."

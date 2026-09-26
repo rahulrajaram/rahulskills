@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep development sandbox Claude skills synchronized with this host
+
+[Timer]
+OnStartupSec=30s
+OnUnitInactiveSec=2min
+Unit=rahulskills-development-claude-sync.service
+
+[Install]
+WantedBy=timers.target

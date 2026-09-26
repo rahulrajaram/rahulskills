@@ -154,7 +154,8 @@ class SkillProfileTests(unittest.TestCase):
     def test_real_chasm_profiles_have_unique_guest_layout_and_conflict_preview(self):
         root = skill_profiles.ROOT
         common_names = skill_profiles.select(root, "codex", ["chasm-development"], [])
-        pi_names = ("skill-creator",)
+        # Codex owns skill-creator; pi-defects-harvester declares runtimes = ["pi"].
+        pi_names = ("pi-defects-harvester", "skill-creator")
         self.assertEqual(len(set(common_names) | set(pi_names)), 61)
         self.assertIn("agent-stall-triage", common_names)
         self.assertEqual(set(common_names) & set(pi_names), set())
@@ -231,6 +232,109 @@ class SkillProfileTests(unittest.TestCase):
                     skill_profiles.apply(root, source, destination, changes)
             self.assertEqual((origin / "SKILL.md").read_text(), "old")
             self.assertFalse(any(destination.glob("skill-backups/migration-stage-*")))
+
+
+class RuntimeSupportTests(unittest.TestCase):
+    @staticmethod
+    def _fixture(root: Path, catalog: str, exclusions: dict[str, str] | None = None) -> None:
+        for name in ("alpha", "pionly", "init"):
+            (root / "skills" / name).mkdir(parents=True)
+            (root / "skills" / name / "SKILL.md").write_text(f"---\nname: {name}\n---\n")
+        (root / "capabilities").mkdir()
+        (root / "capabilities/install-profiles.toml").write_text(
+            'default = "core"\n[profiles]\ncore = ["alpha", "pionly", "init"]\n')
+        (root / "capabilities/skills.toml").write_text(catalog)
+        (root / "runtime-exclusions").mkdir()
+        for runtime, text in (exclusions or {}).items():
+            (root / "runtime-exclusions" / f"{runtime}.txt").write_text(text)
+
+    def test_runtimes_field_gates_selection_per_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._fixture(root, '[skills.pionly]\nruntimes = ["pi"]\n')
+            self.assertIn("pionly", skill_profiles.select(root, "pi", [], []))
+            for runtime in ("claude", "codex", "opencode"):
+                self.assertNotIn("pionly", skill_profiles.select(root, runtime, [], []))
+                self.assertIn("alpha", skill_profiles.select(root, runtime, [], []))
+            # Explicit selection cannot install an unsupported runtime copy.
+            self.assertEqual(skill_profiles.select(root, "claude", [], ["pionly"]), ())
+
+    def test_invalid_runtimes_fail_closed(self):
+        for catalog in ('[skills.pionly]\nruntimes = ["vscode"]\n',
+                        '[skills.pionly]\nruntimes = []\n',
+                        '[skills.pionly]\nruntimes = "pi"\n',
+                        '[skills.pionly.modes.x]\nruntimes = ["nope"]\n'):
+            with self.subTest(catalog=catalog), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                self._fixture(root, catalog)
+                with self.assertRaisesRegex(ValueError, "runtime"):
+                    skill_profiles.select(root, "pi", [], [])
+
+    def test_claude_exclusions_block_builtin_names_only_for_claude(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._fixture(root, "", {"claude": "# built-ins\ninit\n"})
+            self.assertNotIn("init", skill_profiles.select(root, "claude", [], []))
+            self.assertIn("init", skill_profiles.select(root, "codex", [], []))
+
+    def test_real_catalog_runtimes(self):
+        root = skill_profiles.ROOT
+        support = skill_profiles.runtime_support(root)
+        self.assertEqual(support["pi-defects-harvester"], frozenset({"pi"}))
+        self.assertIn("pi-defects-harvester", skill_profiles.select(root, "pi", [], []))
+        for runtime in ("claude", "codex", "opencode"):
+            self.assertNotIn("pi-defects-harvester", skill_profiles.select(root, runtime, [], []))
+
+    def test_real_claude_exclusions_do_not_shadow_package_skills(self):
+        root = skill_profiles.ROOT
+        builtins = skill_profiles.exclusions(root, "claude") - skill_profiles.exclusions(root, "__none__")
+        self.assertTrue({"init", "review", "security-review", "simplify", "loop"} <= builtins)
+        packaged = {path.name for path in (root / "skills").iterdir() if path.is_dir()}
+        self.assertEqual(builtins & packaged, set(), "package skill collides with a Claude built-in")
+
+
+class LedgerAdoptionTests(unittest.TestCase):
+    def _install(self, tmp: Path, adopt: bool = False):
+        root = tmp / "checkout"
+        source = tmp / "assembled"
+        destination = tmp / "runtime"
+        (source / "skills" / "demo").mkdir(parents=True, exist_ok=True)
+        (source / "skills" / "demo" / "SKILL.md").write_text("v1")
+        changes = skill_profiles.migration(root, source, destination, ("demo",), adopt_source=adopt)
+        skill_profiles.apply(root, source, destination, changes, adopt_source=adopt)
+        return source, destination
+
+    def test_foreign_ledger_is_refused_by_default_and_adopted_explicitly(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            source, destination = self._install(tmp)
+            (source / "skills" / "demo" / "SKILL.md").write_text("v2")
+            worktree = tmp / "worktree"
+            with self.assertRaisesRegex(ValueError, "another source.*--adopt-source"):
+                skill_profiles.migration(worktree, source, destination, ("demo",))
+            changes = skill_profiles.migration(worktree, source, destination, ("demo",), adopt_source=True)
+            self.assertEqual([c.action for c in changes if c.path == "skills/demo"], ["update"])
+            skill_profiles.apply(worktree, source, destination, changes, adopt_source=True)
+            ledger = json.loads((destination / skill_profiles.LEDGER).read_text())
+            self.assertEqual(ledger["source"], str(worktree.resolve()))
+            self.assertEqual((destination / "skills/demo/SKILL.md").read_text(), "v2")
+            # Re-rooted: no flag needed from the adopting checkout any more.
+            skill_profiles.migration(worktree, source, destination, ("demo",))
+
+    def test_adoption_still_preserves_user_modified_entries(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            source, destination = self._install(tmp)
+            (destination / "skills/demo/SKILL.md").write_text("user edit")
+            changes = skill_profiles.migration(tmp / "worktree", source, destination, ("demo",), adopt_source=True)
+            self.assertEqual([c.action for c in changes if c.path == "skills/demo"], ["blocked"])
+
+    def test_unsupported_ledger_version_is_refused_even_when_adopting(self):
+        with tempfile.TemporaryDirectory() as raw:
+            destination = Path(raw)
+            (destination / skill_profiles.LEDGER).write_text(json.dumps({"version": 9, "source": "/x", "entries": {}}))
+            with self.assertRaisesRegex(ValueError, "version"):
+                skill_profiles.load_ownership(destination, Path(raw) / "root", adopt_source=True)
 
 
 if __name__ == "__main__":

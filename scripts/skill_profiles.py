@@ -23,12 +23,46 @@ LEDGER = ".rahulskills-ownership.json"
 NAME = re.compile(r"[a-z0-9][a-z0-9-]*\Z")
 MARKDOWN_LINK = re.compile(r"!?(?:\[[^]]*\])\(([^)]+)\)")
 PORTABLE_VERSION = 1
+RUNTIMES = ("claude", "codex", "pi", "opencode")
 
 
 def exclusions(root: Path, runtime: str) -> set[str]:
     paths = [root / ".exclude-skills", root / "runtime-exclusions" / f"{runtime}.txt"]
     return {line.split("#", 1)[0].strip() for path in paths if path.is_file()
             for line in path.read_text().splitlines() if line.split("#", 1)[0].strip()}
+
+
+def _validated_runtimes(label: str, value: object) -> frozenset[str]:
+    if (not isinstance(value, list) or not value
+            or not all(isinstance(item, str) for item in value)):
+        raise ValueError(f"{label}: runtimes must be a non-empty list of strings")
+    unknown = sorted(set(value) - set(RUNTIMES))
+    if unknown:
+        raise ValueError(f"{label}: unknown runtime(s) {', '.join(unknown)}; "
+                         f"expected one of {', '.join(RUNTIMES)}")
+    return frozenset(value)
+
+
+def runtime_support(root: Path) -> dict[str, frozenset[str]]:
+    """Map skills that declare `runtimes = [...]` to their validated runtime set.
+
+    Skills without the field support every runtime. Mode-level `runtimes`
+    fields are validated here too; they describe routes, not installation.
+    """
+    catalog = root / "capabilities/skills.toml"
+    if not catalog.is_file():
+        return {}
+    skills = tomllib.loads(catalog.read_text()).get("skills", {})
+    result: dict[str, frozenset[str]] = {}
+    for name, entry in skills.items():
+        if not isinstance(entry, dict):
+            continue
+        if "runtimes" in entry:
+            result[name] = _validated_runtimes(f"skills.{name}", entry["runtimes"])
+        for mode_name, mode in entry.get("modes", {}).items():
+            if isinstance(mode, dict) and "runtimes" in mode:
+                _validated_runtimes(f"skills.{name}.modes.{mode_name}", mode["runtimes"])
+    return result
 
 
 def select(root: Path, runtime: str, profiles: list[str], skills: list[str]) -> tuple[str, ...]:
@@ -50,7 +84,9 @@ def select(root: Path, runtime: str, profiles: list[str], skills: list[str]) -> 
         directory = root / "skills" / name
         if sum((directory / manifest).is_file() for manifest in ("SKILL.md", "skill.md")) != 1:
             raise ValueError(f"Skill must have exactly one canonical manifest: {name}")
-    return tuple(sorted(chosen - exclusions(root, runtime)))
+    support = runtime_support(root)
+    unsupported = {name for name in chosen if runtime not in support.get(name, RUNTIMES)}
+    return tuple(sorted(chosen - exclusions(root, runtime) - unsupported))
 
 
 def fingerprint(path: Path) -> str | None:
@@ -75,15 +111,26 @@ def fingerprint(path: Path) -> str | None:
     return "sha256:" + digest.hexdigest()
 
 
-def load_ownership(destination: Path, root: Path) -> dict[str, str]:
+def load_ownership(destination: Path, root: Path, *, adopt_source: bool = False) -> dict[str, str]:
+    """Return the fingerprint ledger for `destination`.
+
+    A ledger written from another checkout is refused unless `adopt_source` is
+    explicitly set; adoption keeps the recorded fingerprints (so only entries
+    still matching them are updatable) and the next apply re-roots the ledger.
+    """
     path = destination / LEDGER
     if path.is_symlink():
         raise ValueError(f"Refusing symlink ownership ledger: {path}")
     if not path.exists():
         return {}
     data = json.loads(path.read_text())
-    if data.get("source") != str(root.resolve()) or data.get("version") != 1:
-        raise ValueError(f"Ownership ledger belongs to another source/version: {path}")
+    if data.get("version") != 1:
+        raise ValueError(f"Ownership ledger has unsupported version: {path}")
+    if data.get("source") != str(root.resolve()) and not adopt_source:
+        raise ValueError(
+            f"Ownership ledger belongs to another source/version: {path} "
+            f"(recorded source {data.get('source')!r}); rerun with --adopt-source "
+            "to re-root it to this checkout")
     entries = data.get("entries", {})
     for key in entries:
         if Path(key).is_absolute() or ".." in Path(key).parts or not key.startswith(("skills/", "references/")):
@@ -387,8 +434,9 @@ def declared_payloads(root: Path, names: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def migration(root: Path, source: Path, destination: Path, names: tuple[str, ...],
-              *, links: bool = False, remove: tuple[str, ...] = ()) -> tuple[Change, ...]:
-    owned = load_ownership(destination, root)
+              *, links: bool = False, remove: tuple[str, ...] = (),
+              adopt_source: bool = False) -> tuple[Change, ...]:
+    owned = load_ownership(destination, root, adopt_source=adopt_source)
     selected = {f"skills/{name}" for name in names}
     reference_root = source / "references"
     if reference_root.exists():
@@ -437,10 +485,14 @@ def migration(root: Path, source: Path, destination: Path, names: tuple[str, ...
     return tuple(changes)
 
 
-def apply(root: Path, source: Path, destination: Path, changes: tuple[Change, ...], *, links: bool = False) -> None:
+def apply(root: Path, source: Path, destination: Path, changes: tuple[Change, ...], *,
+          links: bool = False, adopt_source: bool = False) -> None:
     if any(change.action == "blocked" for change in changes):
         raise ValueError("Migration has ownership conflicts; no installed entries were changed")
-    owned = load_ownership(destination, root)
+    owned = load_ownership(destination, root, adopt_source=adopt_source)
+    if adopt_source and (destination / LEDGER).exists():
+        # Re-root even when nothing else changes so later runs need no flag.
+        write_ownership(destination, root, owned)
     for change in changes:
         if change.action not in ("add", "update", "remove"):
             continue
@@ -520,7 +572,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("select", "preview", "apply", "bundle"))
     parser.add_argument("--root", type=Path, default=ROOT)
-    parser.add_argument("--runtime", choices=("codex", "claude", "pi", "opencode"), required=True)
+    parser.add_argument("--runtime", choices=RUNTIMES, required=True)
     parser.add_argument("--profile", action="append", default=[])
     parser.add_argument("--skill", action="append", default=[])
     parser.add_argument("--source", type=Path)
@@ -530,6 +582,8 @@ def main() -> int:
     parser.add_argument("--links", action="store_true")
     parser.add_argument("--require-safe", action="store_true", help="Fail preview on ownership conflicts")
     parser.add_argument("--remove", action="append", default=[])
+    parser.add_argument("--adopt-source", action="store_true",
+                        help="Accept an ownership ledger written by another checkout and re-root it here on apply")
     args = parser.parse_args()
     try:
         names = select(args.root, args.runtime, args.profile, args.skill)
@@ -545,13 +599,15 @@ def main() -> int:
         if args.source is None or args.destination is None:
             parser.error("preview/apply require --source and --destination")
         changes = migration(args.root, args.source, args.destination, names,
-                            links=args.links, remove=tuple(args.remove))
+                            links=args.links, remove=tuple(args.remove),
+                            adopt_source=args.adopt_source)
         print(json.dumps({"runtime": args.runtime, "selection": names,
                           "changes": [asdict(change) for change in changes]}, indent=2))
         if args.require_safe and any(change.action == "blocked" for change in changes):
             raise ValueError("Migration has ownership conflicts")
         if args.command == "apply":
-            apply(args.root, args.source, args.destination, changes, links=args.links)
+            apply(args.root, args.source, args.destination, changes, links=args.links,
+                  adopt_source=args.adopt_source)
         return 0
     except (ValueError, OSError, KeyError) as error:
         parser.exit(2, f"{error}\n")

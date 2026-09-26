@@ -134,14 +134,25 @@ installed version again at incident time:
   checked.
 - Codex: `codex resume [SESSION_ID]` or `codex resume --last`; `queue` and
   `fork` are separate commands. Prefer an exact ID over “last”.
-- Claude: `--continue`, `--resume`, and `--fork-session`; do not assume a
-  session is persisted when `--no-session-persistence` was used.
+- Claude: `claude --continue` (most recent in that cwd), `claude --resume
+  <session-id>`, and `--fork-session` with either to resume under a new ID;
+  `claude agents` lists `--bg` background sessions. Prefer the exact ID. Do not
+  assume a session is persisted when `--no-session-persistence` was used
+  (print mode only). The local install keeps transcripts at
+  `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<cwd-slug>/<session-id>.jsonl`,
+  where the slug is the absolute cwd with each non-alphanumeric character
+  replaced by `-`; subagent transcripts sit under `<session-id>/subagents/`.
+  Correlate the `claude` PID from `ps -o pid,ppid,etime,stat,cmd -C claude`
+  and `/proc/<pid>/cwd` with the JSONL whose mtime matches the last known
+  event, and compare that mtime across both snapshots.
 - OpenCode: `--continue`, `--session <id>`, `--fork`, and `opencode session
   list`.
 
-Do not invent default storage paths for these runtimes. Discover them from
-the exact process, current CLI help, and readable local metadata. Never resume
-or fork until the project cwd, session identity, and authorization match.
+Storage paths named above are observed defaults, not guarantees: verify the
+path exists and matches the exact process, current CLI help, and readable local
+metadata before relying on it, and do not invent paths for other runtimes.
+Never resume or fork until the project cwd, session identity, and authorization
+match.
 
 ## Completion and evidence
 

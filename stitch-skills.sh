@@ -8,14 +8,19 @@ BUILD_DIR="$ROOT_DIR/build"
 ISOLATED_OUTPUT=0
 SELECTION_ARGS=()
 REMOVAL_ARGS=()
+MIGRATION_ARGS=()
 SELECTOR="$ROOT_DIR/scripts/skill_profiles.py"
 CODEX_ROOT="$HOME/.codex"
-CLAUDE_ROOT="$HOME/.claude"
+# Claude Code relocates its whole config directory with CLAUDE_CONFIG_DIR.
+CLAUDE_ROOT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
-CODEX_INSTALL="$HOME/.codex/skills"
-CLAUDE_SKILLS_INSTALL="$HOME/.claude/skills"
+CODEX_INSTALL="$CODEX_ROOT/skills"
+CLAUDE_SKILLS_INSTALL="$CLAUDE_ROOT/skills"
 
-CLIS=(claude codex)
+# Runtimes this invocation assembles, previews, installs and checks.
+# Default is both copy-installed runtimes; --runtime narrows it.
+SUPPORTED_CLIS=(claude codex)
+CLIS=()
 RUNTIME_EXCLUSIONS_DIR="$ROOT_DIR/runtime-exclusions"
 
 # Keys that belong in overlays, not in generic SKILL.md.
@@ -148,10 +153,16 @@ Options:
   --profile core|design|all   Select a profile (repeatable; default core)
   --skill NAME               Add an individual skill (alone selects only it)
   --output PATH              Assemble into a new isolated path, never replace it
+  --runtime claude|codex     Act on this runtime only (repeatable; default both)
   --codex-root PATH          Codex runtime root (default ~/.codex)
-  --claude-root PATH         Claude runtime root (default ~/.claude)
+  --claude-root PATH         Claude runtime root (default ${CLAUDE_CONFIG_DIR:-~/.claude})
   --remove NAME              Explicitly remove an unselected owned skill
+  --adopt-source             Re-root an ownership ledger written by another
+                             checkout (e.g. a worktree); refused by default
 
+Each runtime is previewed and applied independently of runtimes not selected,
+so a Codex ownership conflict does not block `--runtime claude`. Pi and opencode
+use link installers instead (install-pi-skills.sh, install-opencode-skills.sh).
 Core excludes Figma and the UI prompt generator. Profile drift never removes
 installed copies. Preview lists additions, updates, retained entries, requested
 removals and ownership conflicts. User-managed/modified copies are preserved.
@@ -283,7 +294,9 @@ assemble_skills_into() {
 
     local skill_dir skill_name manifest cli overlay_file
     local fm body merged
-    mkdir -p "$output_root/codex/skills" "$output_root/claude/skills"
+    for cli in "${CLIS[@]}"; do
+        mkdir -p "$output_root/$cli/skills"
+    done
 
     for skill_dir in "$SKILLS_DIR"/*/; do
         [[ -d "$skill_dir" ]] || continue
@@ -299,7 +312,7 @@ assemble_skills_into() {
 
         for cli in "${CLIS[@]}"; do
             local selection
-            if [[ "$cli" == "codex" ]]; then selection="$CODEX_SELECTION"; else selection="$CLAUDE_SELECTION"; fi
+            selection="$(selection_for "$cli")"
             [[ $'\n'"$selection"$'\n' == *$'\n'"$skill_name"$'\n'* ]] || continue
             if is_runtime_excluded "$cli" "$skill_name"; then
                 echo "  SKIP [$cli] runtime-owned conflict: $skill_name"
@@ -357,10 +370,12 @@ assemble_skills_into() {
     fi
 
     # Count assembled skills
-    local claude_count codex_count
-    claude_count="$(find "$output_root/claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
-    codex_count="$(find "$output_root/codex/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
-    echo "Assembled: claude=$claude_count skills, codex=$codex_count skills"
+    local counts=() count
+    for cli in "${CLIS[@]}"; do
+        count="$(find "$output_root/$cli/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+        counts+=("$cli=$count skills")
+    done
+    echo "Assembled: $(printf '%s, ' "${counts[@]}" | sed 's/, $//')"
 }
 
 assemble_skills() {
@@ -403,21 +418,63 @@ assemble_skills() {
     echo "Published assembled output: $BUILD_DIR"
 }
 
+runtime_root() {
+    case "$1" in
+        codex) printf '%s\n' "$CODEX_ROOT" ;;
+        claude) printf '%s\n' "$CLAUDE_ROOT" ;;
+        *) echo "ERROR: unsupported runtime: $1" >&2; return 1 ;;
+    esac
+}
+
+runtime_install_dir() {
+    case "$1" in
+        codex) printf '%s\n' "$CODEX_INSTALL" ;;
+        claude) printf '%s\n' "$CLAUDE_SKILLS_INSTALL" ;;
+        *) echo "ERROR: unsupported runtime: $1" >&2; return 1 ;;
+    esac
+}
+
+selection_for() {
+    case "$1" in
+        codex) printf '%s\n' "$CODEX_SELECTION" ;;
+        claude) printf '%s\n' "$CLAUDE_SELECTION" ;;
+        *) echo "ERROR: unsupported runtime: $1" >&2; return 1 ;;
+    esac
+}
+
+add_runtime() {
+    local wanted="$1" known existing
+    for known in "${SUPPORTED_CLIS[@]}"; do
+        if [[ "$wanted" == "$known" ]]; then
+            for existing in "${CLIS[@]}"; do
+                [[ "$existing" == "$wanted" ]] && return 0
+            done
+            CLIS+=("$wanted")
+            return 0
+        fi
+    done
+    echo "ERROR: --runtime must be one of: ${SUPPORTED_CLIS[*]} (Pi/opencode use their link installers)" >&2
+    return 2
+}
+
 migration_for_runtime() {
     local operation="$1" runtime="$2" destination="$3"
     shift 3
     python3 "$SELECTOR" "$operation" --root "$ROOT_DIR" --runtime "$runtime" \
         --source "$BUILD_DIR/$runtime" --destination "$destination" \
-        "${SELECTION_ARGS[@]}" "${REMOVAL_ARGS[@]}" "$@"
+        "${SELECTION_ARGS[@]}" "${REMOVAL_ARGS[@]}" "${MIGRATION_ARGS[@]}" "$@"
 }
 
 install_skills() {
+    local cli
     assemble_skills
-    # Check both ownership boundaries before changing either runtime.
-    migration_for_runtime preview codex "$CODEX_ROOT" --require-safe
-    migration_for_runtime preview claude "$CLAUDE_ROOT" --require-safe
-    migration_for_runtime apply codex "$CODEX_ROOT"
-    migration_for_runtime apply claude "$CLAUDE_ROOT"
+    # Check every selected ownership boundary before changing any runtime.
+    for cli in "${CLIS[@]}"; do
+        migration_for_runtime preview "$cli" "$(runtime_root "$cli")" --require-safe
+    done
+    for cli in "${CLIS[@]}"; do
+        migration_for_runtime apply "$cli" "$(runtime_root "$cli")"
+    done
 }
 
 preview_install() {
@@ -428,8 +485,10 @@ preview_install() {
         ISOLATED_OUTPUT=1
     fi
     assemble_skills
-    migration_for_runtime preview codex "$CODEX_ROOT"
-    migration_for_runtime preview claude "$CLAUDE_ROOT"
+    local cli
+    for cli in "${CLIS[@]}"; do
+        migration_for_runtime preview "$cli" "$(runtime_root "$cli")"
+    done
 }
 
 check_sync() {
@@ -441,13 +500,9 @@ check_sync() {
     local has_issue=0
 
     echo "=== Checking installed vs assembled ==="
-    for cli_label in codex claude; do
+    for cli_label in "${CLIS[@]}"; do
         local install_dir
-        if [[ "$cli_label" == "codex" ]]; then
-            install_dir="$CODEX_INSTALL"
-        else
-            install_dir="$CLAUDE_SKILLS_INSTALL"
-        fi
+        install_dir="$(runtime_install_dir "$cli_label")"
 
         [[ -d "$install_dir" ]] || { echo "  SKIP $cli_label: install dir not found"; continue; }
 
@@ -486,6 +541,12 @@ main() {
             --remove)
                 [[ $# -ge 2 ]] || usage
                 REMOVAL_ARGS+=("$1" "$2"); shift 2 ;;
+            --runtime)
+                [[ $# -ge 2 ]] || usage
+                add_runtime "$2" || exit 2
+                shift 2 ;;
+            --adopt-source)
+                MIGRATION_ARGS+=("$1"); shift ;;
             --output)
                 [[ $# -ge 2 ]] || usage
                 BUILD_DIR="$2"; ISOLATED_OUTPUT=1; shift 2 ;;
@@ -498,8 +559,16 @@ main() {
             *) usage ;;
         esac
     done
-    CODEX_SELECTION="$(python3 "$SELECTOR" select --root "$ROOT_DIR" --runtime codex "${SELECTION_ARGS[@]}")"
-    CLAUDE_SELECTION="$(python3 "$SELECTOR" select --root "$ROOT_DIR" --runtime claude "${SELECTION_ARGS[@]}")"
+    [[ ${#CLIS[@]} -gt 0 ]] || CLIS=("${SUPPORTED_CLIS[@]}")
+    CODEX_SELECTION=""
+    CLAUDE_SELECTION=""
+    local cli
+    for cli in "${CLIS[@]}"; do
+        case "$cli" in
+            codex) CODEX_SELECTION="$(python3 "$SELECTOR" select --root "$ROOT_DIR" --runtime codex "${SELECTION_ARGS[@]}")" ;;
+            claude) CLAUDE_SELECTION="$(python3 "$SELECTOR" select --root "$ROOT_DIR" --runtime claude "${SELECTION_ARGS[@]}")" ;;
+        esac
+    done
     case "$command" in
         repo-layout) ensure_repo_layout ;;
         assemble) assemble_skills ;;
