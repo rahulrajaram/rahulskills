@@ -5,6 +5,10 @@ description: Improve an already qualified MetaBuilder harness from concrete cons
 
 # MetaBuilder harness improvement
 
+## Harness state diagrams
+
+When work in this skill concerns a harness's states or transitions, follow [harness state diagrams](../metabuilder/references/harness-state-diagrams.md) and include the required Mermaid and ASCII diagrams in the final response.
+
 Use this package adapter when an existing harness has an exact agreed brief,
 bundle, run, and qualification report, and the consumer wants a bounded repair
 and matched requalification. The exact objective remains the complete agreed

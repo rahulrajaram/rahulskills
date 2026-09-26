@@ -5,6 +5,10 @@ description: Assess MetaBuilder skills and prompts, harness construction, runtim
 
 # MetaBuilder assessment
 
+## Harness state diagrams
+
+When work in this skill concerns a harness's states or transitions, follow [harness state diagrams](../metabuilder/references/harness-state-diagrams.md) and include the required Mermaid and ASCII diagrams in the final response.
+
 ## Intent and applicability
 
 Use this skill as a thin, evidence-first assessor for an existing MetaBuilder

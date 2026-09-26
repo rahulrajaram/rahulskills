@@ -5,6 +5,10 @@ description: "Use MetaBuilder to design, agree, compile, inspect, run, qualify, 
 
 # Use MetaBuilder
 
+## Harness state diagrams
+
+When work in this skill concerns a harness's states or transitions, follow [harness state diagrams](references/harness-state-diagrams.md) and include the required Mermaid and ASCII diagrams in the final response.
+
 ## Target scope
 
 Bind the target from the user's request or current working repository. Locating
