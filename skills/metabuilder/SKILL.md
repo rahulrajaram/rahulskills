@@ -5,6 +5,18 @@ description: "Use MetaBuilder to design, agree, compile, inspect, run, qualify, 
 
 # Use MetaBuilder
 
+## Target scope
+
+Bind the target from the user's request or current working repository. Locating
+MetaBuilder for its CLI, README, and authority files does not adopt its own
+handoff, campaign, or checkpoint as the target's work. Resume only the bound
+target's state. A missing skill or CLI is a prerequisite gap, not permission to
+substitute the MetaBuilder repository's session instructions.
+
+Consumer findings may identify engine defects. Route those to the maintainer
+workflow only within explicit authority to work on MetaBuilder; preserve its
+repository rules and keep the consumer's objective and evidence separate.
+
 ## Start
 
 1. Locate the existing MetaBuilder checkout. Use the path supplied by the user

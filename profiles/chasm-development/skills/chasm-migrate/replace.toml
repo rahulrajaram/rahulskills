@@ -1,0 +1,3 @@
+[[replacements]]
+find = "Package installation is an external mutation and may require separate approval."
+replace = "For a requested development task, project-scoped dependency installation inside the guest is authorized; system-wide or out-of-scope installation requires explicit authority."

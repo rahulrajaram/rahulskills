@@ -28,3 +28,9 @@ jobs:
 
       - name: Test shared safety contracts
         run: python3 -m unittest -v test_stitch_skills.py test_redaction.py test_install_commithooks.py
+
+      - name: Install package test dependencies
+        run: python3 -m pip install pytest==9.0.2 git-filter-repo==2.47.0
+
+      - name: Test package tools
+        run: python3 -m pytest tests -q

@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""ow-run - run a command and announce its completion to the opencode agent.
+
+Overwatch supervises processes but has no callback into an agent session, so a
+finished task's result sits unread until the human next speaks (f-2077). ow-run
+closes that loop: it runs the command, then writes an atomic completion
+sentinel that the global opencode plugin `overwatch-continuation` watches. The
+plugin prompts the session, resuming the orchestrator without human action.
+
+Usage:
+    ow-run <label> [--log FILE] [--cwd DIR] [--task-id ID] [--target-pid PID] [--target-session ID] [--quiet] -- <command...>
+
+    --target-pid addresses the completion to one opencode process: only a plugin
+    instance whose process pid matches will claim and prompt. Use "$OPENCODE_PID"
+    and --target-session so a sibling session cannot receive the notification.
+    Unaddressed completions remain pending for explicit inspection.
+
+Exit code: the child's exit code, or 2 on usage error, 4 on internal error.
+"""
+from __future__ import annotations
+
+import argparse
+import datetime
+import json
+import os
+import pathlib
+import re
+import subprocess
+import sys
+import time
+import tempfile
+
+STATE = pathlib.Path(
+    os.environ.get("OW_CONTINUATION_DIR", pathlib.Path.home() / ".local/state/ow-continuation")
+)
+
+
+def slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60] or "task"
+
+
+def now() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def write_sentinel(payload: dict) -> pathlib.Path:
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%f")
+    target = STATE / f"{stamp}-{slug(payload['label'])}.json"
+    tmp = target.with_suffix(".json.tmp")
+    with open(tmp, "x", opener=lambda path, flags: os.open(path, flags, 0o600)) as stream:
+        stream.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    os.replace(tmp, target)
+    return target
+
+
+def preflight(log: str | None, target_pid: str | None) -> list[str]:
+    """Report anything that would stop a completion record reaching a reader.
+
+    Silence is the one failure mode that cannot be detected from the outside, so
+    every dispatch announces up front what could go quiet.
+    """
+    warnings: list[str] = []
+    if log:
+        parent = pathlib.Path(log).parent
+        try:
+            parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryFile(dir=parent):
+                pass
+        except OSError as exc:
+            warnings.append(f"log parent not writable: {exc}")
+    try:
+        STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with tempfile.TemporaryFile(dir=STATE):
+            pass
+    except OSError as exc:
+        warnings.append(f"sentinel dir not writable: {exc}")
+    if target_pid:
+        heartbeat = STATE / f"heartbeat-{target_pid}"
+        if not heartbeat.exists():
+            warnings.append(
+                f"no heartbeat for pid {target_pid}: the opencode plugin is not running "
+                f"(or predates heartbeats), so this completion may go unclaimed"
+            )
+        else:
+            age = time.time() - heartbeat.stat().st_mtime
+            if age > 30:
+                warnings.append(f"stale heartbeat for pid {target_pid} ({age:.0f}s old)")
+    return warnings
+
+
+def parse(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog="ow-run")
+    parser.add_argument("label")
+    parser.add_argument("--log")
+    parser.add_argument("--cwd")
+    parser.add_argument("--task-id")
+    parser.add_argument("--target-pid", type=int)
+    parser.add_argument("--target-session")
+    parser.add_argument("--quiet", action="store_true")
+    if argv in (["-h"], ["--help"]):
+        parser.print_help()
+        raise SystemExit(0)
+    if "--" not in argv:
+        parser.error("a command must follow --")
+    separator = argv.index("--")
+    args = parser.parse_args(argv[:separator])
+    args.command = argv[separator + 1:]
+    if not args.command:
+        parser.error("a command must follow --")
+    if args.target_pid is not None and args.target_pid <= 0:
+        parser.error("--target-pid must be positive")
+    if args.target_session is not None and not re.fullmatch(r"[A-Za-z0-9_-]+", args.target_session):
+        parser.error("--target-session must be a nonempty session identifier")
+    return args
+
+
+def main() -> int:
+    args = parse(sys.argv[1:])
+    label, log, quiet = args.label, args.log, args.quiet
+    cwd = str(pathlib.Path(args.cwd or os.getcwd()).resolve())
+    task_id, target_pid, command = args.task_id, args.target_pid, args.command
+    if log:
+        log = str(pathlib.Path(log).resolve())
+    warnings = preflight(log, target_pid)
+    for warning in warnings:
+        sys.stderr.write(f"ow-run: PREFLIGHT {warning}\n")
+    started, t0 = now(), time.monotonic()
+    # Never die before writing the completion record: create the log's parent,
+    # and if the log still cannot be opened, degrade to no log and say so in the
+    # sentinel. An earlier version raised here and vanished silently - no
+    # sentinel, no log, no wake-up (the exact failure this wrapper exists to stop).
+    log_warning = None
+    handle = None
+    if log:
+        try:
+            pathlib.Path(log).parent.mkdir(parents=True, exist_ok=True)
+            handle = open(log, "ab", buffering=0)
+        except OSError as exc:
+            log_warning = f"could not open log {log}: {exc}"
+            sys.stderr.write(f"ow-run: {log_warning}\n")
+            log = None
+    proc = None
+    try:
+        proc = subprocess.Popen(
+            command,
+            cwd=cwd or None,
+            stdout=handle if handle else (subprocess.DEVNULL if quiet else None),
+            stderr=subprocess.STDOUT if handle else None,
+        )
+        code = proc.wait()
+        signal = f"signal {-code}" if code < 0 else None
+    except KeyboardInterrupt:
+        if proc is not None:
+            proc.kill()
+            proc.wait()
+        code, signal = 130, "SIGINT"
+    except OSError as exc:
+        code, signal = 127, str(exc)
+    finally:
+        if handle:
+            handle.close()
+
+    duration = time.monotonic() - t0
+    verdict = "succeeded" if code == 0 else f"FAILED (exit {code})"
+    prompt = (
+        f"ow-run task {label!r} {verdict} after {duration:.0f}s."
+        + (f" Durable log: {log}." if log else "")
+        + (f" Overwatch task id: {task_id}." if task_id else "")
+        + " " + label + " is a label, NOT an Overwatch task id; do not call"
+          " status/receipt with it."
+        + " Read the durable log, record the outcome in the campaign journal, and"
+          " continue only within existing task authorization. Do not re-run a task that already succeeded."
+    )
+    try:
+        sentinel = write_sentinel({
+            "schema_version": 1,
+            "label": label,
+            "target_pid": target_pid,
+            "target_session": args.target_session,
+            "exit_code": code,
+            "signal": signal,
+            "cwd": cwd or os.getcwd(),
+            "command": command,
+            "log": log,
+            "log_warning": log_warning,
+            "preflight_warnings": warnings,
+            "started_at": started,
+            "ended_at": now(),
+            "duration_s": round(duration, 3),
+            "prompt": prompt,
+        })
+        if not quiet:
+            sys.stderr.write(f"ow-run: sentinel {sentinel}\n")
+    except Exception as exc:  # never mask the child's result
+        sys.stderr.write(f"ow-run: could not write sentinel: {exc}\n")
+        return 4
+    return min(255, 128 - code) if code < 0 else code if code <= 255 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

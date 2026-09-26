@@ -3,8 +3,8 @@
   "unit": {
     "phase_id": "design-harness",
     "skill": "metabuilder-harness-design",
-    "semantic_version": "1.1.0",
-    "guidance_digest": "f17f47d1c47b3f53ef73b11f24b887e4129767c06d88b7955287ceeb7e715098"
+    "semantic_version": "1.1.1",
+    "guidance_digest": "8edc9368bbc5dfb8c09368d498d55fa25ea6795f3ad3ecc0c42611e84d7e104d"
   },
   "inputs": [
     {
