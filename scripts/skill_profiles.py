@@ -48,8 +48,8 @@ def select(root: Path, runtime: str, profiles: list[str], skills: list[str]) -> 
         if not NAME.fullmatch(name):
             raise ValueError(f"Invalid skill name: {name}")
         directory = root / "skills" / name
-        if not any((directory / manifest).is_file() for manifest in ("SKILL.md", "skill.md")):
-            raise ValueError(f"Skill has no canonical manifest: {name}")
+        if sum((directory / manifest).is_file() for manifest in ("SKILL.md", "skill.md")) != 1:
+            raise ValueError(f"Skill must have exactly one canonical manifest: {name}")
     return tuple(sorted(chosen - exclusions(root, runtime)))
 
 
@@ -148,8 +148,91 @@ def _relative_target(source: Path, owner: Path, raw_target: str) -> Path | None:
     return candidate
 
 
+def _prepend_after_frontmatter(manifest: Path, fragment: Path) -> bytes:
+    """Insert a Chasm instruction fragment after frontmatter, before the body."""
+    try:
+        canonical = manifest.read_text(encoding="utf-8")
+        addition = fragment.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError) as error:
+        raise ValueError(f"Cannot read Chasm skill fragment: {fragment}") from error
+    lines = canonical.splitlines(keepends=True)
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        raise ValueError(f"Canonical skill manifest has no YAML frontmatter: {manifest}")
+    closing = next((index for index, line in enumerate(lines[1:], 1)
+                    if line.rstrip("\r\n") in ("---", "...")), None)
+    if closing is None:
+        raise ValueError(f"Canonical skill manifest has unterminated YAML frontmatter: {manifest}")
+    if not addition:
+        return canonical.encode("utf-8")
+    prefix = "".join(lines[:closing + 1])
+    body = "".join(lines[closing + 1:])
+    separator = "" if prefix.endswith(("\n", "\r")) else "\n"
+    return (prefix + separator + addition + "\n\n" + body).encode("utf-8")
+
+
+def _apply_replacements(manifest: bytes, replacement_file: Path, boundary: Path) -> bytes:
+    """Apply fail-closed exact text replacements from a Chasm TOML fragment."""
+    _assert_portable_path(boundary, replacement_file)
+    checked = replacement_file
+    if not checked.is_file():
+        raise ValueError(f"Invalid Chasm replacement file: {replacement_file}")
+    try:
+        config = tomllib.loads(checked.read_text(encoding="utf-8"))
+        text = manifest.decode("utf-8")
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise ValueError(f"Cannot read Chasm replacement file: {replacement_file}") from error
+    if set(config) != {"replacements"} or not isinstance(config["replacements"], list):
+        raise ValueError(f"Chasm replacement file must contain only [[replacements]] entries: {replacement_file}")
+    if not config["replacements"]:
+        raise ValueError(f"Chasm replacement file must contain at least one [[replacements]] entry: {replacement_file}")
+    seen = set()
+    for index, item in enumerate(config["replacements"], 1):
+        if not isinstance(item, dict) or set(item) != {"find", "replace"}:
+            raise ValueError(f"Replacement {index} must contain exactly find and replace: {replacement_file}")
+        find, replacement = item["find"], item["replace"]
+        if not isinstance(find, str) or not find or not isinstance(replacement, str):
+            raise ValueError(f"Replacement {index} requires nonempty string find and string replace")
+        if find in seen:
+            raise ValueError(f"Duplicate exact match in Chasm replacements: {replacement_file}")
+        seen.add(find)
+        count = text.count(find)
+        if count != 1:
+            raise ValueError(f"Chasm replacement {index} expected exactly one match, found {count}: {replacement_file}")
+        text = text.replace(find, replacement, 1)
+    return text.encode("utf-8")
+
+
+def profile_overrides(root: Path, names: tuple[str, ...], profiles: tuple[str, ...]) -> dict[Path, bytes]:
+    """Compose optional guest instructions without modifying canonical skills."""
+    if "chasm-development" not in profiles:
+        return {}
+    result = {}
+    for name in names:
+        directory = root / "profiles/chasm-development/skills" / name
+        override, prepend, replacements = (directory / leaf for leaf in
+                                           ("SKILL.md", "prepend.md", "replace.toml"))
+        for path in (override, prepend, replacements):
+            _assert_portable_path(root, path)
+        if override.exists() and prepend.exists():
+            raise ValueError(f"Skill cannot define both Chasm override and prepend fragment: {name}")
+        manifests = tuple(p for p in (root / "skills" / name / "SKILL.md",
+                                     root / "skills" / name / "skill.md") if p.is_file())
+        if len(manifests) != 1:
+            raise ValueError(f"Skill must have exactly one canonical manifest: {name}")
+        manifest = manifests[0]
+        _assert_portable_path(root, manifest)
+        data = override.read_bytes() if override.exists() else manifest.read_bytes()
+        if prepend.exists():
+            data = _prepend_after_frontmatter(manifest, prepend)
+        if replacements.exists():
+            data = _apply_replacements(data, replacements, root)
+        result[manifest] = data
+    return result
+
+
 def referenced_resources(
-    root: Path, names: tuple[str, ...], payloads: tuple[str, ...] = ()
+    root: Path, names: tuple[str, ...], payloads: tuple[str, ...] = (),
+    overrides: dict[Path, bytes] | None = None,
 ) -> tuple[set[Path], tuple[PortabilityFinding, ...]]:
     """Resolve Markdown links from selected skills to repo-local resources.
 
@@ -195,7 +278,8 @@ def referenced_resources(
         if current.suffix.lower() not in (".md", ".markdown"):
             continue
         try:
-            text = current.read_text(encoding="utf-8")
+            text = (overrides[current].decode("utf-8") if overrides and current in overrides
+                    else current.read_text(encoding="utf-8"))
         except UnicodeDecodeError:
             continue
         for raw_target in MARKDOWN_LINK.findall(text):
@@ -227,6 +311,7 @@ def bundle(
     runtime: str,
     names: tuple[str, ...],
     payloads: tuple[str, ...] = (),
+    *, profiles: tuple[str, ...] = (),
 ) -> dict[str, object]:
     """Create a self-contained, offline bundle without touching runtime installs."""
     root = root.resolve()
@@ -236,7 +321,8 @@ def bundle(
         candidate = root / payload
         if not candidate.exists():
             raise ValueError(f"Missing portable payload: {payload}")
-    resources, findings = referenced_resources(root, names, payloads)
+    overrides = profile_overrides(root, names, profiles)
+    resources, findings = referenced_resources(root, names, payloads, overrides)
     required = [item for item in findings if item.kind in ("required_missing", "host_only", "unlisted_reference")]
     if required:
         details = ", ".join(f"{item.kind}:{item.path}" for item in required)
@@ -265,6 +351,8 @@ def bundle(
             target.mkdir(exist_ok=True)
         elif path.is_file():
             shutil.copy2(path, target)
+            if path in overrides:
+                target.write_bytes(overrides[path])
         else:
             raise ValueError(f"Portable bundle rejects non-regular resource: {relative}")
         if target.is_file():
@@ -452,7 +540,7 @@ def main() -> int:
             if args.output is None:
                 parser.error("bundle requires --output")
             payloads = tuple(sorted(set(args.payload) | set(declared_payloads(args.root, names))))
-            print(json.dumps(bundle(args.root, args.output, args.runtime, names, payloads), indent=2, sort_keys=True))
+            print(json.dumps(bundle(args.root, args.output, args.runtime, names, payloads, profiles=tuple(args.profile)), indent=2, sort_keys=True))
             return 0
         if args.source is None or args.destination is None:
             parser.error("preview/apply require --source and --destination")

@@ -28,3 +28,6 @@ jobs:
 
       - name: Test shared safety contracts
         run: python3 -m unittest -v test_stitch_skills.py test_redaction.py test_install_commithooks.py
+
+      - name: Test package tools
+        run: python3 -m unittest discover -s tests -p 'test_*.py'

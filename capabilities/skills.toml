@@ -558,3 +558,16 @@ effect = "local-write"
 effects = ["readonly", "local-write", "local-process"]
 approval_boundaries = ["brief-approval", "epoch-activation", "effect-expansion", "campaign-continuation"]
 layer = "composer"
+
+[skills.runpod-b300-personal]
+optional_commands = ["llmctl"]
+effect = "external-call"
+effects = ["readonly", "local-process", "network-read", "external-call"]
+approval_boundaries = ["provisioning", "spending", "credentials", "teardown"]
+layer = "workflow"
+
+[skills.metabuilder-sandbox-runtime]
+commands = ["metabuilder"]
+effect = "readonly"
+effects = ["readonly"]
+layer = "workflow"

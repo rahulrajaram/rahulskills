@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""ow-child - read-only insight into what a running opencode child is doing.
+
+A dispatched child is detached and unobservable from the foreground, so the only
+honest answer to "what is it doing?" was scouring its stdout or guessing from
+process state. opencode already records everything: its SQLite store holds the
+child's own todo plan and every tool call with status, input and output.
+
+This prints that view. Read-only: opens the database with mode=ro and never writes.
+
+Usage:
+    ow-child --pid <pid>          # resolve the session from the continuation log
+    ow-child --session <ses_id>
+    ow-child --latest <dir>       # newest session recorded for a directory
+    [--tools N] [--db PATH]
+"""
+from __future__ import annotations
+
+import argparse
+import datetime
+import json
+import pathlib
+import re
+import sqlite3
+import sys
+
+DEFAULT_DB = pathlib.Path.home() / ".local/share/opencode/opencode.db"
+CONTINUATION_LOG = pathlib.Path.home() / ".local/state/ow-continuation/plugin.log"
+
+
+def session_for_pid(pid: str) -> str | None:
+    """Resolve a pid to its session id from the plugin's tracking log."""
+    if not CONTINUATION_LOG.exists():
+        return None
+    found = None
+    for line in CONTINUATION_LOG.read_text().splitlines():
+        if re.search(rf"(?:^|\s)pid={re.escape(pid)}(?:\s|$)", line) and "tracking session=" in line:
+            match = re.search(r"tracking session=(\S+)", line)
+            if match:
+                found = match.group(1)
+    return found
+
+
+def connect(db: pathlib.Path) -> sqlite3.Connection:
+    return sqlite3.connect(db.resolve().as_uri() + "?mode=ro", uri=True)
+
+
+def resolve_latest(conn: sqlite3.Connection, directory: str) -> str | None:
+    row = conn.execute(
+        "select id from session where directory = ? order by time_updated desc limit 1",
+        (directory,),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def show_todos(conn: sqlite3.Connection, session: str) -> None:
+    rows = conn.execute(
+        "select content, status from todo where session_id = ? order by position",
+        (session,),
+    ).fetchall()
+    if not rows:
+        return
+    done = sum(1 for _, status in rows if status == "completed")
+    print(f"plan ({done}/{len(rows)} done):")
+    marks = {"completed": "x", "in_progress": ">", "pending": ".", "cancelled": "-"}
+    for content, status in rows:
+        print(f"  [{marks.get(status, '?')}] {content[:110]}")
+
+
+def show_activity(conn: sqlite3.Connection, session: str, tools: int) -> None:
+    rows = conn.execute(
+        "select time_created, data from part where session_id = ? order by time_created desc limit 400",
+        (session,),
+    ).fetchall()
+    printed = 0
+    running: str | None = None
+    newest_text: str | None = None
+    tokens = 0
+    for created, data in rows:
+        try:
+            part = json.loads(data)
+        except (TypeError, ValueError):
+            continue
+        kind = part.get("type")
+        if kind == "text" and newest_text is None:
+            newest_text = (part.get("text") or "").strip().replace("\n", " ")[:160]
+        if kind == "step-finish":
+            tokens = max(tokens, (part.get("tokens") or {}).get("total", 0))
+        if kind != "tool":
+            continue
+        state = part.get("state") or {}
+        status = state.get("status", "?")
+        if status == "running" and running is None:
+            running = part.get("tool")
+        if printed < tools:
+            stamp = datetime.datetime.fromtimestamp(created / 1000).strftime("%H:%M:%S")
+            detail = ""
+            payload = state.get("input") or {}
+            for key in ("command", "filePath", "pattern", "description"):
+                if payload.get(key):
+                    detail = str(payload[key]).replace("\n", " ")[:90]
+                    break
+            print(f"  {stamp} {part.get('tool', '?'):<10} {status:<10} {detail}")
+            printed += 1
+    if newest_text:
+        print(f"last words: {newest_text}")
+    if tokens:
+        print(f"last step tokens: {tokens:,}")
+    print(f"tool call currently running: {running or 'none'}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog="ow-child")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--pid")
+    source.add_argument("--session")
+    source.add_argument("--latest", metavar="DIR")
+    parser.add_argument("--tools", type=int, default=6)
+    parser.add_argument("--db", default=str(DEFAULT_DB))
+    args = parser.parse_args()
+
+    db = pathlib.Path(args.db)
+    if not db.exists():
+        print(f"ow-child: no opencode store at {db}", file=sys.stderr)
+        return 1
+    if args.tools < 0:
+        parser.error("--tools must be nonnegative")
+    conn = connect(db)
+
+    session = args.session
+    if args.pid:
+        session = session_for_pid(args.pid)
+        if not session:
+            print(f"ow-child: no tracked session for pid {args.pid}", file=sys.stderr)
+            return 1
+    if args.latest:
+        session = resolve_latest(conn, args.latest)
+        if not session:
+            print(f"ow-child: no session recorded for {args.latest}", file=sys.stderr)
+            return 1
+
+    row = conn.execute("select directory, time_updated from session where id = ?", (session,)).fetchone()
+    where = row[0] if row else "?"
+    age = ""
+    if row and row[1]:
+        seconds = datetime.datetime.now().timestamp() - row[1] / 1000
+        age = f", last activity {seconds:.0f}s ago"
+    print(f"session {session}\n  directory {where}{age}\n")
+    show_todos(conn, session)
+    print("\nrecent activity (newest first):")
+    show_activity(conn, session, args.tools)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -116,6 +116,20 @@ Keep working without asking unless one of these occurs:
 
 Routine implementation details, test failures, benchmark artifacts, noisy local state, and non-destructive local commits are not reasons to stop when the contract grants autonomy.
 
+## Worktree, supervision, and evidence discipline
+
+Use one writer per checkout. Inspect existing worktrees and create isolation only
+when the task or repository requires it, using the prescribed environment's root.
+For targets already governed by a harness, preserve its declared change and proof
+boundaries; route unsupported repairs to the appropriate owner rather than
+hand-editing the subject to manufacture a passing result.
+
+A supervision handle is not completion evidence. Retain durable output and exit
+status, and inspect the same process after interruption before retrying. If the
+selected supervisor is unavailable, report the limitation and use an authorized
+alternative only when the workflow permits it. Never describe an unsupervised
+run as supervised or infer success from silence.
+
 ## Execution Loop
 
 1. State the objective and existing task ID when supplied. In governed work,
