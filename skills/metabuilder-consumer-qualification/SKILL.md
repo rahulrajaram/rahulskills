@@ -5,6 +5,10 @@ description: Run and assess an already designed Linux-local consumer harness wit
 
 # MetaBuilder consumer qualification
 
+## Harness state diagrams
+
+When work in this skill concerns a harness's states or transitions, follow [harness state diagrams](../metabuilder/references/harness-state-diagrams.md) and include the required Mermaid and ASCII diagrams in the final response.
+
 Use the target's own instructions, source, and tests to execute an already
 agreed Harness Module through MetaBuilder and produce an exact qualification
 report. Initial repository discovery, task grilling, brief agreement, and
