@@ -6,6 +6,10 @@ argument-hint: "<analysis objective or existing harness>"
 
 # MetaBuilder Progressive Harness
 
+## Harness state diagrams
+
+When work in this skill concerns a harness's states or transitions, follow [harness state diagrams](../metabuilder/references/harness-state-diagrams.md) and include the required Mermaid and ASCII diagrams in the final response.
+
 Build the smallest useful index-grounded analysis first. Increase analysis capability and harness governance independently, and only from observed evidence that the current rung is insufficient.
 
 This skill produces a bounded harness recommendation, calibration case, or graduation decision. It does not approve a brief, activate an epoch, grant effects, install a harness, or execute a campaign unless those actions are separately authorized.

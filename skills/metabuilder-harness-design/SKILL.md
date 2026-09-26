@@ -5,6 +5,10 @@ description: Design a new MetaBuilder harness from repository evidence and a use
 
 # MetaBuilder harness design
 
+## Harness state diagrams
+
+When work in this skill concerns a harness's states or transitions, follow [harness state diagrams](../metabuilder/references/harness-state-diagrams.md) and include the required Mermaid and ASCII diagrams in the final response.
+
 Turn an underspecified request into reviewable MetaBuilder design artifacts. Own
 task and repository discovery, the question-and-evidence process, brief
 agreement, and translation into typed MetaBuilder intent and Harness Module
