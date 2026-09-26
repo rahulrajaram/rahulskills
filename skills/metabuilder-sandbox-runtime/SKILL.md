@@ -5,6 +5,10 @@ description: "Historical playbook for executing Harness Module command actions i
 
 # MetaBuilder sandbox runtime playbook
 
+## Harness state diagrams
+
+When work in this skill concerns a harness's states or transitions, follow [harness state diagrams](../metabuilder/references/harness-state-diagrams.md) and include the required Mermaid and ASCII diagrams in the final response.
+
 The observations below came from a prior communication-harness run against the
 confinement profile in
 `metabuilder/crates/mb-core/src/campaign_step_fs.rs`
