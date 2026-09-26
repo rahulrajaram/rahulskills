@@ -546,3 +546,15 @@ overlap_kind = "router"
 effect = "local-write"
 effects = ["local-write"]
 layer = "composer"
+
+[skills.evaluate-skill]
+effect = "readonly"
+effects = ["readonly"]
+layer = "workflow"
+
+[skills.metabuilder-progressive-harness]
+optional_commands = ["metabuilder"]
+effect = "local-write"
+effects = ["readonly", "local-write", "local-process"]
+approval_boundaries = ["brief-approval", "epoch-activation", "effect-expansion", "campaign-continuation"]
+layer = "composer"

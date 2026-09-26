@@ -19,6 +19,15 @@ This skill is guidance, not authority. The Rust CLI admits the artifacts, the
 controller grants effects, and the consumer decides whether the resulting
 checks are meaningful.
 
+Design the first useful iteration, with an honest account of what it cannot
+yet establish. The consumer owns target-specific tests and improvement ideas;
+MetaBuilder supplies general composition and enforced execution boundaries.
+Do not narrow the objective to what a convenient template happens to cover.
+When explaining this distinction or planning later revisions, consult, when available,
+`.agents/skills/metabuilder-harness-improvement/references/iterating-harnesses.md`
+in the located MetaBuilder checkout. It includes a worked revision sequence,
+an illustration, and reusable feedback and extension-request templates.
+
 ## Boundary
 
 - Read the target repository's applicable instructions before designing.
@@ -211,6 +220,8 @@ Return a compact design packet containing:
 - candidate, prepared, and agreed brief identities;
 - the checked `defineIntent` source;
 - the compiled/re-admitted module and bundle identities;
+- a mapping from every brief obligation to its intent nodes, requirements,
+  actions, and intended evidence, including constraints and owned assumptions;
 - the effect preflight, assumptions, limitations, unsupported conditions, and
   stop decisions; and
 - an explicit qualification handoff with no production-readiness claim.

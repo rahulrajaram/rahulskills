@@ -3,8 +3,8 @@
   "unit": {
     "phase_id": "qualify-harness",
     "skill": "metabuilder-consumer-qualification",
-    "semantic_version": "1.1.0",
-    "guidance_digest": "48377cd3d4cc1bd4a958814d53e8fea160ae7d6cf25842fe79a63b4aa3ea1233"
+    "semantic_version": "1.1.1",
+    "guidance_digest": "d0238f8ab3882c5c9d7d24d5d89d7b857fd7f5ae75bf2f713bcc138ee17e7721"
   },
   "inputs": [
     {
