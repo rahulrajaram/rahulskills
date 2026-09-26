@@ -15,6 +15,21 @@ qualification; route design gaps back upstream.
 This skill is guidance only. Rust admission, the compiled bundle, and the run
 journal remain authority.
 
+Qualification supplies the feedback for the next harness revision. A first
+harness may run successfully while failing to answer the consumer's question.
+Explain that shortfall precisely: expected behavior, observed evidence, the
+missing check or operation, and what would establish improvement. Distinguish
+a harness change, a missing general MetaBuilder capability, and missing
+permission; investigate absent evidence or local resources before blaming the
+engine. Domain-specific investigations remain the consumer's work.
+
+For the worked revision sequence, illustration, and feedback template, consult, when available,
+`.agents/skills/metabuilder-harness-improvement/references/iterating-harnesses.md`
+in the located MetaBuilder checkout. Finish the assessment of this exact bundle
+before handing its evidence to `metabuilder-harness-improvement`; never edit the
+running subject to turn its result green. This agent-directed workflow adds no
+unattended consumer-loop authority.
+
 When this repository-local skill is unavailable, emit the same installed guide
 with `metabuilder qualify guide`.
 
@@ -368,6 +383,11 @@ which requirements were useful, which checks were missing or awkward to
 express, which effects were unsupported, and whether the harness changed the
 consumer's semantic verdict. MetaBuilder owns structural traceability and
 controller observations; the consumer owns test adequacy and product meaning.
+Return the design handoff’s brief-obligation mapping with the report. For each
+obligation, identify its requirement/action/evidence links, semantic acceptance
+owner, and missing capability, evidence, or authority. Preserve non-goals,
+constraints, risks, decisions, and owned assumptions in that baseline.
+
 Return the exact report and attestations through the agreed coordination
 channel. Keep the artifacts in the consumer repository or discard them under
 the consumer's own retention policy after the handoff; MetaBuilder does not

@@ -66,7 +66,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (63)
+### Package-managed skills (65)
 
 Authored in this package and available for explicit selection on Pi, Codex, and
 Claude Code. The default `core` profile omits the optional design skills
@@ -88,6 +88,7 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `debate` | Multi-AI debate (Claude + Codex + Gemini) via gptengage |
 | `define-operating-charter` | Define and ratify authority, lifecycle, evidence, and stop rules for long-running agentic systems |
 | `diagram-review-viewer` | Create Mermaid diagrams with an interactive browser review viewer |
+| `evaluate-skill` | Review skill instructions through realistic scenarios and propose evidence-backed corrections |
 | `ecosystem-borrow-audit` | Cross-repo borrowing analysis and multi-sigma ideation sweeps |
 | `figma` | Use Figma MCP for design context, screenshots, variables, assets, setup, and design-to-code work |
 | `figma-implement-design` | Translate Figma nodes into production code with 1:1 visual fidelity |
@@ -110,6 +111,7 @@ exclusions prevent package copies from shadowing system-owned skills.
 | `metabuilder-assess` | Assess epoch evidence and route justified improvements to the owning workflow |
 | `metabuilder-harness-improvement` | Repair an existing harness against the same objective and requalify it through the MetaBuilder package |
 | `metabuilder-consumer-qualification` | Run and assess an already designed consumer harness without conflating controller evidence with product judgment |
+| `metabuilder-progressive-harness` | Select the smallest useful analysis harness and expand only from demonstrated gaps |
 | `metabuilder-harness-design` | Turn a target objective into an agreed brief and typed MetaBuilder harness design |
 | `next-todos` | Generate imperative next-step to-do lists as full sentences with clear objectives |
 | `objective-to-dag-decomposition` | Decompose vague objectives into typed reasoning trees, an execution DAG, and phased plans |
@@ -254,6 +256,16 @@ still does not prove that a command's operation succeeds. The output directory
 must be empty or absent.
 
 Respects per-machine exclusion list in `.exclude-skills` (one skill name per line, gitignored).
+
+### Activate a reviewed Chasm bundle
+
+From the development guest, `scripts/activate_chasm_skills.py --runtime pi
+--bundle BUNDLE` previews composition over the existing managed skill snapshot.
+Use `--runtime codex` for Codex. After reviewing the preview, `--apply` atomically
+switches the selected runtime's discovery link and reports its rollback target.
+Unselected skills remain in the composed snapshot. Pi duplicate or broken entries
+are listed before archival; inspect that list before applying. This does not
+install global instructions, credentials, providers, or external dependencies.
 
 ### `scan-skills.sh`
 
