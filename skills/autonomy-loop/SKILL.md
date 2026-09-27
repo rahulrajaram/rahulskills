@@ -109,13 +109,16 @@ invent another task to consume remaining budget.
 
 ## Separate engine, target, and harness changes
 
-In a governed campaign, keep three responsibilities distinct. Engine repairs
-follow the engine repository's authority and proof schedule, with isolation when
-required. Target changes follow the admitted harness's effects and evidence
+In a governed campaign, keep the three levels of change distinct, each with its
+own tree, gates, and evidence. Engine repairs follow the engine repository's
+authority and proof schedule, one writer per tree; when isolation applies, the
+engine changes in a forked worktree and commits locally rather than in the main
+worktree. Target changes follow the admitted harness's effects and evidence
 contract. Harness revisions follow assess, revise, and requalify at the allowed
-epoch boundary; preserve the prior bundle and run rather than editing a running
-subject to turn its result green. Route each gap to its owner without expanding
-another layer's authority to compensate.
+epoch boundary; a revision rebinds the module and bundle and needs a fresh run
+root, so preserve the prior bundle and run rather than editing a running subject
+to turn its result green. Route each gap to its owner without expanding another
+layer's authority to compensate.
 
 ## Reactor Mode
 
