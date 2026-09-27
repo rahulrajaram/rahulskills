@@ -1,1 +1,1 @@
-allowed-tools: "Bash, Read, Write, Edit, Glob, Grep, Task, WebSearch"
+allowed-tools: "Bash, Read, Write, Edit, Glob, Grep, Agent, WebSearch"

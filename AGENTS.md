@@ -24,6 +24,11 @@ while doing all substantial work in the primary agent.
   value. Do not invent parallel work just to satisfy a delegation quota.
 - If LUNA is unavailable in the current host, report that limitation and use the
   best available authorized path; do not claim another model was LUNA.
+- In Claude Code, LUNA is normally unavailable: apply this guidance with the
+  Agent tool's `general-purpose` subagents (subagents cannot spawn further
+  subagents, so the primary session owns all decomposition) and say so. After
+  editing `skills/` or `overlays/claude/`, preview Claude's assembled copies with
+  `./install-claude-skills.sh --preview --claude-root <temp dir>`.
 
 ## Corpus work
 

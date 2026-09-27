@@ -62,6 +62,11 @@ A model's assessment or a passing report cannot supply human ratification.
 
 ## Contract boundary
 
+- Keep harness definitions in the consuming project's repository, and run roots
+  and outputs in an external run-root directory outside it. Never create
+  harnesses, journals, or run artifacts inside the MetaBuilder repository. An
+  agent working on MetaBuilder itself forks a dedicated worktree instead of
+  editing the main checkout.
 - The Harness Module is the exact consumer config from the design handoff. Do
   not invent a second workflow or claims format. If no agreed module exists,
   stop and return to `metabuilder-harness-design`; the emitted module template

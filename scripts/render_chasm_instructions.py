@@ -9,7 +9,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "profiles/chasm-development/instructions/policy.md"
-PI_RUNTIME = ROOT / "profiles/chasm-development/instructions/pi-runtime.md"
+RUNTIME_NOTES = {
+    "pi": ROOT / "profiles/chasm-development/instructions/pi-runtime.md",
+    "claude": ROOT / "profiles/chasm-development/instructions/claude-runtime.md",
+}
+RUNTIME_OVERLAYS = {
+    "codex": (ROOT / "profiles/chasm-development/instructions/overlays/codex-orchestration.md",),
+    "pi": (ROOT / "profiles/chasm-development/instructions/overlays/pi-worker.md",),
+    "claude": (ROOT / "profiles/chasm-development/instructions/overlays/claude-orchestrator.md",),
+}
 OUTPUT = ROOT / "profiles/chasm-development/instructions/rendered"
 
 RUNTIMES = {
@@ -39,14 +47,24 @@ RUNTIMES = {
 
 def render(runtime: str, policy: str) -> str:
     """Render the shared policy without installer notes in agent context."""
-    runtime_text = PI_RUNTIME.read_text(encoding="utf-8").rstrip() if runtime == "pi" else ""
-    body = policy.rstrip() + ("\n\n" + runtime_text if runtime_text else "")
-    return (
+    note = RUNTIME_NOTES.get(runtime)
+    runtime_text = note.read_text(encoding="utf-8").rstrip() if note else ""
+    overlays = "\n\n".join(
+        path.read_text(encoding="utf-8").strip()
+        for path in RUNTIME_OVERLAYS.get(runtime, ())
+    )
+    body = policy.rstrip()
+    if runtime_text:
+        body += "\n\n" + runtime_text
+    rendered = (
         f"<!-- Generated from profiles/chasm-development/instructions/policy.md; "
         f"edit the source, then rerender. -->\n"
         f"# Chasm development instructions ({runtime})\n\n"
         f"{body}\n"
     )
+    if runtime == "pi":
+        return f"{overlays}\n\n{rendered}" if overlays else rendered
+    return f"{rendered.rstrip()}\n\n{overlays}\n" if overlays else rendered
 
 
 def main() -> int:

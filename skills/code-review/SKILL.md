@@ -81,6 +81,16 @@ admits exact `zai-coding-plan/glm-5.3-flash` and requires the controller to run
 one fresh `opencode run` session per perspective. Do not substitute providers,
 models, or implicit defaults.
 
+The Claude Code route (`claude-native` mode) runs in the host session's own
+model: spawn one fresh subagent per selected perspective with the Agent tool,
+using `general-purpose` or a user-defined read-only reviewer agent. Never shell
+out to `claude -p` as a substitute. A Claude subagent cannot spawn further
+subagents, so a delegated controller running as a subagent returns its prepared
+prompts to the parent for dispatch. The package currently admits no Claude
+model in its native or opencode adapters, so this route has no dispatch or
+completion receipts: never record Claude agent IDs through
+`native_codex_adapter.py`, and aggregate only as an unbound import.
+
 # Procedure
 
 Select the operation before invoking tools. A focused source review uses the
@@ -167,6 +177,19 @@ session ID, `--terminal-status completed`, report path, and evidence output.
 After every perspective completes, run `distill_swarm.py` as above. The
 adapter binds event, source, prompt, report, and receipt digests; do not edit
 those artifacts by hand.
+
+For `claude-native`, bind the same clean source, scope, objective, selected
+perspectives, authorization, and fresh evidence directory. For each
+perspective, compose the prompt from `REVIEW-CONTRACT.md`,
+`REASONING-PROTOCOL.md`, and `<perspective>.md` plus those bindings and an
+instruction to stay read-only; start a fresh Agent-tool subagent with it
+(independent perspectives may run concurrently). Capture each terminal v2
+report as `/absolute/new-evidence/<perspective>.md`, then run
+`distill_swarm.py --reviews-dir /absolute/new-evidence --out
+/absolute/new-packet.md --perspectives <p1> <p2>` and label the packet an
+unbound import with the Agent-returned IDs recorded separately as controller
+notes, not receipts. A subagent that did not return a complete report yields
+an incomplete packet.
 
 If the requested workflow is an end-of-epoch gate for generated code, use the
 optional `review-pipeline/scripts/epoch_review.py` flow: `init` with explicit

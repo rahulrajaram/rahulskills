@@ -87,8 +87,9 @@ Use the companion skills as the detailed operating procedures:
    requested inspection or execution scope. If qualification exposes a design
    gap, return upstream; do not repair the design silently.
 5. When modifying MetaBuilder itself, use the repository-local
-   `metabuilder-rust-functional-core` skill and repository authority. That
-   maintainer discipline is not part of a target project's consumer workflow.
+   `metabuilder-rust-functional-core` skill and repository authority, in a
+   forked worktree rather than the main checkout. That maintainer discipline is
+   not part of a target project's consumer workflow.
 6. For an epoch effectiveness assessment or improvement diagnosis, follow
    [metabuilder-assess](../metabuilder-assess/SKILL.md). It consumes existing
    evidence and recommends an owner, change, and validation method.
@@ -102,6 +103,14 @@ Use the companion skills as the detailed operating procedures:
    `metabuilder-consumer-qualification`, and a changed brief/objective to
    `metabuilder-harness-design` with lineage preserved. Do not invent runtime
    assessment flags; inspect the current runtime scaffold.
+
+Change three things in three places. The engine (MetaBuilder itself) changes in
+a forked worktree, one writer per tree, under this repository's own proof
+schedule. The target changes only through the harness MetaBuilder built, as
+governed actions with receipts. The harness changes at epoch turns through
+assess, revise, and requalify, which rebinds the module and bundle and needs a
+fresh run root. A gap at one level belongs to that level; never widen an
+adjacent one to compensate.
 
 Design states what should be tested. The Harness Module commits to executable
 checks. Qualification records what the controller observed and leaves semantic

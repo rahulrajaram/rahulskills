@@ -1,0 +1,14 @@
+# Claude Code ships these built-in skills and commands. A package skill with
+# the same name would shadow or be shadowed by the runtime copy, so never
+# install a second divergent Claude copy. Other runtimes are unaffected.
+claude-api
+fewer-permission-prompts
+init
+keybindings-help
+loop
+review
+run
+schedule
+security-review
+simplify
+update-config

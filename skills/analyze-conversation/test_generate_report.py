@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import generate_report
+import session_discovery
 from analyzer import analyze_conversation, detect_hardcoded_values, print_anti_patterns
 from patterns import find_retry_without_diagnosis, is_normal_retry_command
 
@@ -32,6 +33,25 @@ def write_jsonl(path: Path, events: list[dict]) -> None:
         "".join(json.dumps(event) + "\n" for event in events),
         encoding="utf-8",
     )
+
+
+RUNTIME_ENV = ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CODING_AGENT_DIR")
+_saved_env = {}
+
+
+def setUpModule() -> None:
+    # Keep report output and discovery hermetic even inside a configured runtime.
+    import os
+
+    for name in RUNTIME_ENV:
+        if name in os.environ:
+            _saved_env[name] = os.environ.pop(name)
+
+
+def tearDownModule() -> None:
+    import os
+
+    os.environ.update(_saved_env)
 
 
 class CodexNormalizationTests(unittest.TestCase):
@@ -372,6 +392,263 @@ class CodexNormalizationTests(unittest.TestCase):
             self.assertEqual(stats.user_messages, ["Inspect"])
             self.assertEqual(len(stats.bash_commands), 1)
             self.assertEqual(stats.bash_commands[0]["command"], "git status")
+
+
+def claude_record(role, content, cwd, **extra):
+    return {
+        "type": role,
+        "sessionId": "synthetic-session",
+        "cwd": cwd,
+        "isSidechain": False,
+        "timestamp": extra.pop("timestamp", "2026-01-01T00:00:00Z"),
+        "message": {"role": role, "content": content},
+        **extra,
+    }
+
+
+def claude_bash(command, cwd, tool_id="t1", **extra):
+    return claude_record(
+        "assistant",
+        [{"type": "tool_use", "id": tool_id, "name": "Bash", "input": {"command": command}}],
+        cwd,
+        **extra,
+    )
+
+
+def claude_result(text, cwd, tool_id="t1", is_error=False, **extra):
+    return claude_record(
+        "user",
+        [{"type": "tool_result", "tool_use_id": tool_id, "content": text, "is_error": is_error}],
+        cwd,
+        **extra,
+    )
+
+
+class ClaudeDiscoveryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.config = self.root / "claude-config"
+        self.cwd = "/srv/example/my_proj.x"
+        self.project = self.config / "projects" / "-srv-example-my-proj-x"
+        self.project.mkdir(parents=True)
+
+    def tearDown(self) -> None:
+        self._tmp.cleanup()
+
+    def transcript(self, name, mtime):
+        import os
+
+        path = self.project / f"{name}.jsonl"
+        write_jsonl(path, [claude_record("user", "hi", self.cwd)])
+        os.utime(path, (mtime, mtime))
+        return path
+
+    def test_slugs_follow_runtime_layouts(self) -> None:
+        self.assertEqual("-srv-example-my-proj-x", session_discovery.claude_slug(self.cwd))
+        self.assertEqual("--srv-example-my_proj.x--", session_discovery.pi_slug(self.cwd))
+
+    def test_runtime_detection_order(self) -> None:
+        detect = session_discovery.detect_runtime
+        self.assertEqual("claude", detect({"CLAUDECODE": "1", "CODEX_SANDBOX": "x"}))
+        self.assertEqual("claude", detect({"CLAUDE_CODE_SESSION_ID": "abc"}))
+        self.assertEqual("codex", detect({"CODEX_SANDBOX": "seatbelt"}))
+        self.assertIsNone(detect({"CODEX_HOME": "/somewhere"}))
+        self.assertEqual("pi", detect({"PI_CODING_AGENT": "true"}))
+        self.assertIsNone(detect({}))
+
+    def test_session_id_env_wins_over_newest_transcript(self) -> None:
+        older = self.transcript("older", 1_000)
+        self.transcript("newer", 2_000)
+        env = {"CLAUDECODE": "1", "CLAUDE_CONFIG_DIR": str(self.config), "CLAUDE_CODE_SESSION_ID": "older"}
+        found = session_discovery.current_session(None, self.cwd, env)
+        self.assertEqual(("claude", older), (found.runtime, found.path))
+
+    def test_newest_slug_transcript_without_session_id(self) -> None:
+        self.transcript("older", 1_000)
+        newer = self.transcript("newer", 2_000)
+        (self.project / "newer" / "subagents").mkdir(parents=True)
+        write_jsonl(self.project / "newer" / "subagents" / "agent-x.jsonl", [])
+        env = {"CLAUDECODE": "1", "CLAUDE_CONFIG_DIR": str(self.config)}
+        self.assertEqual(newer, session_discovery.current_session(None, self.cwd, env).path)
+        self.assertEqual(
+            newer,
+            Path(generate_report.find_current_conversation_file("claude", self.cwd, env)),
+        )
+
+    def test_missing_session_lists_candidates_without_guessing(self) -> None:
+        env = {"CLAUDE_CONFIG_DIR": str(self.config), "HOME": str(self.root)}
+        other = self.config / "projects" / "-elsewhere"
+        other.mkdir()
+        write_jsonl(other / "s.jsonl", [claude_record("user", "hi", "/elsewhere")])
+        with self.assertRaises(session_discovery.SessionNotFound) as raised:
+            session_discovery.current_session("claude", self.cwd, env)
+        self.assertEqual((), raised.exception.candidates)
+        with patch.dict("os.environ", env), self.assertRaises(FileNotFoundError):
+            generate_report.find_current_conversation_file("claude", self.cwd, env)
+
+    def test_find_by_id_is_exact_for_claude(self) -> None:
+        target = self.transcript("abc", 1_000)
+        self.transcript("abcd", 2_000)
+        env = {"CLAUDE_CONFIG_DIR": str(self.config), "HOME": str(self.root)}
+        with patch.dict("os.environ", env):
+            self.assertEqual(str(target), generate_report.find_conversation_file("abc", "claude"))
+            with self.assertRaises(FileNotFoundError):
+                generate_report.find_conversation_file("missing", "claude")
+
+
+class ClaudeParsingTests(unittest.TestCase):
+    def test_claude_transcript_normalizes_turns_results_and_project_cwd(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            root = Path(raw_dir)
+            project = root / "my_proj.x"  # the lossy slug decode would miss this path
+            project.mkdir()
+            (project / "AGENTS.md").write_text("synthetic", encoding="utf-8")
+            cwd = str(project)
+            session_dir = root / "projects" / session_discovery.claude_slug(cwd)
+            session_dir.mkdir(parents=True)
+            transcript = session_dir / "synthetic-session.jsonl"
+            write_jsonl(
+                transcript,
+                [
+                    {"type": "permission-mode", "sessionId": "synthetic-session"},
+                    claude_record("user", "Run the build", cwd, timestamp="2026-01-01T00:00:00Z"),
+                    claude_record(
+                        "user", "<skill body>", cwd, isMeta=True, timestamp="2026-01-01T00:00:01Z"
+                    ),
+                    claude_bash("make build", cwd, timestamp="2026-01-01T00:00:02Z"),
+                    claude_result(
+                        "make: *** failed", cwd, is_error=True, timestamp="2026-01-01T00:00:03Z"
+                    ),
+                    claude_record(
+                        "assistant",
+                        [{"type": "text", "text": "The build failed."}],
+                        cwd,
+                        timestamp="2026-01-01T00:00:04Z",
+                    ),
+                ],
+            )
+
+            normalized, runtime, _ = generate_report.normalize_runtime_conversation(str(transcript))
+            try:
+                self.assertEqual("claude", runtime)
+                stats = analyze_conversation(normalized)
+            finally:
+                Path(normalized).unlink()
+            self.assertEqual(1, stats.total_turns)
+            self.assertEqual(["Run the build"], stats.user_messages)
+            self.assertEqual(["make build"], [c["command"] for c in stats.bash_commands])
+            self.assertEqual(1, len(stats.errors))
+
+            self.assertEqual(project, session_discovery.transcript_cwd(transcript))
+            self.assertTrue(generate_report.check_project_context(str(transcript))["has_agents_md"])
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                report = Path(generate_report.generate_markdown_report(str(transcript), root / "out"))
+            text = report.read_text(encoding="utf-8")
+            self.assertEqual("synthetic-session_retrospective.md", report.name)
+            self.assertIn("Claude Code JSONL normalized", text)
+            self.assertIn("**Shell Commands**: 1", text)
+
+    def test_include_subagents_merges_actions_but_not_parent_prompts(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            root = Path(raw_dir)
+            cwd = "/synthetic/project"
+            transcript = root / "main-session.jsonl"
+            write_jsonl(
+                transcript,
+                [
+                    claude_record("user", "Delegate it", cwd, timestamp="2026-01-01T00:00:00Z"),
+                    claude_bash("git status", cwd, timestamp="2026-01-01T00:00:05Z"),
+                ],
+            )
+            subagents = root / "main-session" / "subagents"
+            subagents.mkdir(parents=True)
+            write_jsonl(
+                subagents / "agent-a1.jsonl",
+                [
+                    claude_record(
+                        "user", "Worker prompt", cwd, isSidechain=True, timestamp="2026-01-01T00:00:01Z"
+                    ),
+                    claude_bash("pytest -q", cwd, "s1", isSidechain=True, timestamp="2026-01-01T00:00:02Z"),
+                    claude_result("ok", cwd, "s1", isSidechain=True, timestamp="2026-01-01T00:00:03Z"),
+                ],
+            )
+
+            for include, commands in ((False, ["git status"]), (True, ["pytest -q", "git status"])):
+                with self.subTest(include=include):
+                    normalized, _, paths = generate_report.normalize_runtime_conversation(
+                        str(transcript), include_subagents=include
+                    )
+                    try:
+                        stats = analyze_conversation(normalized)
+                    finally:
+                        Path(normalized).unlink()
+                    self.assertEqual(len(paths), 1 if include else 0)
+                    self.assertEqual(["Delegate it"], stats.user_messages)
+                    self.assertEqual(commands, [c["command"] for c in stats.bash_commands])
+
+    def test_cli_current_claude_session_writes_under_config_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            root = Path(raw_dir)
+            cwd = "/synthetic/project"
+            config = root / "claude-config"
+            session_dir = config / "projects" / session_discovery.claude_slug(cwd)
+            session_dir.mkdir(parents=True)
+            write_jsonl(
+                session_dir / "cli-session.jsonl",
+                [claude_record("user", "Inspect", cwd), claude_bash("git status", cwd)],
+            )
+            env = {"CLAUDECODE": "1", "CLAUDE_CONFIG_DIR": str(config), "HOME": str(root)}
+            with patch.dict("os.environ", env), patch("os.getcwd", return_value=cwd), \
+                    contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(0, generate_report.main(["--current", "--runtime", "claude"]))
+            self.assertTrue((config / "retrospectives" / "cli-session_retrospective.md").is_file())
+            self.assertIn("runtime: claude", out.getvalue())
+
+    def test_empty_claude_conversation_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            transcript = Path(raw_dir) / "meta-only.jsonl"
+            write_jsonl(transcript, [claude_record("user", "x", "/p", isMeta=True)])
+            with self.assertRaises(ValueError):
+                generate_report.normalize_runtime_conversation(str(transcript))
+
+
+class PiParsingTests(unittest.TestCase):
+    def test_pi_session_maps_tools_results_and_header_cwd(self) -> None:
+        records = [
+            {"type": "session", "version": 3, "id": "s", "timestamp": "t0", "cwd": "/synthetic/pi"},
+            {"type": "model_change", "id": "m"},
+            {"type": "message", "timestamp": "t1", "message": {"role": "user", "content": [{"type": "text", "text": "Fix it"}]}},
+            {
+                "type": "message",
+                "timestamp": "t2",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "thinking", "thinking": "hidden"},
+                        {"type": "toolCall", "id": "c1", "name": "bash", "arguments": {"command": "make", "timeout": 5}},
+                        {"type": "toolCall", "id": "c2", "name": "edit", "arguments": {"path": "a.py", "edits": []}},
+                    ],
+                },
+            },
+            {
+                "type": "message",
+                "timestamp": "t3",
+                "message": {"role": "toolResult", "toolCallId": "c1", "toolName": "bash", "isError": True, "content": [{"type": "text", "text": "failed"}]},
+            },
+        ]
+        self.assertEqual("pi", session_discovery.detect_format(records))
+        messages = session_discovery.normalize_pi_records(records)
+        self.assertEqual(["user", "assistant", "assistant"], [m["type"] for m in messages])
+        tools = messages[1]["message"]["content"]
+        self.assertEqual(("Bash", {"command": "make", "description": ""}), (tools[0]["name"], tools[0]["input"]))
+        self.assertEqual(("Edit", {"file_path": "a.py"}), (tools[1]["name"], tools[1]["input"]))
+        self.assertTrue(messages[2]["message"]["content"][0]["is_error"])
+        with tempfile.TemporaryDirectory() as raw_dir:
+            transcript = Path(raw_dir) / "pi.jsonl"
+            write_jsonl(transcript, records)
+            self.assertEqual(Path("/synthetic/pi"), session_discovery.transcript_cwd(transcript))
 
 
 if __name__ == "__main__":

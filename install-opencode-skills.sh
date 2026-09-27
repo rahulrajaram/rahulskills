@@ -17,6 +17,8 @@ usage() {
         '  -n, --dry-run, --preview   Read-only migration and ownership preview' \
         '  --opencode-root PATH      Runtime root (default ~/.config/opencode)' \
         '  --remove NAME             Explicitly remove an unselected owned link' \
+        '  --adopt-source            Re-root a ledger written by another checkout;' \
+        '                            user-modified entries stay blocked' \
         'Runtime exclusions apply. Unrelated links and user-managed copies remain.'
 }
 
@@ -29,6 +31,7 @@ while [[ $# -gt 0 ]]; do
         --remove)
             [[ $# -ge 2 ]] || { usage >&2; exit 2; }
             REMOVAL_ARGS+=("$1" "$2"); shift 2 ;;
+        --adopt-source) REMOVAL_ARGS+=("$1"); shift ;;
         --opencode-root)
             [[ $# -ge 2 ]] || { usage >&2; exit 2; }
             OPENCODE_SKILLS_DIR="$2/skills"; shift 2 ;;

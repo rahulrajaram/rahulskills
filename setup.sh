@@ -94,22 +94,39 @@ if [ "${1:-}" = "--skip-skills" ]; then
 fi
 
 echo ""
-echo "Available skill targets:"
-echo "  all     Deploy all skills to ~/.agents/skills/ and ~/.claude/skills/"
-echo "  none    Skip skill deployment"
+echo "Skill runtimes (the default core profile is installed to each one chosen):"
+echo "  claude    Stitched copies in \${CLAUDE_CONFIG_DIR:-~/.claude}/skills (install-claude-skills.sh)"
+echo "  codex     Stitched copies in ~/.codex/skills (stitch-skills.sh install --runtime codex)"
+echo "  pi        Repository links in ~/.pi/agent/skills (install-pi-skills.sh)"
+echo "  opencode  Repository links in ~/.config/opencode/skills (install-opencode-skills.sh)"
+echo "  all       Every runtime above (sync-skills.sh push)"
+echo "  none      Skip skill deployment"
 echo ""
 
-read -rp "Deploy skills? [all/none] (default: none): " choice
+read -rp "Deploy skills to which runtimes? [space- or comma-separated; default: none]: " choice
 choice="${choice:-none}"
+choice="${choice//,/ }"
 
-case "$choice" in
-  all)
-    "$REPO_ROOT/sync-skills.sh" push
-    ;;
-  none)
+deploy_runtime() {
+  case "$1" in
+    claude)   "$REPO_ROOT/install-claude-skills.sh" ;;
+    codex)    "$REPO_ROOT/stitch-skills.sh" install --runtime codex ;;
+    pi)       "$REPO_ROOT/install-pi-skills.sh" ;;
+    opencode) "$REPO_ROOT/install-opencode-skills.sh" ;;
+    *)        echo "Unknown runtime: $1. Skipping."; return 0 ;;
+  esac
+}
+
+case " $choice " in
+  *" none "*)
     echo "Skipping skill deployment."
     ;;
+  *" all "*)
+    "$REPO_ROOT/sync-skills.sh" push
+    ;;
   *)
-    echo "Unknown choice: $choice. Skipping."
+    for runtime in $choice; do
+      deploy_runtime "$runtime"
+    done
     ;;
 esac

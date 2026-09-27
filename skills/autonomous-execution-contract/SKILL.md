@@ -118,17 +118,24 @@ Routine implementation details, test failures, benchmark artifacts, noisy local 
 
 ## Worktree, supervision, and evidence discipline
 
-Use one writer per checkout. Inspect existing worktrees and create isolation only
-when the task or repository requires it, using the prescribed environment's root.
-For targets already governed by a harness, preserve its declared change and proof
-boundaries; route unsupported repairs to the appropriate owner rather than
-hand-editing the subject to manufacture a passing result.
+Use one writer per tree, and never two writers in the same tree. Inspect existing
+worktrees and create isolation only when the task or repository requires it, using
+the prescribed environment's root; when isolated feature work is required it
+happens in a forked worktree, so the main worktree stays representative of a
+commit or a single coherent controller change. For targets already governed by a
+harness, preserve its declared change and proof boundaries; route unsupported
+repairs to the appropriate owner rather than hand-editing the subject to
+manufacture a passing result.
 
-A supervision handle is not completion evidence. Retain durable output and exit
-status, and inspect the same process after interruption before retrying. If the
-selected supervisor is unavailable, report the limitation and use an authorized
-alternative only when the workflow permits it. Never describe an unsupervised
-run as supervised or infer success from silence.
+A supervision handle is not completion evidence. When work may outlive the call,
+dispatch it under the available supervisor and have the command write its own
+durable log and exit codes; retain that output and exit status, and inspect the
+same process after interruption before retrying rather than treating an absent
+alert as no news. If the selected supervisor is unavailable or loses task state,
+report the limitation and either stop dependent execution or explicitly record
+the softer supervision as a degradation; use an authorized alternative only when
+the workflow permits it. Never describe an unsupervised run as supervised or
+infer success from silence.
 
 ## Execution Loop
 

@@ -1,7 +1,11 @@
+import contextlib
+import io
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import checker
 
@@ -379,6 +383,153 @@ class IdleWithPendingWorkTests(unittest.TestCase):
         self.assertEqual(6, len(checker.IMPLEMENTED_CHECKS))
         finding = checker.Finding("IDLE_WITH_PENDING_WORK", "MEDIUM", "1", "x", "y")
         self.assertEqual(83, checker.heuristic_signal_score((finding,)))
+
+
+CWD = "/synthetic/my_proj.x"
+
+
+def claude(role, content, **extra):
+    return {
+        "type": role,
+        "sessionId": "synthetic-session",
+        "cwd": CWD,
+        "isSidechain": False,
+        "timestamp": extra.pop("timestamp", "2026-01-01T00:00:00Z"),
+        "message": {"role": role, "content": content},
+        **extra,
+    }
+
+
+def claude_bash(command, tool_id):
+    return claude(
+        "assistant",
+        [{"type": "tool_use", "id": tool_id, "name": "Bash", "input": {"command": command}}],
+    )
+
+
+def claude_result(tool_id, text="ok", is_error=False):
+    return claude(
+        "user",
+        [{"type": "tool_result", "tool_use_id": tool_id, "content": text, "is_error": is_error}],
+    )
+
+
+class ClaudeTranscriptTests(unittest.TestCase):
+    def test_claude_records_normalize_without_counting_tool_results_as_turns(self) -> None:
+        events = [
+            {"type": "permission-mode", "permissionMode": "default", "sessionId": "synthetic-session"},
+            claude("user", "Deploy the service"),
+            claude("user", "<injected skill body>", isMeta=True),
+            claude("assistant", [{"type": "thinking", "thinking": "plan"}]),
+            claude_bash("make deploy", "t1"),
+            claude_result("t1", "make: *** failed", is_error=True),
+            claude_bash("make deploy", "t2"),
+            claude_result("t2"),
+        ]
+        data = checker.normalize_events(events)
+        self.assertEqual(("claude-message", "observed"), (data.source_format, data.coverage))
+        self.assertEqual(
+            ["user"], [m["type"] for m in data.messages if m["type"] == "user"]
+        )
+        self.assertEqual(
+            ("make deploy", "make deploy"),
+            tuple(command for _, command in checker.extract_bash_commands(data.messages)),
+        )
+        findings, _ = checker.analyze(data)
+        self.assertIn("RETRY_WITHOUT_DIAGNOSIS", {finding.kind for finding in findings})
+
+    def test_tool_result_does_not_end_turn_after_status_probe(self) -> None:
+        followed_by_wait = [
+            claude("user", "go"),
+            claude_bash("overwatch status abc-123", "t1"),
+            claude_result("t1", "running"),
+            claude_bash("overwatch events abc-123 --follow --json", "t2"),
+            claude_result("t2", "done"),
+        ]
+        data = checker.normalize_events(followed_by_wait)
+        self.assertEqual((), checker.check_idle_with_pending_work(data.messages))
+
+        yielded = [*followed_by_wait[:3], claude("user", "are you done?")]
+        data = checker.normalize_events(yielded)
+        self.assertEqual(
+            ["IDLE_WITH_PENDING_WORK"],
+            [f.kind for f in checker.check_idle_with_pending_work(data.messages)],
+        )
+
+    def test_meta_only_claude_transcript_is_unsupported_coverage(self) -> None:
+        data = checker.normalize_events([claude("user", "x", isMeta=True)])
+        self.assertEqual(("claude-message", "unsupported"), (data.source_format, data.coverage))
+
+    def test_include_subagents_merges_worker_actions(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            transcript = Path(raw_dir) / "main.jsonl"
+            write_jsonl(transcript, [claude("user", "delegate"), claude_bash("git status", "m1")])
+            subagents = Path(raw_dir) / "main" / "subagents"
+            subagents.mkdir(parents=True)
+            write_jsonl(
+                subagents / "agent-a.jsonl",
+                [claude("user", "worker prompt", isSidechain=True), claude_bash("rm -rf ~", "s1")],
+            )
+            plain = checker.read_conversation(transcript)
+            merged = checker.read_conversation(transcript, include_subagents=True)
+        self.assertEqual("claude-message", plain.source_format)
+        self.assertEqual("claude-message+1-subagents", merged.source_format)
+        self.assertEqual(1, sum(1 for m in merged.messages if m["type"] == "user"))
+        self.assertIn(
+            "DESTRUCTIVE_OPERATION_WITHOUT_EXACT_GUARD",
+            {f.kind for f in checker.analyze(merged)[0]},
+        )
+
+    def test_cli_discovers_current_claude_session(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            config = Path(raw_dir) / "claude-config"
+            project = config / "projects" / "-synthetic-my-proj-x"
+            project.mkdir(parents=True)
+            write_jsonl(project / "live.jsonl", [claude("user", "go"), claude_bash("git status", "t1")])
+            env = {
+                "CLAUDECODE": "1",
+                "CLAUDE_CONFIG_DIR": str(config),
+                "CLAUDE_CODE_SESSION_ID": "live",
+                "HOME": raw_dir,
+            }
+            with patch.dict(os.environ, env), patch("os.getcwd", return_value=CWD), \
+                    contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(0, checker.main([]))
+            self.assertIn(f"Transcript: {project / 'live.jsonl'} (current claude session)", out.getvalue())
+
+            empty = {**env, "CLAUDE_CODE_SESSION_ID": "", "CLAUDE_CONFIG_DIR": str(Path(raw_dir) / "none")}
+            with patch.dict(os.environ, empty), patch("os.getcwd", return_value=CWD), \
+                    contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(2, checker.main(["--runtime", "claude"]))
+            self.assertIn("No current session transcript identified", out.getvalue())
+
+
+class PiTranscriptTests(unittest.TestCase):
+    def test_pi_session_normalizes_tool_calls(self) -> None:
+        events = [
+            {"type": "session", "version": 3, "id": "s", "cwd": CWD},
+            {"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "go"}]}},
+            {
+                "type": "message",
+                "message": {
+                    "role": "assistant",
+                    "content": [{"type": "toolCall", "id": "c", "name": "bash", "arguments": {"command": "command -v rg"}}],
+                },
+            },
+            {"type": "message", "message": {"role": "toolResult", "toolCallId": "c", "content": [{"type": "text", "text": "/bin/rg"}]}},
+        ]
+        data = checker.normalize_events(events)
+        self.assertEqual(("pi-message", "observed"), (data.source_format, data.coverage))
+        self.assertEqual(((1, "command -v rg"),), checker.extract_bash_commands(data.messages))
+
+
+class SharedModuleTests(unittest.TestCase):
+    def test_session_discovery_matches_sibling_skill_copy(self) -> None:
+        here = Path(__file__).resolve().parent / "session_discovery.py"
+        sibling = here.parents[1] / "analyze-conversation" / "session_discovery.py"
+        if not sibling.exists():
+            self.skipTest("analyze-conversation is not installed beside this skill")
+        self.assertEqual(sibling.read_bytes(), here.read_bytes())
 
 
 if __name__ == "__main__":

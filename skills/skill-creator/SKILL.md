@@ -1,13 +1,13 @@
 ---
 name: skill-creator
-description: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources.
+description: Create or update an agent skill (Claude Code, Codex, Pi, opencode) with appropriately scoped instructions and any needed supporting resources.
 metadata:
   short-description: Create or update a skill
 ---
 
 # Skill Creator
 
-Create skills that give Codex useful, non-obvious guidance without constraining unrelated work.
+Create skills that give the executing agent useful, non-obvious guidance without constraining unrelated work. All four runtimes share the `SKILL.md` format; runtime-specific frontmatter and metadata are listed under [Runtime differences](#runtime-differences).
 
 ## Rahulskills package integration
 
@@ -16,7 +16,7 @@ When this skill is used from the Rahulskills repository, treat
 `overlays/<runtime>/<name>.yml`, record runtime-owned names under
 `runtime-exclusions/<runtime>.txt`, and never maintain divergent installed
 copies by hand. Assemble and validate the package before offering to install
-it; installation into Pi, Codex, or Claude is a separate external-state action.
+it; installation into Pi, Codex, Claude, or opencode is a separate external-state action.
 
 Preserve repository-supported frontmatter extensions such as `argument-hint`
 and `disable-model-invocation`. The bundled validator recognizes the package's
@@ -30,7 +30,7 @@ For corpus edits, use the [authoring contract](../../references/skill-authoring-
 to keep intent, local bindings, authority and evidence congruent. Keep executing
 skills locally sufficient; this is an authoring reference, not a runtime prerequisite.
 
-**Assume Codex is already capable.** Include information that changes its decisions or improves its work. Remove generic advice and examples that do not materially clarify the task. Retain repeated instructions at discovery, mode entry and consequential operations when repetition improves reliability; shorter is not inherently better.
+**Assume the agent is already capable.** Include information that changes its decisions or improves its work. Remove generic advice and examples that do not materially clarify the task. Retain repeated instructions at discovery, mode entry and consequential operations when repetition improves reliability; shorter is not inherently better.
 
 **Preserve user intent and scope.** A skill should support the requested task, not replace the user's chosen product, expand the assignment, modify unrelated configuration, or imply permission for additional external actions. Do not turn a particular example, past failure, or personal preference into a universal requirement.
 
@@ -55,7 +55,7 @@ skill-name/
 |-- SKILL.md                 Required skill instructions
 |   |-- YAML frontmatter     Required name and description
 |   `-- Markdown body        Instructions loaded when the skill is used
-|-- agents/                  Optional UI metadata and invocation policy
+|-- agents/                  Optional Codex UI metadata and invocation policy
 |   `-- openai.yaml
 |-- scripts/                 Optional executable helpers
 |-- references/              Optional documentation loaded as needed
@@ -106,7 +106,31 @@ Use `assets/` for files that belong in generated output rather than in the model
 - **Useful for:** Templates, images, fonts, icons, boilerplate projects, and other files copied or adapted into the result.
 - **Context:** Do not load assets as instructions unless the task requires inspecting them.
 
-### UI Metadata and Invocation Policy
+### Runtime differences
+
+Invocation: Claude Code `/skill-name [args]`, Codex `$skill-name`, Pi
+`/skill:skill-name`. Claude Code substitutes `$ARGUMENTS` (and `$0`, `$1`, ...)
+and `${CLAUDE_SKILL_DIR}` in the body and appends unsubstituted arguments as an
+`ARGUMENTS:` line; other runtimes do not, so a portable body should say how
+arguments arrive and resolve bundled files relative to the `SKILL.md` it read.
+
+| Intent | Claude Code (`SKILL.md` frontmatter) | Codex (`agents/openai.yaml`) |
+| --- | --- | --- |
+| Explicit-only (no automatic selection) | `disable-model-invocation: true` | `policy.allow_implicit_invocation: false` |
+| Model-only (hidden from the slash menu) | `user-invocable: false` | no equivalent |
+| Display name, short label, prompt | none (`name`, `description`) | `interface.display_name`, `short_description`, `default_prompt` |
+| Argument hint | `argument-hint` | none (Pi also reads `argument-hint`) |
+| Extra selection guidance | `when_to_use` | fold into `description` |
+| Pre-approved tools | `allowed-tools` | none |
+| Model, effort, forked subagent context | `model`, `effort`, `context: fork` + `agent` | none |
+| Lifecycle hooks, path-scoped activation | `hooks`, `paths` | none |
+
+In Rahulskills, runtime-only frontmatter such as `allowed-tools` belongs in
+`overlays/<runtime>/<name>.yml`. The bundled validator accepts these keys but
+parses only scalars and one level of scalar mappings; quote globs, and validate
+list- or hook-valued frontmatter with the target runtime instead.
+
+### Codex UI Metadata and Invocation Policy
 
 `agents/openai.yaml` can provide UI-facing metadata such as `display_name`, `short_description`, and `default_prompt`, along with invocation policy. When creating or updating those settings, read [references/openai_yaml.md](references/openai_yaml.md) and keep the values consistent with the skill.
 
@@ -117,9 +141,9 @@ policy:
   allow_implicit_invocation: false
 ```
 
-This keeps the skill available when explicitly invoked as `$skill-name` without adding it to the model context automatically. Preserve unrelated existing UI, policy, and dependency fields when updating `agents/openai.yaml`.
+This keeps the skill available when explicitly invoked as `$skill-name` without adding it to the model context automatically. The Claude Code equivalent is `disable-model-invocation: true` in `SKILL.md`. Preserve unrelated existing UI, policy, and dependency fields when updating `agents/openai.yaml`.
 
-The initializer creates this file automatically. For new or interface-only metadata, generate it with:
+The initializer writes this file only with `--codex-metadata` or `--interface`. For new or interface-only metadata, generate it with:
 
 ```bash
 python3 scripts/generate_openai_yaml.py <path/to/skill-folder> --interface key=value
@@ -167,7 +191,12 @@ These examples illustrate options, not a required structure. Choose the organiza
 
 Adapt the work to the request. Creating a complex new skill may involve understanding realistic use cases, choosing supporting resources, initializing files, writing instructions, and validating the result. A narrow update to an existing skill may require only a focused edit and validation.
 
-Ask clarifying questions only when the missing information matters and cannot be reasonably inferred. Respect a user-specified location; otherwise create discoverable skills in `$CODEX_HOME/skills`, or `~/.codex/skills` when `CODEX_HOME` is unset.
+Ask clarifying questions only when the missing information matters and cannot be reasonably inferred. Respect a user-specified location; in Rahulskills, author under `skills/<name>/`. Otherwise create discoverable skills for the current runtime:
+
+- Claude Code: `${CLAUDE_CONFIG_DIR:-~/.claude}/skills/<name>/`, or `.claude/skills/<name>/` for a project skill.
+- Codex: `${CODEX_HOME:-~/.codex}/skills/<name>/`.
+- Pi: `~/.pi/agent/skills/<name>/`.
+- opencode: `~/.config/opencode/skills/<name>/` (it also discovers `~/.claude/skills`).
 
 Keep automatic skill selection enabled unless the user explicitly requests an explicit-only skill. When the intended invocation mode is genuinely unclear and matters to the requested workflow, ask whether the user wants normal automatic discovery or explicit-only invocation; otherwise preserve the default. Do not infer explicit-only invocation from sensitive operations or required approvals: keep the skill discoverable and require authorization immediately before the actual mutation. Preserve an existing skill's invocation policy unless the user asks to change it.
 
@@ -191,19 +220,19 @@ Create those resources only when their concrete benefit justifies them. If the u
 For a new skill, use the bundled initializer when it helps create the required files consistently:
 
 ```bash
-python3 scripts/init_skill.py <skill-name> --path <output-directory> [--resources scripts,references,assets] [--examples]
+python3 scripts/init_skill.py <skill-name> --path <output-directory> [--resources scripts,references,assets] [--examples] [--codex-metadata]
 ```
 
 For example:
 
 ```bash
-python3 scripts/init_skill.py my-skill --path "${CODEX_HOME:-$HOME/.codex}/skills"
-python3 scripts/init_skill.py my-skill --path "${CODEX_HOME:-$HOME/.codex}/skills" --resources references
+python3 scripts/init_skill.py my-skill --path "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills"
+python3 scripts/init_skill.py my-skill --path "${CODEX_HOME:-$HOME/.codex}/skills" --resources references --codex-metadata
 ```
 
 Request only the resource directories the skill needs. Use `--examples` only when concrete placeholders would help, and replace or remove them before finishing. Do not initialize an existing skill again.
 
-The initializer creates the skill directory, a concise `SKILL.md` starter, and `agents/openai.yaml`. It creates resource directories and example files only when requested. Pass generated UI values as `--interface key=value` when needed.
+The initializer creates the skill directory and a concise `SKILL.md` starter. It writes Codex `agents/openai.yaml` only with `--codex-metadata` or `--interface key=value`, and creates resource directories and example files only when requested.
 
 ### Write the Instructions
 
@@ -217,7 +246,7 @@ description: Create or edit Word documents when formatting, tracked changes, or 
 
 Put detailed workflows, tool choices, examples, and operating modes in the body or relevant references rather than listing them all in the description. Preserve supported optional frontmatter, such as existing `metadata`, when appropriate.
 
-Write only the instructions needed for another Codex instance to perform the task well. State the desired outcome, non-obvious context, real constraints, and relevant references or tools. Preserve the user's explicit choices and existing authorization boundaries. Avoid prescribing a fixed structure, process, or number of steps when the task does not require one.
+Write only the instructions needed for another agent instance to perform the task well. State the desired outcome, non-obvious context, real constraints, and relevant references or tools. Preserve the user's explicit choices and existing authorization boundaries. Avoid prescribing a fixed structure, process, or number of steps when the task does not require one.
 
 ### Validate and Iterate
 
@@ -242,7 +271,7 @@ Give the evaluating agent a realistic user request, the skill, and the minimum r
 For example:
 
 ```text
-Use $skill-name at /path/to/skill-name to complete this realistic request.
+Use the skill-name skill at /path/to/skill-name to complete this realistic request.
 ```
 
 Keep the evaluation scoped to permitted resources and side effects. Use an isolated temporary workspace for generated artifacts so they do not enter the working tree or contaminate later evaluations. Ask for approval when the proposed evaluation would require additional authorization, affect a live production system, or impose substantial time or cost. Review the actual outcome and artifacts, then make only changes supported by the observed behavior.
