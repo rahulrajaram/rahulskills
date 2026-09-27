@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Print the gptqueue agent name a Claude Code session should use for a directory.
+# Precedence: GPTQ_AGENT_NAME, then the longest matching prefix in the names file,
+# then claude-<basename of the git top level (or the directory)>.
+set -euo pipefail
+
+dir="$(realpath -m "${1:-$PWD}")"
+names_file="${GPTQ_CLAUDE_NAMES_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/gptqueue/claude-agent-names.tsv}"
+
+if [ -n "${GPTQ_AGENT_NAME:-}" ]; then
+  printf '%s\n' "$GPTQ_AGENT_NAME"
+  exit 0
+fi
+
+if [ -r "$names_file" ]; then
+  best_len=0 best_name=""
+  while IFS=$'\t' read -r prefix name; do
+    case "$prefix" in ''|'#'*) continue ;; esac
+    prefix="${prefix%/}"
+    if [ "$dir" = "$prefix" ] || [ "${dir#"$prefix"/}" != "$dir" ]; then
+      if [ "${#prefix}" -gt "$best_len" ]; then best_len=${#prefix} best_name=$name; fi
+    fi
+  done < "$names_file"
+  if [ -n "$best_name" ]; then printf '%s\n' "$best_name"; exit 0; fi
+fi
+
+top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$dir")"
+base="$(basename "$top" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-\n' '-')"
+printf 'claude-%s\n' "${base:-root}"

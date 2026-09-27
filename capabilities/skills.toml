@@ -357,6 +357,15 @@ layer = "workflow"
 overlaps = ["handoff"]
 overlap_kind = "producer-consumer"
 
+[skills.gptqueue-claude-channel]
+# Claude-only: Codex and Pi get gptqueue through gptqueue-session instead.
+runtimes = ["claude"]
+approval_boundaries = ["install", "external-state"]
+commands = ["claude", "node", "redis-cli", "jq"]
+effect = "home-write"
+effects = ["readonly", "local-process", "home-write", "external-call"]
+layer = "workflow"
+
 [skills.install-commithooks]
 commands = ["git"]
 effect = "local-write"

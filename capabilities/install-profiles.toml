@@ -23,6 +23,7 @@ core = [
   "fp-refine",
   "frame-goals-constraints",
   "git-status-report",
+  "gptqueue-claude-channel",
   "grill-me",
   "grilling",
   "handoff",

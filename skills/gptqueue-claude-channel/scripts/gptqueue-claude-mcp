@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# stdio MCP entry for Claude Code: start the gptqueue MCP server auto-registered
+# under this project's agent name (see gptqueue-claude-name).
+set -euo pipefail
+here="$(dirname "$(realpath "$0")")"
+GPTQUEUE_HOME="${GPTQUEUE_HOME:-/workspace/gptqueue}"
+export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379/0}"
+GPTQ_AGENT_NAME="$("$here/gptqueue-claude-name" "${CLAUDE_PROJECT_DIR:-$PWD}")"
+export GPTQ_AGENT_NAME
+exec node "$GPTQUEUE_HOME/dist/mcp-server/index.js"

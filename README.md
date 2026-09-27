@@ -96,7 +96,7 @@ Skill logic is authored once in `skills/`. CLI-specific metadata (like `allowed-
 
 ## Skills Inventory
 
-### Package-managed skills (67)
+### Package-managed skills (68)
 
 Authored in this package and available for explicit selection on Claude Code,
 Codex, Pi, and opencode. The default `core` profile omits the optional design
@@ -128,6 +128,7 @@ Pi session artifacts and writes `~/.pi/agent/reports/`.
 | `fp-refine` | Transform imperative code into functional-programming-first structures |
 | `frame-goals-constraints` | Turn complex product and system direction into a living, customer-legible product thesis |
 | `git-status-report` | Report git sync status of repo and submodules as ASCII table |
+| `gptqueue-claude-channel` | Give Claude Code a per-project gptqueue identity (MCP + hooks), verify round-trips, and wait on replies with a non-consuming background watcher |
 | `grilling` | Hard, dependency-aware questions with human-first rendering; speculative factory research, internal debate, and a plain-language orchestrator close |
 | `grill-me` | Alias trigger that invokes the grilling skill |
 | `handoff` | Prepare a coherent commit and write a verified `NEXT_SHELL_PROMPT.md` handoff |
