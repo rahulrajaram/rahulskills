@@ -10,6 +10,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
+import activate_chasm_skills
 from activate_chasm_skills import CLAUDE_LEDGER, apply, main, prepare
 
 
@@ -93,6 +94,63 @@ class ClaudeActivationTests(unittest.TestCase):
         second = prepare("claude", self.tmp / "b2", self.home, self.snapshots)
         self.assertTrue(all(action == "unchanged" for _, action, _ in second["projection"]))
         self.assertEqual(apply(second)[0], final)
+
+    def test_partial_projection_failure_restores_projection_ledger_and_active_link(self) -> None:
+        first_bundle = write_bundle(self.tmp / "b1", {"demo": "v1\n"})
+        self.activate(first_bundle)
+        prior_active = (self.snapshots / "claude/active").resolve()
+        prior_ledger = (self.config / CLAUDE_LEDGER).read_bytes()
+
+        user_skill = self.config / "skills/user-owned"
+        user_skill.mkdir(parents=True)
+        (user_skill / "SKILL.md").write_text("keep me\n")
+
+        second_bundle = write_bundle(self.tmp / "b2", {"demo": "v2\n", "new": "new\n"})
+        plan = prepare("claude", second_bundle, self.home, self.snapshots)
+        original_write = activate_chasm_skills.write_claude_ledger
+        writes = 0
+
+        def fail_on_second_ledger_write(config: Path, entries: dict[str, str]) -> None:
+            nonlocal writes
+            writes += 1
+            if writes == 2:
+                raise RuntimeError("injected projection failure")
+            original_write(config, entries)
+
+        with mock.patch("activate_chasm_skills.write_claude_ledger", side_effect=fail_on_second_ledger_write):
+            with self.assertRaisesRegex(RuntimeError, "injected projection failure"):
+                apply(plan)
+
+        self.assertEqual((self.snapshots / "claude/active").resolve(), prior_active)
+        self.assertEqual((self.config / "skills/demo/SKILL.md").read_text(), "v1\n")
+        self.assertFalse((self.config / "skills/new").exists())
+        self.assertEqual((user_skill / "SKILL.md").read_text(), "keep me\n")
+        self.assertEqual((self.config / CLAUDE_LEDGER).read_bytes(), prior_ledger)
+
+    def test_projection_failure_preserves_external_active_link_change(self) -> None:
+        self.activate(write_bundle(self.tmp / "b1", {"demo": "v1\n"}))
+        second_bundle = write_bundle(self.tmp / "b2", {"demo": "v2\n", "new": "new\n"})
+        plan = prepare("claude", second_bundle, self.home, self.snapshots)
+        alternate = self.snapshots / "claude" / ("a" * 64) / "skills"
+        alternate.mkdir(parents=True)
+        active = self.snapshots / "claude/active"
+        original_write = activate_chasm_skills.write_claude_ledger
+        writes = 0
+
+        def fail_after_external_link_change(config: Path, entries: dict[str, str]) -> None:
+            nonlocal writes
+            writes += 1
+            if writes == 2:
+                active.unlink()
+                active.symlink_to(alternate)
+                raise RuntimeError("injected link race")
+            original_write(config, entries)
+
+        with mock.patch("activate_chasm_skills.write_claude_ledger", side_effect=fail_after_external_link_change):
+            with self.assertRaisesRegex(RuntimeError, "injected link race"):
+                apply(plan)
+
+        self.assertEqual(active.resolve(), alternate.resolve())
 
     def test_claude_config_dir_env_and_flag(self) -> None:
         bundle = write_bundle(self.tmp / "b1", {"demo": "v1\n"})
