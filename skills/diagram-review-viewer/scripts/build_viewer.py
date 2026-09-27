@@ -35,24 +35,32 @@ def required_text(config: dict, key: str) -> str:
     return value
 
 
+def reject_review_verdict(value: str, field: str) -> str:
+    if VERDICT_WORDS.search(value):
+        raise ValueError(f"{field} contains a review verdict; record it in verdict_record")
+    return value
+
+
 def change_section(config: dict, source: str, previous_bytes: bytes | None) -> str:
-    """Plain-language meaning changes first, exact line changes behind a disclosure."""
+    """Plain-language meaning changes first, changed lines behind a disclosure."""
     changes = config.get("changes")
     if previous_bytes is None and changes is None:
         return ""
     if previous_bytes is None:
-        raise ValueError("changes require --previous so the exact line changes can be shown")
+        raise ValueError("changes require --previous so changed lines can be shown")
     if not isinstance(changes, dict):
         raise ValueError("a --previous revision requires a changes object with since and summary")
-    since = required_text(changes, "since")
+    since = reject_review_verdict(required_text(changes, "since"), "changes.since")
     summary = changes.get("summary")
     if not isinstance(summary, list) or not summary or not all(
         isinstance(item, str) and item.strip() for item in summary
     ):
         raise ValueError("changes.summary must be a nonempty list of plain-language strings")
+    for item in summary:
+        reject_review_verdict(item, "changes.summary")
     previous = previous_bytes.decode("utf-8").splitlines()
-    lines = [line for line in difflib.unified_diff(previous, source.splitlines(), lineterm="", n=0)
-             if line[:1] in "+-" and not line.startswith(("+++", "---"))]
+    unified = list(difflib.unified_diff(previous, source.splitlines(), lineterm="", n=0))
+    lines = [line for line in unified[2:] if line[:1] in "+-"]
     shown = lines[:MAX_DIFF_LINES]
     exact = "".join(
         '<li class="' + ("removed" if line[0] == "-" else "added") + '">'
@@ -64,7 +72,7 @@ def change_section(config: dict, source: str, previous_bytes: bytes | None) -> s
     bullets = "".join("<li>" + html.escape(item) + "</li>" for item in summary)
     return ('<details class="rail-section changes" open><summary>What changed since '
             + html.escape(since) + '</summary><div class="rail-content"><ul>' + bullets
-            + '</ul><details class="exact-changes"><summary>Exact line changes ('
+            + '</ul><details class="exact-changes"><summary>Changed lines ('
             + str(len(lines)) + ')</summary><ul class="line-changes">' + exact + '</ul>' + more
             + '</details></div></details>')
 
@@ -79,13 +87,10 @@ def build(source_bytes: bytes, config: dict, runtime_uri: str, template: str,
     expected = config.get("expected_digest")
     if expected is not None and expected != digest:
         raise ValueError("expected_digest does not match exact Mermaid bytes")
-    title = required_text(config, "title")
-    summary = required_text(config, "summary")
-    boundary = required_text(config, "boundary")
-    revision = required_text(config, "revision")
-    if VERDICT_WORDS.search(revision):
-        raise ValueError("revision is a version label; review verdicts belong in the owner's record, "
-                         "referenced through verdict_record")
+    title = reject_review_verdict(required_text(config, "title"), "title")
+    summary = reject_review_verdict(required_text(config, "summary"), "summary")
+    boundary = reject_review_verdict(required_text(config, "boundary"), "boundary")
+    revision = reject_review_verdict(required_text(config, "revision"), "revision")
     verdict_record = config.get("verdict_record")
     if verdict_record is not None and (not isinstance(verdict_record, str) or not verdict_record.strip()):
         raise ValueError("verdict_record must be a nonempty string when present")
@@ -102,12 +107,14 @@ def build(source_bytes: bytes, config: dict, runtime_uri: str, template: str,
     for section in sections:
         if not isinstance(section, dict):
             raise ValueError("each section must be an object")
-        heading = required_text(section, "title")
+        heading = reject_review_verdict(required_text(section, "title"), "section.title")
         paragraphs = section.get("paragraphs")
         if not isinstance(paragraphs, list) or not paragraphs or not all(
             isinstance(paragraph, str) for paragraph in paragraphs
         ):
             raise ValueError("section paragraphs must be a nonempty list of strings")
+        for paragraph in paragraphs:
+            reject_review_verdict(paragraph, "section.paragraphs")
         body = "".join("<p>" + html.escape(paragraph) + "</p>" for paragraph in paragraphs)
         rail.append('<details class="rail-section"><summary>' + html.escape(heading)
                     + '</summary><div class="rail-content">' + body + '</div></details>')
@@ -152,7 +159,9 @@ def main() -> None:
         if not runtime.is_file():
             raise ValueError("runtime must be an existing local file")
         destination = args.out.resolve()
-        if destination in {args.source.resolve(), args.config.resolve(), runtime, TEMPLATE.resolve()}:
+        previous_path = args.previous.resolve() if args.previous else None
+        if destination in {args.source.resolve(), args.config.resolve(), runtime,
+                           TEMPLATE.resolve(), previous_path}:
             raise ValueError("output must not overwrite an input or template")
         config = json.loads(args.config.read_text(encoding="utf-8"))
         if not isinstance(config, dict):
