@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Claude Code hook for gptqueue: SessionStart context and a Stop gate on unread mail.
+#   gptqueue-claude-hook session-start | stop     (hook JSON arrives on stdin)
+# Fails open: any Redis or parsing problem yields no output and exit 0.
+set -uo pipefail
+here="$(dirname "$(realpath "$0")")"
+input="$(cat 2>/dev/null || true)"
+cwd="$(jq -r '.cwd // empty' <<<"$input" 2>/dev/null)"
+name="$("$here/gptqueue-claude-name" "${cwd:-$PWD}" 2>/dev/null)" || exit 0
+pending="$("$here/gptqueue-inbox-peek" --name "$name" 2>/dev/null)" || exit 0
+[[ "$pending" =~ ^[0-9]+$ ]] || exit 0
+
+consume="Consume with claim_tasks (max_batch up to 16), act on each task, then acknowledge_tasks with the claim_id. Do not use receive_message: it is an unacknowledged pop."
+
+case "${1:-}" in
+  session-start)
+    ctx="gptqueue: this session is registered as agent '$name' by the gptqueue MCP server (no register_agent call needed). Inbox: $pending pending."
+    [ "$pending" -gt 0 ] && ctx="$ctx $consume"
+    ctx="$ctx Use a distinct idempotency_key per recipient on send_message (keys are global). For long waits, run 'gptqueue-inbox-peek --watch' with run_in_background; its exit wakes you."
+    jq -n --arg c "$ctx" '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'
+    ;;
+  stop)
+    [ "$(jq -r '.stop_hook_active // false' <<<"$input" 2>/dev/null)" = "true" ] && exit 0
+    [ "$pending" -gt 0 ] || exit 0
+    jq -n --arg r "gptqueue inbox for '$name' has $pending unread message(s). $consume If none need action now, say so and stop." \
+      '{decision:"block",reason:$r}'
+    ;;
+  *) echo "usage: $0 session-start|stop" >&2; exit 2 ;;
+esac
+exit 0
