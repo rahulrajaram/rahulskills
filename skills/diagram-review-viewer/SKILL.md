@@ -19,11 +19,24 @@ it is a review package, not a diagram format or a renderer service.
    architecture/compartments, others only with cause.
 3. Rail content: 3–7 info sections. Required: a "Where we are" summary, a
    "Plain-language glossary" whenever jargon appears, an "Evidence boundary"
-   section stating what the diagram does NOT prove, and a "Review status"
-   section with the exact digest. For compartmented diagrams add one section
+   section stating what the diagram does NOT prove, and the exact digest
+   (the builder adds it). Never write a review verdict (accepted, pending
+   review, approved) anywhere on the page: the HTML is frozen at build time,
+   so a verdict goes stale the moment the owner decides. Put the location of
+   the owner's record (for MetaBuilder, its review receipt) in
+   `verdict_record`; the builder renders it as a pointer. For compartmented diagrams add one section
    enumerating the processes and what each owns, one on process boundaries
    (what may not cross), and a "Reading the shapes" legend.
-4. Version label (e.g. `v1`, `v3 · corrected after walkthrough`).
+4. Version label (e.g. `v1`, `v3 · corrected after walkthrough`). The builder
+   rejects labels containing verdict words.
+5. For a new revision of an existing diagram: the previous `.mmd` (pass it as
+   `--previous`) and a `changes` object with `since` (the earlier label) and a
+   `summary` list that states, in plain language, every change in *meaning*:
+   caveats or doubts removed, legend or color meanings redefined, status or
+   capability claims upgraded or downgraded, nodes that appeared or vanished.
+   Say whether each removed caveat was resolved (and by what evidence) or just
+   dropped. The builder shows this first and the exact line changes behind a
+   disclosure.
 
 ## Mermaid source rules
 
@@ -79,7 +92,7 @@ available. Its template bindings are:
 | --- | --- |
 | `{{VIEWER_TITLE}}` | `<title>` text |
 | `{{HEADER_TITLE}}` | `<h1>` headline |
-| `{{REVISION_LINE}}` | e.g. `Revision 2 · corrected after review · pending review` |
+| `{{REVISION_LINE}}` | e.g. `Revision 2 · corrected after review` (no verdict words) |
 | `{{BADGE}}` | `v1 · <digest8>…<digest6>` |
 | `{{DIAGRAM_ARIA}}` | aria-label for the diagram host |
 | `{{MERMAID_SOURCE_JSON}}` | full `.mmd` contents encoded as JSON for a script element |
@@ -88,9 +101,9 @@ available. Its template bindings are:
 | `{{RAIL_CONTENT}}` | the `<aside>` inner HTML (use the classes below) |
 | `{{MERMAJS_PATH}}` | URI for an already-installed `mermaid.min.js`; resolve it in the current environment and never encode a username or machine-specific path in tracked source |
 
-Digest = sha256 of the exact `.mmd` bytes. Put the full digest in the review
-status section (`<div class="digest">Exact Mermaid digest: …</div>`) and the
-short form in the badge.
+Digest = sha256 of the exact `.mmd` bytes. The builder writes the full digest
+(`<div class="digest">Exact Mermaid digest: …</div>`), the short form in the
+badge, and a `<p class="verdict">` pointer to the owner's review record.
 
 Rail section vocabulary (keep these classes):
 
