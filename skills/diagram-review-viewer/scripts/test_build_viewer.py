@@ -93,6 +93,73 @@ class ViewerTests(unittest.TestCase):
             self.assertEqual(subprocess.run(overwritten_input, capture_output=True).returncode, 2)
             self.assertEqual(source.read_text(), 'flowchart TB\n A --> B\n')
 
+            previous = root / 'previous.mmd'
+            previous.write_text('flowchart TB\n Old\n')
+            previous_original = previous.read_bytes()
+            previous_command = command[:-1] + [str(previous), '--replace', '--previous', str(previous)]
+            self.assertEqual(subprocess.run(previous_command, capture_output=True).returncode, 2)
+            self.assertEqual(previous.read_bytes(), previous_original)
+
+    def test_revision_cannot_assert_a_review_verdict(self):
+        for revision in ("v6 · pending review", "v2 accepted", "Approved v3"):
+            with self.assertRaisesRegex(ValueError, "contains a review verdict"):
+                builder.build(b"flowchart TB\n A", dict(self.config, revision=revision),
+                              "file:///tmp/m.js", self.template)
+
+    def test_authored_rail_text_cannot_assert_a_review_verdict(self):
+        cases = (
+            ("title", "Approved diagram"),
+            ("summary", "Pending review"),
+            ("boundary", "Accepted by the owner"),
+            ("sections", [{"title": "Evidence", "paragraphs": ["Under review"]}]),
+            ("changes", {"since": "v1", "summary": ["Rejected caveat"]}),
+        )
+        for field, value in cases:
+            with self.subTest(field=field), self.assertRaisesRegex(
+                    ValueError, "contains a review verdict"):
+                config = dict(self.config, **{field: value})
+                previous = b"flowchart TB\n A" if field == "changes" else None
+                builder.build(b"flowchart TB\n A", config, "file:///tmp/m.js",
+                              self.template, previous)
+
+    def test_verdict_record_is_a_pointer_and_may_describe_its_record(self):
+        config = dict(self.config, verdict_record="pending review receipt.json")
+        document, _ = builder.build(b"flowchart TB\n A", config, "file:///tmp/m.js", self.template)
+        self.assertIn("pending review receipt.json", document)
+
+    def test_changed_lines_resembling_diff_headers_are_rendered(self):
+        previous = b"flowchart TB\n A\n"
+        current = b"flowchart TB\n +++ literal\n A\n"
+        config = dict(self.config, changes={"since": "v1", "summary": ["Added a literal marker."]})
+        document, _ = builder.build(current, config, "file:///tmp/m.js", self.template, previous)
+        self.assertIn("+ +++ literal", document)
+
+    def test_page_points_to_the_verdict_owner_instead_of_claiming_one(self):
+        config = dict(self.config, verdict_record="MetaBuilder review receipt review.json")
+        document, _ = builder.build(b"flowchart TB\n A", config, "file:///tmp/m.js", self.template)
+        self.assertIn("Acceptance is not recorded on this page", document)
+        self.assertIn("MetaBuilder review receipt review.json", document)
+
+    def test_previous_revision_renders_meaning_summary_and_exact_changes(self):
+        previous = b'flowchart TB\n A["Doubt: <unchecked> limit"]\n B\n'
+        current = b"flowchart TB\n B\n C[New boundary]\n"
+        config = dict(self.config, changes={"since": "v4", "summary": ["Removed the limit doubt."]})
+        document, _ = builder.build(current, config, "file:///tmp/m.js", self.template, previous)
+        self.assertIn("What changed since v4", document)
+        self.assertIn("Removed the limit doubt.", document)
+        self.assertIn("Changed lines (2)", document)
+        self.assertIn("&lt;unchecked&gt;", document)
+        self.assertNotIn("<unchecked>", document)
+
+    def test_changes_and_previous_must_come_together(self):
+        with self.assertRaisesRegex(ValueError, "changes object"):
+            builder.build(b"flowchart TB\n B", self.config, "file:///tmp/m.js", self.template,
+                          b"flowchart TB\n A")
+        with self.assertRaisesRegex(ValueError, "require --previous"):
+            builder.build(b"flowchart TB\n B",
+                          dict(self.config, changes={"since": "v1", "summary": ["x"]}),
+                          "file:///tmp/m.js", self.template)
+
 
 if __name__ == '__main__':
     unittest.main()
