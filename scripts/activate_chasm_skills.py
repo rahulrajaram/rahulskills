@@ -183,13 +183,16 @@ def load_claude_ledger(config: Path) -> dict[str, str]:
     return dict(entries)
 
 
+def _claude_ledger_text(entries: dict[str, str]) -> str:
+    return json.dumps({"version": 1, "manager": CLAUDE_LEDGER_MANAGER, "entries": entries},
+                      indent=2, sort_keys=True) + "\n"
+
+
 def write_claude_ledger(config: Path, entries: dict[str, str]) -> None:
     descriptor, raw = tempfile.mkstemp(prefix=".chasm-ownership-", dir=config)
     try:
         with os.fdopen(descriptor, "w") as stream:
-            json.dump({"version": 1, "manager": CLAUDE_LEDGER_MANAGER, "entries": entries}, stream,
-                      indent=2, sort_keys=True)
-            stream.write("\n")
+            stream.write(_claude_ledger_text(entries))
         os.replace(raw, config / CLAUDE_LEDGER)
     finally:
         Path(raw).unlink(missing_ok=True)
@@ -235,55 +238,172 @@ def _remove_entry(path: Path) -> None:
         path.unlink()
 
 
+def _ensure_claude_target_path(config: Path, target: Path) -> None:
+    try:
+        relative = target.relative_to(config)
+    except ValueError as error:
+        raise ValueError(f"Claude target escapes config directory: {target}") from error
+    for ancestor in (config, *config.parents):
+        if ancestor.is_symlink():
+            raise ValueError(f"Refusing Claude target through symlink: {ancestor}")
+    ancestor = config
+    for part in relative.parts[:-1]:
+        if ancestor.is_symlink():
+            raise ValueError(f"Refusing Claude target through symlink: {ancestor}")
+        ancestor /= part
+    if ancestor.is_symlink():
+        raise ValueError(f"Refusing Claude target through symlink: {ancestor}")
+
+
+def _copy_entry(source: Path, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if source.is_symlink():
+        destination.symlink_to(os.readlink(source), target_is_directory=source.is_dir())
+    elif source.is_dir():
+        shutil.copytree(source, destination, symlinks=True)
+    else:
+        shutil.copy2(source, destination, follow_symlinks=False)
+
+
+def _restore_claude_projection(
+    config: Path,
+    before: dict[str, tuple[bool, Path | None, str | None]],
+    mutated: set[str],
+    ledger_before: bytes | None,
+    ledger_expected: set[bytes | None],
+    ledger_path: Path,
+) -> list[str]:
+    """Restore entries changed by projection while preserving intervening edits."""
+    errors: list[str] = []
+    for key in mutated:
+        existed, backup, expected_after = before[key]
+        target = config / key
+        try:
+            _ensure_claude_target_path(config, target)
+            current = tree_fingerprint(target)
+        except BaseException as error:
+            errors.append(f"{key}: cannot inspect target ({error})")
+            continue
+        if expected_after == "<untouched>":
+            continue
+        if expected_after is not None:
+            if expected_after == "<absent>" and current is not None:
+                continue
+            if expected_after != "<absent>" and current != expected_after:
+                continue
+        try:
+            if os.path.lexists(target):
+                _remove_entry(target)
+            if existed and backup is not None:
+                _copy_entry(backup, target)
+        except BaseException as error:
+            errors.append(f"{key}: cannot restore target ({error})")
+    try:
+        ledger_current = ledger_path.read_bytes() if ledger_path.exists() else None
+        if ledger_current in ledger_expected:
+            if ledger_before is None:
+                ledger_path.unlink(missing_ok=True)
+            else:
+                descriptor, raw = tempfile.mkstemp(prefix=".chasm-ownership-rollback-", dir=config)
+                try:
+                    with os.fdopen(descriptor, "wb") as stream:
+                        stream.write(ledger_before)
+                    os.replace(raw, ledger_path)
+                finally:
+                    Path(raw).unlink(missing_ok=True)
+    except BaseException as error:
+        errors.append(f"{CLAUDE_LEDGER}: cannot restore ledger ({error})")
+    return errors
+
+
 def apply_claude_projection(generation: Path, config: Path, plan: list[tuple[str, str, str | None]]) -> None:
     blocked = [key for key, action, _ in plan if action == "blocked"]
     if blocked:
         raise ValueError("Claude projection conflicts with unmanaged or locally edited entries: " + ", ".join(blocked))
     owned = load_claude_ledger(config)
+    _ensure_claude_target_path(config, config / CLAUDE_LEDGER)
     config.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=".chasm-skills-staging-", dir=config))
+    ledger_path = config / CLAUDE_LEDGER
+    ledger_before = ledger_path.read_bytes() if ledger_path.exists() else None
+    ledger_expected: set[bytes | None] = {ledger_before}
+    rollback: Path | None = None
+    staging: Path | None = None
     try:
-        for index, (key, action, want) in enumerate(plan):
-            target = config / key
-            current = tree_fingerprint(target)
+        rollback = Path(tempfile.mkdtemp(prefix=".chasm-projection-rollback-", dir=config))
+        before: dict[str, tuple[bool, Path | None, str | None]] = {}
+        for key, action, want in plan:
             if action in ("unchanged", "retain"):
                 continue
-            if action == "forget":
-                owned.pop(key, None)
+            target = config / key
+            _ensure_claude_target_path(config, target)
+            existed = os.path.lexists(target)
+            backup = rollback / key if existed else None
+            if existed and backup is not None:
+                _copy_entry(target, backup)
+            expected_after = want if action in ("add", "update") else "<absent>"
+            before[key] = (existed, backup, expected_after)
+        staging = Path(tempfile.mkdtemp(prefix=".chasm-skills-staging-", dir=config))
+        mutated: set[str] = set()
+        try:
+            for index, (key, action, want) in enumerate(plan):
+                target = config / key
+                _ensure_claude_target_path(config, target)
+                current = tree_fingerprint(target)
+                if action in ("unchanged", "retain"):
+                    continue
+                if action == "forget":
+                    owned.pop(key, None)
+                    ledger_expected.add(_claude_ledger_text(owned).encode())
+                    write_claude_ledger(config, owned)
+                    continue
+                # Recheck ownership immediately before touching the entry.
+                if action == "add" and current is not None:
+                    raise ValueError(f"Claude entry appeared after preview: {target}")
+                if action in ("update", "remove") and owned.get(key) != current:
+                    raise ValueError(f"Claude entry ownership changed after preview: {target}")
+                if action == "remove":
+                    _ensure_claude_target_path(config, target)
+                    mutated.add(key)
+                    _remove_entry(target)
+                    owned.pop(key, None)
+                    ledger_expected.add(_claude_ledger_text(owned).encode())
+                    write_claude_ledger(config, owned)
+                    continue
+                source = generation / key
+                staged = staging / str(index)
+                if source.is_dir():
+                    shutil.copytree(source, staged, symlinks=False)
+                else:
+                    shutil.copy2(source, staged)
+                if tree_fingerprint(staged) != want:
+                    raise ValueError(f"Snapshot changed while projecting: {source}")
+                _ensure_claude_target_path(config, target)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                retired = staging / f"{index}.old"
+                mutated.add(key)
+                if current is not None:
+                    os.replace(target, retired)
+                try:
+                    os.replace(staged, target)
+                except OSError:
+                    if os.path.lexists(retired) and not os.path.lexists(target):
+                        os.replace(retired, target)
+                    raise
+                owned[key] = want
+                ledger_expected.add(_claude_ledger_text(owned).encode())
                 write_claude_ledger(config, owned)
-                continue
-            # Recheck ownership immediately before touching the entry.
-            if action == "add" and current is not None:
-                raise ValueError(f"Claude entry appeared after preview: {target}")
-            if action in ("update", "remove") and owned.get(key) != current:
-                raise ValueError(f"Claude entry ownership changed after preview: {target}")
-            if action == "remove":
-                _remove_entry(target)
-                owned.pop(key, None)
-                write_claude_ledger(config, owned)
-                continue
-            source = generation / key
-            staged = staging / str(index)
-            if source.is_dir():
-                shutil.copytree(source, staged, symlinks=False)
-            else:
-                shutil.copy2(source, staged)
-            if tree_fingerprint(staged) != want:
-                raise ValueError(f"Snapshot changed while projecting: {source}")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            retired = staging / f"{index}.old"
-            if current is not None:
-                os.replace(target, retired)
-            try:
-                os.replace(staged, target)
-            except OSError:
-                if os.path.lexists(retired) and not os.path.lexists(target):
-                    os.replace(retired, target)
-                raise
-            owned[key] = want
-            write_claude_ledger(config, owned)
+        except BaseException as error:
+            rollback_errors = _restore_claude_projection(
+                config, before, mutated, ledger_before, ledger_expected, ledger_path
+            )
+            if rollback_errors:
+                error.add_note("Claude projection rollback incomplete: " + "; ".join(rollback_errors))
+            raise
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
+        if rollback is not None:
+            shutil.rmtree(rollback, ignore_errors=True)
 
 
 def _pi_archive_candidates(pi_root: Path, final_names: set[str], *, include_broken: bool = False) -> list[Path]:
@@ -420,19 +540,40 @@ def apply(plan: dict) -> tuple[Path, Path | None, Path | None]:
                 target = archive_path / entry.name
                 os.replace(entry, target)
                 moved.append((entry, target))
-    except Exception:
+    except BaseException as error:
+        rollback_errors: list[str] = []
         for source, target in reversed(moved):
-            if os.path.lexists(target) and not os.path.lexists(source):
-                os.replace(target, source)
-        if archive_path and archive_path.exists() and not any(archive_path.iterdir()):
-            archive_path.rmdir()
+            try:
+                if os.path.lexists(target) and not os.path.lexists(source):
+                    os.replace(target, source)
+            except BaseException as rollback_error:
+                rollback_errors.append(f"Pi archive {source}: cannot restore ({rollback_error})")
+        if archive_path:
+            try:
+                if archive_path.exists() and not any(archive_path.iterdir()):
+                    archive_path.rmdir()
+            except BaseException as rollback_error:
+                rollback_errors.append(f"Pi archive {archive_path}: cannot remove ({rollback_error})")
         # Restore the prior discovery link after an archive or projection failure.
-        if expected_old:
-            rollback_link = link.parent / f".rollback-{os.getpid()}-{time.time_ns()}"
-            os.symlink(str(expected_old), rollback_link)
-            os.replace(rollback_link, link)
-        else:
-            link.unlink(missing_ok=True)
+        try:
+            current_after = _active_snapshot(link, snapshot_root, runtime)
+        except ValueError:
+            current_after = None
+        except BaseException as rollback_error:
+            current_after = None
+            rollback_errors.append(f"Active link: cannot inspect ({rollback_error})")
+        if current_after == final / "skills":
+            try:
+                if expected_old:
+                    rollback_link = link.parent / f".rollback-{os.getpid()}-{time.time_ns()}"
+                    os.symlink(str(expected_old), rollback_link)
+                    os.replace(rollback_link, link)
+                else:
+                    link.unlink(missing_ok=True)
+            except BaseException as rollback_error:
+                rollback_errors.append(f"Active link: cannot restore ({rollback_error})")
+        if rollback_errors:
+            error.add_note("Activation rollback incomplete: " + "; ".join(rollback_errors))
         raise
     return final, expected_old, archive_path
 

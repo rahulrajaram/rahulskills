@@ -183,7 +183,7 @@ def guest_status(sandbox: str = "development", prefix: list[str] | None = None) 
     raise RuntimeError("selected sandbox does not exist")
 
 
-GUEST_APPLY = r'''import base64, hashlib, json, os, pathlib, re, stat, sys, tempfile
+GUEST_APPLY = r'''import base64, hashlib, json, os, pathlib, re, shutil, stat, sys, tempfile
 payload = json.load(sys.stdin)
 runtime_paths = {"pi": ("/workspace/.agent-skills/pi", "/home/agent/.pi/agent/skills/host-synced"), "codex": ("/workspace/.agent-skills/codex", "/home/agent/.codex/skills/host-synced"), "claude": ("/workspace/.agent-skills/claude", "/workspace/.agent-skills/claude/active")}
 guest_home = pathlib.PurePosixPath("/home/agent")
@@ -349,26 +349,100 @@ def plan_projection(gen, config):
     return plan
 
 def apply_projection(gen, config, plan):
-    import shutil
     owned = load_ledger(config)
+    for ancestor in (config, *config.parents):
+        if ancestor.is_symlink():
+            raise SystemExit("Claude config ancestor became a symlink: " + str(ancestor))
     config.mkdir(mode=0o700, parents=True, exist_ok=True)
-    staging = pathlib.Path(tempfile.mkdtemp(prefix=".chasm-skills-staging-", dir=config))
+    staging = None
+    rollback = None
+    ledger_path = config / LEDGER
+    prior_ledger = ledger_path.read_bytes() if ledger_path.exists() else None
+    ledger_versions = []
+    prior_entries = {}
+    mutated = []
+
+    def save_ledger():
+        write_ledger(config, owned)
+        ledger_versions.append(ledger_path.read_bytes())
+
+    def validate_restore_target(target):
+        for ancestor in (config, *config.parents):
+            if ancestor.is_symlink():
+                raise OSError("Claude config ancestor became a symlink: " + str(ancestor))
+        try:
+            relative = target.relative_to(config)
+        except ValueError as error:
+            raise OSError("rollback target escaped Claude config") from error
+        current = config
+        for part in relative.parts[:-1]:
+            current /= part
+            if current.is_symlink():
+                raise OSError("rollback target has a symlinked ancestor: " + str(current))
+
+    def restore_entry(key, action, want):
+        target = config / key
+        validate_restore_target(target)
+        _, existed = prior_entries[key]
+        current = fingerprint(target)
+        changed_by_us = ((action == "add" and current == want)
+                         or (action == "update" and current == want)
+                         or (action == "remove" and current is None))
+        if not changed_by_us:
+            return
+        if os.path.lexists(target):
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+        if existed:
+            backup = rollback / key
+            target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+            if backup.is_dir() and not backup.is_symlink():
+                shutil.copytree(backup, target, symlinks=True)
+            elif backup.is_symlink():
+                target.symlink_to(os.readlink(backup))
+            else:
+                shutil.copy2(backup, target, follow_symlinks=False)
+
     try:
+        staging = pathlib.Path(tempfile.mkdtemp(prefix=".chasm-skills-staging-", dir=config))
+        rollback = pathlib.Path(tempfile.mkdtemp(prefix=".chasm-skills-rollback-", dir=config))
+        for key, action, _ in plan:
+            if action in ("unchanged", "retain"):
+                continue
+            target = config / key
+            validate_restore_target(target)
+            before = fingerprint(target)
+            backup = rollback / key
+            if os.path.lexists(target):
+                backup.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+                if target.is_dir() and not target.is_symlink():
+                    shutil.copytree(target, backup, symlinks=True)
+                elif target.is_symlink():
+                    backup.symlink_to(os.readlink(target))
+                else:
+                    shutil.copy2(target, backup, follow_symlinks=False)
+            prior_entries[key] = (before, os.path.lexists(target))
         for index, (key, action, want) in enumerate(plan):
-            target, cur = config / key, fingerprint(config / key)
+            target = config / key
+            validate_restore_target(target)
+            cur = fingerprint(target)
             if action in ("unchanged", "retain"):
                 continue
             if action == "forget":
-                owned.pop(key, None); write_ledger(config, owned); continue
+                owned.pop(key, None); save_ledger(); continue
             if (action == "add" and cur is not None) or (action in ("update", "remove") and owned.get(key) != cur):
                 raise SystemExit("claude entry changed during projection: " + key)
             if action == "remove":
                 shutil.rmtree(target) if target.is_dir() and not target.is_symlink() else target.unlink()
-                owned.pop(key, None); write_ledger(config, owned); continue
+                mutated.append((key, action, want))
+                owned.pop(key, None); save_ledger(); continue
             staged, retired = staging / str(index), staging / (str(index) + ".old")
             (shutil.copytree(gen / key, staged, symlinks=False) if (gen / key).is_dir() else shutil.copy2(gen / key, staged))
             if fingerprint(staged) != want:
                 raise SystemExit("generation changed while projecting")
+            validate_restore_target(target)
             target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
             if cur is not None:
                 os.replace(target, retired)
@@ -379,9 +453,35 @@ def apply_projection(gen, config, plan):
                     os.replace(retired, target)
                 raise
             owned[key] = want
-            write_ledger(config, owned)
+            mutated.append((key, action, want))
+            save_ledger()
+    except BaseException:
+        rollback_errors = []
+        for key, action, want in reversed(mutated):
+            try:
+                restore_entry(key, action, want)
+            except BaseException as error:
+                rollback_errors.append(key + ": " + str(error))
+        try:
+            validate_restore_target(ledger_path)
+            current_ledger = ledger_path.read_bytes() if ledger_path.exists() else None
+            if current_ledger in ledger_versions or current_ledger == prior_ledger:
+                if prior_ledger is None:
+                    ledger_path.unlink(missing_ok=True)
+                else:
+                    temporary = ledger_path.with_name("." + ledger_path.name + ".rollback")
+                    temporary.write_bytes(prior_ledger)
+                    os.replace(temporary, ledger_path)
+        except BaseException as error:
+            rollback_errors.append("ledger: " + str(error))
+        if rollback_errors:
+            print("rollback incomplete: " + "; ".join(rollback_errors), file=sys.stderr)
+        raise
     finally:
-        shutil.rmtree(staging, ignore_errors=True)
+        if staging is not None:
+            shutil.rmtree(staging, ignore_errors=True)
+        if rollback is not None:
+            shutil.rmtree(rollback, ignore_errors=True)
 
 projection = None
 if payload["runtime"] == "claude":
@@ -394,16 +494,32 @@ if payload["runtime"] == "claude":
     if conflicts:
         raise SystemExit("claude projection conflicts with unmanaged or locally edited entries: " + ", ".join(conflicts))
 unchanged = link.is_symlink() and os.readlink(link) == str(generation / "skills")
-if not unchanged:
-    link.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
-    temporary = link.with_name(".host-synced." + str(os.getpid()))
-    temporary.symlink_to(generation / "skills")
-    os.replace(temporary, link)
-result = {"generation": str(generation), "link": str(link), "hash": payload["hash"], "unchanged": unchanged}
-if projection is not None:
-    apply_projection(generation, config, projection)
-    result["claude_config"] = str(config)
-    result["projection"] = {key: action for key, action, _ in projection if action != "unchanged"}
+prior_link_target = os.readlink(link) if link.is_symlink() else None
+try:
+    if not unchanged:
+        link.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+        temporary = link.with_name(".host-synced." + str(os.getpid()))
+        temporary.symlink_to(generation / "skills")
+        os.replace(temporary, link)
+    result = {"generation": str(generation), "link": str(link), "hash": payload["hash"], "unchanged": unchanged}
+    if projection is not None:
+        apply_projection(generation, config, projection)
+        result["claude_config"] = str(config)
+        result["projection"] = {key: action for key, action, _ in projection if action != "unchanged"}
+except BaseException:
+    try:
+        if any(path.is_symlink() for path in (link.parent, *link.parent.parents)):
+            raise OSError("active link has a symlinked ancestor")
+        if link.is_symlink() and os.readlink(link) == str(generation / "skills"):
+            if prior_link_target is None:
+                link.unlink(missing_ok=True)
+            else:
+                temporary = link.with_name(".rollback-link." + str(os.getpid()))
+                temporary.symlink_to(prior_link_target)
+                os.replace(temporary, link)
+    except BaseException as rollback_error:
+        print("rollback incomplete: active link: " + str(rollback_error), file=sys.stderr)
+    raise
 print(json.dumps(result))
 '''
 

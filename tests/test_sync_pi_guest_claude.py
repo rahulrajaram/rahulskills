@@ -22,10 +22,10 @@ def guest(tmp_path):
     home.mkdir()
     code = sync.GUEST_APPLY.replace("/workspace/.agent-skills/claude", str(root)).replace("/home/agent", str(home))
 
-    def run(manifest, config=None):
+    def run(manifest, config=None, code_override=None):
         payload = {**manifest, "runtime": "claude", "root": str(root), "link": str(root / "active"),
                    "claude_config": str(config or home / ".claude")}
-        return subprocess.run([sys.executable, "-I", "-c", code], input=json.dumps(payload),
+        return subprocess.run([sys.executable, "-I", "-c", code_override or code], input=json.dumps(payload),
                               text=True, capture_output=True)
     return run, home / ".claude", root
 
@@ -94,6 +94,58 @@ def test_claude_refuses_unmanaged_or_edited_entries_before_switching(tmp_path, g
     assert result.returncode != 0 and "locally edited" in result.stderr
     assert (clash / "SKILL.md").read_text() == "guest edit"
     assert (root / "active").resolve() == root / manifest["hash"] / "skills"
+
+
+def test_claude_projection_rolls_back_partial_failure(tmp_path, guest):
+    run, config, root = guest
+    first, _ = source_tree(tmp_path / "first", {"demo": "v1", "remove-me": "old"})
+    assert run(first).returncode == 0
+    prior_link = (root / "active").resolve()
+    prior_ledger = (config / ".chasm-skills-ownership.json").read_bytes()
+
+    second, _ = source_tree(tmp_path / "second", {"demo": "v2", "new": "added"})
+    injection_point = '            mutated.append((key, action, want))\n            save_ledger()\n'
+    assert injection_point in sync.GUEST_APPLY
+    faulty_code = sync.GUEST_APPLY.replace(
+        injection_point,
+        injection_point +
+        '            if key == "skills/new": raise OSError("injected projection failure")\n',
+        1,
+    ).replace("/workspace/.agent-skills/claude", str(root)).replace("/home/agent", str(guest[1].parent))
+    result = run(second, code_override=faulty_code)
+    assert result.returncode != 0
+    assert (root / "active").resolve() == prior_link
+    assert (config / "skills/demo/SKILL.md").read_text() == "v1"
+    assert (config / "skills/remove-me/SKILL.md").read_text() == "old"
+    assert not (config / "skills/new").exists()
+    assert (config / ".chasm-skills-ownership.json").read_bytes() == prior_ledger
+
+
+def test_claude_projection_reports_unsafe_rollback_target(tmp_path, guest):
+    run, config, root = guest
+    first, _ = source_tree(tmp_path / "first", {"demo": "v1"})
+    assert run(first).returncode == 0
+    prior_link = (root / "active").resolve()
+    second, _ = source_tree(tmp_path / "second", {"demo": "v2", "new": "added"})
+    injection_point = '            mutated.append((key, action, want))\n            save_ledger()\n'
+    assert injection_point in sync.GUEST_APPLY
+    faulty_code = sync.GUEST_APPLY.replace(
+        injection_point,
+        injection_point +
+        '            if key == "skills/new":\n'
+        '                outside = config.parent / "outside"\n'
+        '                outside.mkdir()\n'
+        '                (config / "skills").rename(config / "skills-real")\n'
+        '                (config / "skills").symlink_to(outside)\n'
+        '                raise OSError("injected rollback symlink")\n',
+        1,
+    ).replace("/workspace/.agent-skills/claude", str(root)).replace("/home/agent", str(guest[1].parent))
+    result = run(second, code_override=faulty_code)
+    assert result.returncode != 0
+    assert "rollback incomplete" in result.stderr
+    assert (root / "active").resolve() == prior_link
+    assert (config / "skills").is_symlink()
+    assert not (config.parent / "outside" / "demo").exists()
 
 
 def test_claude_config_outside_guest_home_is_rejected(tmp_path, guest):
