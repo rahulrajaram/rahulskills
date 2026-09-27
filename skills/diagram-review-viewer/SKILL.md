@@ -35,8 +35,8 @@ it is a review package, not a diagram format or a renderer service.
    caveats or doubts removed, legend or color meanings redefined, status or
    capability claims upgraded or downgraded, nodes that appeared or vanished.
    Say whether each removed caveat was resolved (and by what evidence) or just
-   dropped. The builder shows this first and the exact line changes behind a
-   disclosure.
+   dropped. The builder shows this first and the changed lines behind a
+   disclosure, capped at 200 lines.
 
 ## Mermaid source rules
 
