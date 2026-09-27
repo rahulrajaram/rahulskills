@@ -11,11 +11,17 @@ Use an existing working Figma connection. A request to inspect or implement a de
 
 ## Authorized setup options
 
-Confirm the installed client's supported commands with `codex mcp add --help` and `codex mcp login --help`. For a selected OAuth setup, add the server only if it is missing, then authenticate as needed:
+For Codex, confirm the installed client's supported commands with `codex mcp add --help` and `codex mcp login --help`. For a selected OAuth setup, add the server only if it is missing, then authenticate as needed:
 
 ```bash
 codex mcp add figma --url https://mcp.figma.com/mcp
 codex mcp login figma
+```
+
+In Claude Code, confirm with `claude mcp add --help` and `claude mcp list`, add the server only if it is missing (default scope is `local`; `--scope user` makes it available in every project), then authenticate interactively with `/mcp` inside a Claude Code session:
+
+```bash
+claude mcp add --transport http figma https://mcp.figma.com/mcp
 ```
 
 Do not change feature flags or force a restart from an old example. Follow the actual client's reload/login requirements; if a user action is still required, preserve the completed preparation and identify the remaining step.

@@ -18,6 +18,7 @@ with `env_mode="caller_only"` and an explicit mapping:
 
 ```
 PATH=$HOME/.opencode/bin:$HOME/.local/bin:<runtime bins>:/usr/local/bin:/usr/bin:/bin
+     # $HOME/.local/bin holds the native `claude` launcher; keep only bins the child needs
 HOME=<operator-home>
 LOGNAME=<operator>  USER=<operator>  SHELL=<login shell>  TERM=xterm-256color
 XDG_RUNTIME_DIR=/run/user/<uid>      # add CARGO_NET_OFFLINE=true for cargo work
@@ -113,6 +114,19 @@ claims manually before retrying; the bridge does not promise exactly-once
 notification or authorize the next task. Prove the installed wake path before
 promising unattended continuation. Without a verified bridge, retain the task
 handle and report that an agent turn is still needed to collect completion.
+
+In Claude Code, the native wake path is the Bash tool's `run_in_background`:
+launch a blocking terminal wait such as `overwatch events <task_id> --follow`
+as a background Bash command, and Claude Code re-invokes the same session when
+that command exits. Then collect `overwatch status`/`receipt` as the terminal
+evidence; the re-invocation itself proves only that the wait command ended. A
+host-provided monitor tool, when present, may stream the same events. Stop,
+Notification, or PostToolUse hooks in `settings.json` can also signal
+completion, but adding or changing hooks is a settings change that needs its
+own authorization. Do not use `ow-run --target-session` or `ow-child` for a
+Claude session: they address OpenCode sessions only. A background command does
+not survive the Claude session ending; if the session may end first, retain the
+task id and report that a later turn must collect completion.
 
 The read-only inspector depends on the installed OpenCode database schema;
 a missing database, schema mismatch, or empty result is not evidence of completion.

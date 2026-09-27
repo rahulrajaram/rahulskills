@@ -5,11 +5,13 @@ SKILLS_DIR="$(cd "$(dirname "$0")" && pwd)"
 CODEX_SRC="${CODEX_SKILLS_DIR:-$HOME/.codex/skills}"
 CODEX_SYSTEM_SRC="${CODEX_SYSTEM_SKILLS_DIR:-$CODEX_SRC/.system}"
 PI_SRC="${PI_SKILLS_DIR:-$HOME/.pi/agent/skills}"
-CLAUDE_SRC="$HOME/.claude/skills"
+CLAUDE_SRC="${CLAUDE_SKILLS_DIR:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills}"
 OPENCODE_SRC="${OPENCODE_SKILLS_DIR:-$HOME/.config/opencode/skills}"
 REPO_SKILLS_DIR="$SKILLS_DIR/skills"
 BUILD_DIR="$SKILLS_DIR/build"
 STITCH_SCRIPT="$SKILLS_DIR/stitch-skills.sh"
+PI_INSTALLER="$SKILLS_DIR/install-pi-skills.sh"
+OPENCODE_INSTALLER="$SKILLS_DIR/install-opencode-skills.sh"
 RUNTIME_EXCLUSIONS_DIR="$SKILLS_DIR/runtime-exclusions"
 CAPABILITY_CATALOG="$SKILLS_DIR/capabilities/skills.toml"
 
@@ -64,23 +66,26 @@ count_skill_names() {
 
 usage() {
     cat <<'USAGE'
-Usage: sync-skills.sh <command>
+Usage: sync-skills.sh <command> [options]
 
 Commands:
   pull      Copy skills FROM installed locations INTO this repo
-  push      Assemble and install skills to all CLI locations
+  push      Install selected skills to every runtime: stitched copies for
+            Claude and Codex, repository links for Pi and opencode.
+            Options: --runtime claude|codex|pi|opencode (repeatable; default
+            all four), --profile/--skill (selection), --adopt-source.
   diff      Show differences between assembled output and installed skills
   status    List which skills exist where
-  source-coverage          Verify every installed Pi/Codex skill is represented here
+  source-coverage          Verify every installed Pi/Codex/Claude skill is represented here
   compare-implementations  Compare skill parity across repo, Codex, and Claude
   audit-catalog            Audit loaded roots for divergent names and bloat
   capability-health        Report unavailable command/MCP/platform dependencies
 
-Installed locations:
-  Codex skills:     ~/.codex/skills/
-  Pi skills:        ~/.pi/agent/skills/
-  Claude skills:    ~/.claude/skills/
-  opencode skills:  ~/.config/opencode/skills/
+Installed locations (override with the named environment variable):
+  Codex skills:     ~/.codex/skills/              CODEX_SKILLS_DIR
+  Pi skills:        ~/.pi/agent/skills/           PI_SKILLS_DIR
+  Claude skills:    ${CLAUDE_CONFIG_DIR:-~/.claude}/skills/  CLAUDE_SKILLS_DIR
+  opencode skills:  ~/.config/opencode/skills/    OPENCODE_SKILLS_DIR
 USAGE
     exit 1
 }
@@ -266,8 +271,54 @@ pull() {
 }
 
 push() {
-    echo "Delegating to stitch-skills.sh install ..."
-    "$STITCH_SCRIPT" install
+    # Claude and Codex need stitched copies (overlays applied), so they go
+    # through stitch-skills.sh. Pi and opencode read canonical sources, so they
+    # get ownership-tracked links. Each installer previews its own ownership
+    # boundary before applying; a conflict stops the push at that runtime and
+    # leaves runtimes already applied in place.
+    local runtimes=() selection=() stitch_runtimes=() link_extra=() runtime
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --runtime)
+                [[ $# -ge 2 ]] || usage
+                case "$2" in
+                    claude|codex|pi|opencode) runtimes+=("$2") ;;
+                    *) echo "ERROR: unknown runtime: $2" >&2; return 2 ;;
+                esac
+                shift 2 ;;
+            --profile|--skill)
+                [[ $# -ge 2 ]] || usage
+                selection+=("$1" "$2"); shift 2 ;;
+            --adopt-source) link_extra+=("$1"); shift ;;
+            *) usage ;;
+        esac
+    done
+    [[ ${#runtimes[@]} -gt 0 ]] || runtimes=(claude codex pi opencode)
+    for runtime in "${runtimes[@]}"; do
+        case "$runtime" in claude|codex) stitch_runtimes+=(--runtime "$runtime") ;; esac
+    done
+    if [[ ${#stitch_runtimes[@]} -gt 0 ]]; then
+        # Assemble privately so a push never replaces or backs up build/.
+        local work_dir
+        work_dir="$(mktemp -d "${TMPDIR:-/tmp}/rahulskills-push.XXXXXX")"
+        echo "Installing stitched copies via stitch-skills.sh install ${stitch_runtimes[*]} ..."
+        if ! "$STITCH_SCRIPT" install "${stitch_runtimes[@]}" --output "$work_dir/assembled" \
+                "${selection[@]}" "${link_extra[@]}"; then
+            rm -rf -- "$work_dir"
+            return 1
+        fi
+        rm -rf -- "$work_dir"
+    fi
+    for runtime in "${runtimes[@]}"; do
+        case "$runtime" in
+            pi)
+                echo "Linking Pi skills via install-pi-skills.sh ..."
+                "$PI_INSTALLER" "${selection[@]}" "${link_extra[@]}" ;;
+            opencode)
+                echo "Linking opencode skills via install-opencode-skills.sh ..."
+                "$OPENCODE_INSTALLER" "${selection[@]}" "${link_extra[@]}" ;;
+        esac
+    done
 }
 
 do_diff() {
@@ -278,7 +329,7 @@ do_diff() {
     # Reusing a prior build can reverse the apparent direction of runtime drift.
     "$STITCH_SCRIPT" assemble
 
-    echo "=== Codex skills (~/.codex/skills/) ==="
+    echo "=== Codex skills ($CODEX_SRC) ==="
     for skill_dir in "$BUILD_DIR/codex/skills"/*/; do
         [[ -d "$skill_dir" ]] || continue
         skill_name="$(basename "$skill_dir")"
@@ -302,7 +353,7 @@ do_diff() {
     done < <(list_skill_names "$CODEX_SRC")
 
     echo ""
-    echo "=== Pi skills (~/.pi/agent/skills/) ==="
+    echo "=== Pi skills ($PI_SRC) ==="
     for skill_dir in "$REPO_SKILLS_DIR"/*/; do
         [[ -d "$skill_dir" ]] || continue
         skill_name="$(basename "$skill_dir")"
@@ -325,7 +376,7 @@ do_diff() {
     done < <(list_skill_names "$PI_SRC")
 
     echo ""
-    echo "=== Claude skills (~/.claude/skills/) ==="
+    echo "=== Claude skills ($CLAUDE_SRC) ==="
     for skill_dir in "$BUILD_DIR/claude/skills"/*/; do
         [[ -d "$skill_dir" ]] || continue
         skill_name="$(basename "$skill_dir")"
@@ -423,12 +474,12 @@ source_coverage() {
     local root
     local label
 
-    for root in "$CODEX_SRC" "$PI_SRC"; do
-        if [[ "$root" == "$CODEX_SRC" ]]; then
-            label="codex"
-        else
-            label="pi"
-        fi
+    for root in "$CODEX_SRC" "$PI_SRC" "$CLAUDE_SRC"; do
+        case "$root" in
+            "$CODEX_SRC") label="codex" ;;
+            "$PI_SRC") label="pi" ;;
+            *) label="claude" ;;
+        esac
         while IFS= read -r skill; do
             if is_excluded "$skill"; then
                 continue
@@ -453,7 +504,7 @@ source_coverage() {
     done < <(list_skill_names "$CODEX_SYSTEM_SRC")
 
     if [[ "$has_issue" -eq 0 ]]; then
-        echo "PASS: every installed Pi and Codex skill has package source or a Codex runtime-owned catalog entry."
+        echo "PASS: every installed Pi, Codex, and Claude skill has package source or a Codex runtime-owned catalog entry."
     else
         echo "FAIL: installed skills are missing from package source or runtime ownership metadata."
         return 1
@@ -505,7 +556,7 @@ status() {
 
 case "$1" in
     pull)   pull ;;
-    push)   push ;;
+    push)   push "${@:2}" ;;
     diff)   do_diff ;;
     compare-implementations) compare_implementations ;;
     source-coverage) source_coverage ;;

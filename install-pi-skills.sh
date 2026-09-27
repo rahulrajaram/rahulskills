@@ -16,6 +16,8 @@ usage() {
         '  -n, --dry-run, --preview   Read-only migration and ownership preview' \
         '  --pi-root PATH            Runtime root (default ~/.pi/agent)' \
         '  --remove NAME             Explicitly remove an unselected owned link' \
+        '  --adopt-source            Re-root a ledger written by another checkout;' \
+        '                            links then point at this checkout' \
         'Runtime exclusions apply. Unrelated links and user-managed copies remain.'
 }
 
@@ -28,6 +30,7 @@ while [[ $# -gt 0 ]]; do
         --remove)
             [[ $# -ge 2 ]] || { usage >&2; exit 2; }
             REMOVAL_ARGS+=("$1" "$2"); shift 2 ;;
+        --adopt-source) REMOVAL_ARGS+=("$1"); shift ;;
         --pi-root)
             [[ $# -ge 2 ]] || { usage >&2; exit 2; }
             PI_SKILLS_DIR="$2/skills"; shift 2 ;;

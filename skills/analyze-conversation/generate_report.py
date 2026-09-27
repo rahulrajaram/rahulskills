@@ -14,6 +14,7 @@ from pathlib import Path
 
 # Import from analyzer and patterns modules
 sys.path.insert(0, os.path.dirname(__file__))
+import session_discovery
 from analyzer import analyze_conversation
 from redaction import redact_sensitive_text
 from patterns import (
@@ -383,46 +384,70 @@ def normalize_codex_conversation(conversation_file: str) -> str:
 
 def find_current_codex_conversation_file() -> str:
     """Find the most recently updated Codex session JSONL."""
-    sessions_dir = Path.home() / ".codex" / "sessions"
-    candidates = sorted(
-        sessions_dir.glob("**/*.jsonl"),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-    if not candidates:
-        raise FileNotFoundError("No Codex JSONL sessions found under ~/.codex/sessions")
-    return str(candidates[0])
+    return find_current_conversation_file("codex")
 
 
-def find_conversation_file(conversation_id=None):
-    """Find conversation JSONL file."""
-    if conversation_id == "--current":
-        return find_current_codex_conversation_file()
-    if conversation_id:
-        # Search in .claude/projects/
-        projects_dir = Path.home() / ".claude" / "projects"
-        if projects_dir.exists():
-            for project_dir in projects_dir.iterdir():
-                try:
-                    is_project_dir = project_dir.is_dir()
-                except PermissionError:
-                    continue
-                if not is_project_dir:
-                    continue
-                conv_file = project_dir / f"{conversation_id}.jsonl"
-                try:
-                    if conv_file.exists():
-                        return str(conv_file)
-                except PermissionError:
-                    continue
-        # Search Codex sessions by id or filename fragment.
-        sessions_dir = Path.home() / ".codex" / "sessions"
-        for conv_file in sessions_dir.glob("**/*.jsonl"):
-            if conversation_id in conv_file.name:
-                return str(conv_file)
-        raise FileNotFoundError(f"Conversation {conversation_id} not found")
+def find_current_conversation_file(runtime=None, cwd=None, env=None) -> str:
+    """Resolve the current session transcript for ``runtime`` (auto-detected when None).
+
+    Raises ``FileNotFoundError`` listing candidate paths (never contents) when
+    no transcript can be identified, so the caller can ask the user to choose.
+    """
+    try:
+        return str(session_discovery.current_session(runtime, cwd, env).path)
+    except session_discovery.SessionNotFound as error:
+        listing = session_discovery.describe(error.candidates)
+        raise FileNotFoundError(
+            f"{error}" + (f"; newest candidates:\n{listing}" if listing else "")
+        ) from None
+
+
+def find_conversation_file(conversation_id=None, runtime=None):
+    """Find one conversation JSONL: ``--current``/None resolves the current session."""
+    if conversation_id in (None, "--current"):
+        return find_current_conversation_file(runtime)
+    try:
+        return str(session_discovery.find_session_by_id(conversation_id, runtime).path)
+    except session_discovery.SessionNotFound as error:
+        listing = session_discovery.describe(error.candidates)
+        raise FileNotFoundError(
+            f"{error}" + (f"; matching candidates:\n{listing}" if listing else "")
+        ) from None
+
+
+def normalize_runtime_conversation(conversation_file: str, include_subagents: bool = False):
+    """Normalize Claude Code or Pi JSONL into the analyzer message shape.
+
+    Returns ``(temp_path, runtime, subagent_paths)``; ``temp_path`` is None for
+    Codex/unknown input, which the existing Codex path handles.
+    """
+    records = session_discovery.load_records(conversation_file)
+    runtime = session_discovery.detect_format(records)
+    subagents = ()
+    if runtime == "claude":
+        messages = session_discovery.normalize_claude_records(records)
+        if include_subagents:
+            messages, subagents = session_discovery.merge_claude_subagents(
+                messages, conversation_file
+            )
+    elif runtime == "pi":
+        messages = session_discovery.normalize_pi_records(records)
     else:
-        return find_current_codex_conversation_file()
+        return None, runtime, subagents
+    if not messages:
+        raise ValueError(
+            f"unsupported transcript: no supported {runtime} messages or tool events"
+        )
+    temp = tempfile.NamedTemporaryFile(
+        mode="w",
+        prefix=f"analyze-conversation-{runtime}-",
+        suffix=".jsonl",
+        delete=False,
+    )
+    with temp:
+        for message in messages:
+            temp.write(json.dumps(message) + "\n")
+    return temp.name, runtime, subagents
 
 
 # Commands that are normal development patterns - don't suggest tools for these
@@ -494,33 +519,12 @@ def check_project_context(conversation_file: str) -> dict:
         "existing_tools": [],
     }
 
-    conv_path = Path(conversation_file)
-    project_path = None
-
-    if is_codex_conversation_file(conversation_file):
-        try:
-            with open(conversation_file) as handle:
-                for line in handle:
-                    if not line.strip():
-                        continue
-                    event = json.loads(line)
-                    if event.get("type") != "session_meta":
-                        continue
-                    cwd = (event.get("payload") or {}).get("cwd")
-                    if cwd:
-                        project_path = Path(cwd)
-                    break
-        except (OSError, json.JSONDecodeError):
-            project_path = None
-
-    if project_path is None:
-        # Claude transcripts encode their project root in the parent directory.
-        project_dir_name = conv_path.parent.name
-        if project_dir_name.startswith("-"):
-            project_path = Path("/" + project_dir_name[1:].replace("-", "/"))
+    # Every supported JSONL runtime records its working directory (Claude
+    # ``cwd``, Codex ``session_meta.payload.cwd``, Pi ``session.cwd``). The
+    # Claude project-directory slug is lossy and is never decoded back.
+    project_path = session_discovery.transcript_cwd(conversation_file)
 
     if project_path is not None:
-        # Convert back to path: <project-slug> -> ~/Documents/myproject
         # Check for common documentation files
         if (project_path / "CLAUDE.md").exists():
             context["has_claude_md"] = True
@@ -569,7 +573,9 @@ def _timestamp_span_seconds(first: str, last: str) -> float:
     return max(0.0, (end - start).total_seconds())
 
 
-def generate_markdown_report(conversation_file: str, output_dir: str = None) -> str:
+def generate_markdown_report(
+    conversation_file: str, output_dir: str = None, include_subagents: bool = False
+) -> str:
     """Generate comprehensive markdown report."""
 
     try:
@@ -579,20 +585,28 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         raise
 
     codex_input = is_codex_conversation_file(conversation_file)
+    normalized_temp_file = None
+    subagent_files = ()
+    if codex_input:
+        runtime = "codex"
+        normalized_temp_file = normalize_codex_conversation(conversation_file)
+    else:
+        normalized_temp_file, runtime, subagent_files = normalize_runtime_conversation(
+            conversation_file, include_subagents
+        )
+        runtime = runtime if runtime in session_discovery.RUNTIMES else "claude"
 
-    # Create output directory
+    # Create output directory beneath the transcript's runtime home.
     if output_dir is None:
-        runtime_dir = ".codex" if codex_input else ".claude"
-        output_dir = Path.home() / runtime_dir / "retrospectives"
+        output_dir = session_discovery.runtime_home(runtime) / "retrospectives"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     original_conversation_file = conversation_file
-    analysis_file = conversation_file
-    normalized_temp_file = None
-    if codex_input:
-        normalized_temp_file = normalize_codex_conversation(conversation_file)
-        analysis_file = normalized_temp_file
+    analysis_file = normalized_temp_file or conversation_file
+    print(f"Transcript: {original_conversation_file} (runtime: {runtime})")
+    if include_subagents:
+        print(f"Included {len(subagent_files)} subagent transcript(s)")
 
     # Extract conversation ID from filename
     conv_id = Path(original_conversation_file).stem
@@ -635,8 +649,15 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
         f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
     report_lines.append(f"**Conversation File:** `{original_conversation_file}`")
+    runtime_label = {"codex": "Codex", "claude": "Claude Code", "pi": "Pi"}[runtime]
     if normalized_temp_file:
-        report_lines.append("**Runtime Adapter:** Codex JSONL normalized for analysis")
+        report_lines.append(
+            f"**Runtime Adapter:** {runtime_label} JSONL normalized for analysis"
+        )
+    if include_subagents:
+        report_lines.append(
+            f"**Subagent Transcripts Included:** {len(subagent_files)}"
+        )
     report_lines.append("")
     report_lines.append("---")
     report_lines.append("")
@@ -1065,67 +1086,122 @@ def generate_markdown_report(conversation_file: str, output_dir: str = None) -> 
     return str(report_file)
 
 
-if __name__ == "__main__":
-    if len(sys.argv) >= 2 and sys.argv[1] == "--opencode":
-        # opencode runtime: sessions live in SQLite, not JSONL. Export the
-        # selected session to a temp normalized transcript, then reuse the
-        # standard pipeline. The exported session identity is printed loudly
-        # so the analyzed session is never ambiguous.
-        import tempfile
+def _run_opencode(selector, db_override) -> int:
+    """opencode sessions live in SQLite: export to a temp normalized transcript.
 
-        from opencode_adapter import export_session, default_db
+    The exported session identity is printed loudly so the analyzed session is
+    never ambiguous.
+    """
+    from opencode_adapter import export_session, default_db
 
-        selector = sys.argv[2] if len(sys.argv) > 2 and not sys.argv[2].startswith("--") else None
-        db_override = None
-        if "--db" in sys.argv:
-            db_override = Path(sys.argv[sys.argv.index("--db") + 1])
-        db_path = db_override or default_db()
-        if not db_path.exists():
-            print(f"error: opencode.db not found at {db_path}", file=sys.stderr)
-            sys.exit(1)
-        identity = {}
-        with tempfile.TemporaryDirectory() as tmp:
-            slug = "session"
-            try:
-                pre = export_session(db_path, selector, Path(tmp) / "probe.jsonl")
-                slug = pre["slug"]
-            except SystemExit as exc:
-                print(f"error: {exc}", file=sys.stderr)
-                sys.exit(1)
-            except Exception as exc:
-                print(f"error: opencode export failed: {exc}", file=sys.stderr)
-                sys.exit(1)
-            out_path = Path(tmp) / f"{pre['id']}_{slug}.jsonl"
-            identity = export_session(db_path, selector, out_path)
-            if identity["messages"] == 0:
-                print(
-                    "error: selected session exported zero supported messages "
-                    "(empty or unsupported input) — refusing to emit a report",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+    db_path = Path(db_override) if db_override else default_db()
+    if not db_path.exists():
+        print(f"error: opencode.db not found at {db_path}", file=sys.stderr)
+        return 1
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            pre = export_session(db_path, selector, Path(tmp) / "probe.jsonl")
+        except SystemExit as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        except Exception as exc:
+            print(f"error: opencode export failed: {exc}", file=sys.stderr)
+            return 1
+        out_path = Path(tmp) / f"{pre['id']}_{pre['slug'] or 'session'}.jsonl"
+        identity = export_session(db_path, selector, out_path)
+        if identity["messages"] == 0:
             print(
-                f"Analyzing opencode session {identity['id']} ({identity['slug']}): "
-                f"{identity['title']}"
+                "error: selected session exported zero supported messages "
+                "(empty or unsupported input) — refusing to emit a report",
+                file=sys.stderr,
             )
-            output_file = generate_markdown_report(str(out_path))
-        print("\nRetrospective analysis complete!")
-        print(f"Report: {output_file}")
-        sys.exit(0)
-
-    if len(sys.argv) < 2:
-        conversation_file = find_conversation_file()
-
-    elif sys.argv[1] == "--current":
-        conversation_file = find_conversation_file("--current")
-    elif sys.argv[1] == "--id":
-        if len(sys.argv) < 3:
-            print("Error: Conversation ID required")
-            sys.exit(1)
-        conversation_file = find_conversation_file(sys.argv[2])
-    else:
-        conversation_file = sys.argv[1]
-
-    output_file = generate_markdown_report(conversation_file)
+            return 1
+        print(
+            f"Analyzing opencode session {identity['id']} ({identity['slug']}): "
+            f"{identity['title']}"
+        )
+        output_file = generate_markdown_report(str(out_path))
     print("\nRetrospective analysis complete!")
     print(f"Report: {output_file}")
+    return 0
+
+
+def build_parser():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate a retrospective report for a Claude Code, Codex, Pi, or "
+            "opencode session transcript."
+        )
+    )
+    parser.add_argument("conversation_file", nargs="?", help="explicit transcript JSONL path")
+    parser.add_argument("--current", action="store_true", help="analyze the current session (default)")
+    parser.add_argument("--id", dest="conversation_id", help="select one exact session by id")
+    parser.add_argument(
+        "--runtime",
+        choices=("auto", *session_discovery.RUNTIMES),
+        default="auto",
+        help=(
+            "runtime for --current/--id discovery; auto detects Claude Code "
+            "(CLAUDECODE), then Codex (CODEX_*), then Pi, else newest across roots"
+        ),
+    )
+    parser.add_argument(
+        "--include-subagents",
+        action="store_true",
+        help="merge Claude Code subagent transcripts (<session>/subagents/*.jsonl)",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="list newest candidate transcript paths for the cwd (no contents) and exit",
+    )
+    parser.add_argument(
+        "--opencode",
+        nargs="?",
+        const="",
+        metavar="SESSION",
+        help="analyze an opencode SQLite session (newest when no id/slug given)",
+    )
+    parser.add_argument("--db", help="opencode.db override for --opencode")
+    return parser
+
+
+def main(argv=None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    runtime = None if args.runtime == "auto" else args.runtime
+
+    if args.opencode is not None:
+        return _run_opencode(args.opencode or None, args.db)
+
+    if args.list:
+        found = (
+            session_discovery.candidates(runtime)
+            if runtime
+            else session_discovery.all_candidates()
+        )
+        print(session_discovery.describe(found[:10]) or "No candidate transcripts found.")
+        return 0
+
+    try:
+        if args.conversation_file:
+            conversation_file = args.conversation_file
+        elif args.conversation_id:
+            conversation_file = find_conversation_file(args.conversation_id, runtime)
+        else:
+            conversation_file = find_conversation_file(None, runtime)
+        output_file = generate_markdown_report(
+            conversation_file, include_subagents=args.include_subagents
+        )
+    except (OSError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 1
+    print("\nRetrospective analysis complete!")
+    print(f"Report: {output_file}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -74,6 +74,31 @@ class CapabilityCatalogTests(unittest.TestCase):
         self.assertFalse(demo["admissible"])
         self.assertFalse(demo["mcp_functionality_verified"])
 
+    def test_catalog_collisions_are_scoped_to_runtimes_that_load_both_roots(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            roots = {name: Path(tmp) / name for name in ("claude", "codex", "opencode")}
+            for index, root in enumerate(roots.values()):
+                (root / "demo").mkdir(parents=True)
+                (root / "demo" / "SKILL.md").write_text(f"---\nname: demo\n---\nvariant {index}\n")
+            split = {roots["claude"]: frozenset({"claude"}), roots["codex"]: frozenset({"codex"})}
+            report = audit_catalog.audit([roots["claude"], roots["codex"]], 400, None, split)
+            self.assertEqual(report["collisions"], {})
+            self.assertIn("demo", report["runtime_divergence"])
+            shared = {**split, roots["opencode"]: frozenset({"opencode"}),
+                      roots["claude"]: frozenset({"claude", "opencode"})}
+            report = audit_catalog.audit(list(roots.values()), 400, None, shared)
+            self.assertIn("demo", report["collisions"])
+
+    def test_default_catalog_roots_cover_every_runtime(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+                "os.environ", {"HOME": tmp, "CLAUDE_CONFIG_DIR": tmp + "/cfg"}):
+            visibility = audit_catalog.default_visibility()
+        home = Path(tmp)
+        self.assertEqual(visibility[home / "cfg/skills"], frozenset({"claude", "opencode"}))
+        self.assertIn(home / ".pi/agent/skills", visibility)
+        self.assertIn(home / ".config/opencode/skills", visibility)
+        self.assertIn(home / ".codex/skills", visibility)
+
     def test_catalog_report_exposes_inventory_and_nonsemantic_limits(self):
         report = audit_catalog.audit([ROOT / "skills"], 400, ROOT / "skills")
         self.assertTrue(report["inventory"])

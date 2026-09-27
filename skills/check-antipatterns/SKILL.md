@@ -1,7 +1,7 @@
 ---
 name: check-antipatterns
 description: "Inspect a supplied live or completed agentic session for execution anti-patterns, evidence-backed findings, and immediate course corrections. Use when checking how work was carried out or when execution feels stuck. For direct source/code review, use the separate code-review skill. Use analyze-conversation when a completed-session retrospective, durable markdown report, or longitudinal tooling analysis is wanted."
-argument-hint: "[conversation-jsonl] [--lookback N]"
+argument-hint: "[conversation-jsonl] [--lookback N] [--runtime claude|codex|pi] [--include-subagents]"
 ---
 
 # Anti-Pattern Checker
@@ -16,22 +16,45 @@ session has ended.
 
 ## Inputs and local bindings
 
-Use the supplied readable JSONL transcript path. When the runtime provides the
-current session transcript, use that path for a live check. If no path is
-provided, identify the current runtime session when available; otherwise list
-newest candidates under `~/.codex/sessions` without displaying transcript
-contents. If multiple candidates are plausible, ask the user to select one.
+Use the supplied readable JSONL transcript path. With no path, the checker
+resolves the current runtime session and prints the path it chose:
 
-The implementation is `checker.py` beside this manifest. It accepts one
-positional transcript path and the optional positive integer `--lookback`
-(default `50`):
+- `--runtime auto` (default): Claude Code when `CLAUDECODE` or
+  `CLAUDE_CODE_SESSION_ID` is set, then Codex when a `CODEX_*` session
+  variable (other than `CODEX_HOME`) is set, then Pi when `PI_CODING_AGENT` is
+  set; otherwise the newest transcript across the known roots.
+- Claude Code: `$CLAUDE_CODE_SESSION_ID` under
+  `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<slug>/`, else the newest
+  `*.jsonl` there (`<slug>` = absolute cwd with every non-alphanumeric
+  character replaced by `-`). `--include-subagents` also merges
+  `<session-id>/subagents/*.jsonl`.
+- Codex: newest `${CODEX_HOME:-~/.codex}/sessions/**/*.jsonl`.
+- Pi: newest file in `${PI_CODING_AGENT_DIR:-~/.pi/agent}/sessions/--<cwd with / as ->--/`.
+
+If no transcript is identified, the checker exits 2 and lists candidate paths
+without transcript contents (`--list` prints them directly); ask the user to
+select one when several are plausible. For a subagent checking its parent's
+live session, `CLAUDE_CODE_SESSION_ID` names the parent session.
+
+Bind `SKILL_DIR` to the absolute directory containing this `SKILL.md`: Claude
+Code supplies it as `${CLAUDE_SKILL_DIR}`; in other runtimes use the directory
+the skill was loaded from. The implementation is `checker.py` beside this
+manifest. It accepts an optional transcript path and the optional positive
+integer `--lookback` (default `50`):
 
 ```bash
-python3 "$SKILL_DIR/checker.py" <conversation-jsonl> [--lookback N]
+SKILL_DIR="${CLAUDE_SKILL_DIR:-<directory containing this SKILL.md>}"
+python3 "$SKILL_DIR/checker.py" [<conversation-jsonl>] [--lookback N] \
+  [--runtime auto|claude|codex|pi] [--include-subagents]
+python3 "$SKILL_DIR/checker.py" --list [--runtime ...]
 ```
 
-The checker normalizes current and legacy Codex event streams and Claude
-message streams. It prints to stdout and does not create a report file.
+The checker normalizes current and legacy Codex event streams, Claude Code
+message streams (tool-result records are not treated as human turns; `isMeta`
+injections are skipped), and Pi session `message` records. Its shared
+discovery and normalization module, `session_discovery.py`, is a byte-identical
+copy of the one in `analyze-conversation`. It prints to stdout and does not
+create a report file.
 
 ## Non-goals
 

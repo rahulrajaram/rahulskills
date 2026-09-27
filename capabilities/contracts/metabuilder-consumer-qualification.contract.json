@@ -4,7 +4,7 @@
     "phase_id": "qualify-harness",
     "skill": "metabuilder-consumer-qualification",
     "semantic_version": "1.2.0",
-    "guidance_digest": "dcae39a11240a838086a72183a2763cf04a422fdca9813d29d939d7b1dc9f4ea"
+    "guidance_digest": "8eb1460e02121b14d24ce427cc75fe9cf3748641f50c6f90ea384122f8cd7d1e"
   },
   "inputs": [
     {
