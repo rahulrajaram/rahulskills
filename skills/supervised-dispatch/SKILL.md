@@ -41,6 +41,37 @@ gptengage status --preflight --timeout 60 --require codex
 Typed reasons: `not-found`, `auth-expired`, `client-deprecated`, `quota`,
 `timeout`, `invocation-failed`.
 
+## Defensive-security worker briefs
+
+For an authorized defensive-security assignment, include this block in the
+worker brief using the actual grant. Omit it for unrelated work. The reroute
+bound is an exception only for this stated case, not a general model fallback.
+
+```markdown
+## Authorized defensive-security context and blocker reporting
+
+Project: <project>. Authorization: <actual grant and source>. This assignment
+is authorized defensive code review, evaluation or detection within <scope>.
+Explicitly out of scope: exploit weaponization, targeting real third-party
+systems, malware, and detection evasion. Do not claim authorization beyond the
+genuine grant or broaden the task to make this description fit.
+
+Proceed with in-scope work without re-asking permission already granted.
+If you hesitate or decline, restate the genuine context once, accurately.
+Do not reword or disguise the request to get around a refusal. Respect a
+refusal of genuinely out-of-scope work; never reroute that work.
+
+If an in-scope step is still declined, the dispatch owner may reroute it once
+to another allowed worker under the operator's preference order, using the
+same accurate context and existing authority. Rerouting must not bypass a
+safety boundary or imply a new model, capability, spend or scope grant.
+If no allowed reroute is available, or that attempt is still declined, send
+an immediate blocker packet to <parent>: exact step, verbatim decline text,
+and what was tried (including the one context restatement and any reroute).
+Never stall silently. A blocker report is a result, not permission to expand
+scope or keep retrying.
+```
+
 ## Launch patterns
 
 Single worker (detached), from the working project root:
@@ -60,6 +91,37 @@ campaign-driver queue.json            # dry-run first with --dry-run
 The driver records `results.jsonl`, per-entry event streams, and a summary under
 `~/.local/state/campaign-driver/<queue>/`, blocks dependencies on failure, skips
 already-succeeded entries, and never cancels on interrupt.
+
+## Typed packets and model-terminal acceptance
+
+Bind each worker to a versioned dispatch packet and its schema/validator digest.
+Required fixed identity: role, runtime, model, effort, cwd, write_roots,
+parent_mailbox, task_id. Carry the owner's structured authority record unchanged:
+decision_id, issuer_mailbox, issuer_session, issuer_level, scope (effect_class,
+exact target), derived_from, expiry. Structure is not authentication; verify
+transport identity, authority attenuation and any reserved-effect chain separately.
+
+Require an early checkpoint/BLOCKER before the bound early-report deadline,
+then enforce the explicit budget and stop_rule. Missing or late early evidence
+refuses success; issue a blocker instead of waiting silently. Native queue ACKs
+remain required for completed claims; do not add ACK-only conversations.
+
+The worker's final structured verdict is success/blocked/failed/cancelled/uncertain
+with fixed identity, concise summary and cited artifact evidence. The controller
+builds a result packet from the real model event stream and output, not from
+process state or a worker-authored terminal flag. Keep these separate:
+- process state and exit code;
+- last model assistant terminal and stop reason, or an explicit missing terminal;
+- final structured model verdict, evidence and acceptance result.
+
+Exit 0 or a COMPLETED receipt alone is never semantic success. Reject successful
+admission for content filtering, model error/abort, intermediate tool-use stops,
+missing assistant terminal/final output, identity drift or missing artifacts.
+If native model terminal evidence is unavailable, emit an uncertain/failed typed
+packet and the exact blocker; do not infer a terminal from wrapper shutdown.
+Run the qualified packet validator and existing artifact/acceptance verification.
+Do not report this format installed or a runtime adapter qualified merely because
+a draft schema/validator exists. No new service, model call or retry is authorized.
 
 ## Monitoring (cursor-driven, never sleep-poll)
 
